@@ -1,0 +1,39 @@
+name: campus_go
+description: Campus social networking app
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
+  firebase_core: ^3.8.1
+  firebase_auth: ^5.3.4
+  cloud_firestore: ^5.5.1
+  firebase_storage: ^12.3.7
+  image_picker: ^1.0.7
+  shared_preferences: ^2.2.2
+  # State Management
+  flutter_riverpod: ^2.4.9
+  # Swipe Cards
+  flutter_card_swiper: ^7.0.1
+  # Image Caching
+  cached_network_image: ^3.3.1
+  # Shimmer effect
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
