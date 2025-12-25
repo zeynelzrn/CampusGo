@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <b>Universite ogrencileri icin modern bir tanisma uygulamasi</b>
+  <b>Universite ogrencileri icin modern bir arkadaslik uygulamasi</b>
 </p>
 
 ---
@@ -27,18 +27,18 @@
 - Ilgi alanlari secimi
 - Biyografi ve kisisel bilgiler
 
-### Tinder Tarzi Eslestirme
-- **Saga kaydir** - Begen (LIKE)
+### Arkadas Bulma Sistemi
+- **Saga kaydir** - Arkadas ol (LIKE)
 - **Sola kaydir** - Gec (NOPE)
-- **Yukari kaydir** - Super Begen (SUPER LIKE)
+- **Yukari kaydir** - Cok begendim (SUPER LIKE)
 - Fotograflar arasi gecis (sag/sol tiklama)
 - Gorsel swipe overlay'leri
 - Haptic feedback
 
-### Eslestirme Deneyimi
-- Animasyonlu "It's a Match!" ekrani
+### Arkadaslik Deneyimi
+- Animasyonlu "Yeni Arkadas!" ekrani
 - Cift profil fotografi gorunumu
-- Yuzen kalp animasyonlari
+- Eglenceli animasyonlar
 - Mesaj gonderme secenegi
 
 ### Bildirim Sistemi
@@ -123,7 +123,7 @@ lib/
 
 - [ ] Gercek zamanli mesajlasma
 - [ ] Push bildirimleri
-- [ ] Konum bazli eslestirme
+- [ ] Konum bazli arkadas onerisi
 - [ ] Premium uyelik sistemi
 - [ ] Profil dogrulama
 
