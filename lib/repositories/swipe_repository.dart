@@ -39,9 +39,8 @@ class SwipeRepository {
 
     try {
       // Get all actions where current user is the initiator
-      final snapshot = await _actionsCollection
-          .where('fromUserId', isEqualTo: userId)
-          .get();
+      final snapshot =
+          await _actionsCollection.where('fromUserId', isEqualTo: userId).get();
 
       // Extract target user IDs
       final actionIds = <String>{};
@@ -78,7 +77,9 @@ class SwipeRepository {
           .limit(fetchBatchSize);
 
       // Apply gender filter if specified
-      if (genderFilter != null && genderFilter.isNotEmpty && genderFilter != 'Herkes') {
+      if (genderFilter != null &&
+          genderFilter.isNotEmpty &&
+          genderFilter != 'Herkes') {
         query = query.where('gender', isEqualTo: genderFilter);
       }
 
@@ -118,7 +119,8 @@ class SwipeRepository {
       });
 
       // If it's a like, check for match
-      if (actionType == SwipeActionType.like || actionType == SwipeActionType.superlike) {
+      if (actionType == SwipeActionType.like ||
+          actionType == SwipeActionType.superlike) {
         await _checkAndCreateMatch(targetUserId);
       }
 
@@ -144,7 +146,8 @@ class SwipeRepository {
         final type = data?['type'] as String?;
 
         // If mutual like, create match
-        if (type == SwipeActionType.like.name || type == SwipeActionType.superlike.name) {
+        if (type == SwipeActionType.like.name ||
+            type == SwipeActionType.superlike.name) {
           await _createMatch(userId, targetUserId);
           return true;
         }

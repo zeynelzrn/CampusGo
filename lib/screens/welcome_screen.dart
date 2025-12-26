@@ -8,7 +8,8 @@ class WelcomeScreen extends StatefulWidget {
   _WelcomeScreenState createState() => _WelcomeScreenState();
 }
 
-class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateMixin {
+class _WelcomeScreenState extends State<WelcomeScreen>
+    with TickerProviderStateMixin {
   late AnimationController _animationController;
   late AnimationController _buttonAnimationController;
   late AnimationController _backgroundController;
@@ -22,61 +23,61 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: Duration(milliseconds: 1200),
       vsync: this,
     );
-    
+
     _buttonAnimationController = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     // Arka plan için sürekli animasyon
     _backgroundController = AnimationController(
       duration: Duration(seconds: 8),
       vsync: this,
     );
-    
+
     // Floating animasyon
     _floatingController = AnimationController(
       duration: Duration(seconds: 3),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.elasticOut),
     );
-    
+
     _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: _animationController, 
+        parent: _animationController,
         curve: Interval(0.0, 0.7, curve: Curves.elasticOut),
       ),
     );
-    
+
     // Nefes alma animasyonu - logo için
     _breathingAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
       CurvedAnimation(parent: _backgroundController, curve: Curves.easeInOut),
     );
-    
+
     // Floating animasyon
     _floatingAnimation = Tween<double>(begin: -10.0, end: 10.0).animate(
       CurvedAnimation(parent: _floatingController, curve: Curves.easeInOut),
     );
-    
+
     _animationController.forward();
-    
+
     // Buton animasyonunu gecikmeli başlat
     Future.delayed(Duration(milliseconds: 600), () {
       _buttonAnimationController.forward();
     });
-    
+
     // Sürekli animasyonları başlat
     Future.delayed(Duration(milliseconds: 1500), () {
       _backgroundController.repeat(reverse: true);
@@ -127,8 +128,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           colors: [
-                            Color(0xFFFF2C60).withOpacity(0.15 * _breathingAnimation.value),
-                            Color(0xFFFFBA93).withOpacity(0.25 * _breathingAnimation.value),
+                            Color(0xFFFF2C60)
+                                .withOpacity(0.15 * _breathingAnimation.value),
+                            Color(0xFFFFBA93)
+                                .withOpacity(0.25 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -139,7 +142,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 );
               },
             ),
-            
+
             AnimatedBuilder(
               animation: _backgroundController,
               builder: (context, child) {
@@ -154,8 +157,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           colors: [
-                            Color(0xFFFFBA93).withOpacity(0.35 * _breathingAnimation.value),
-                            Color(0xFFFF2C60).withOpacity(0.15 * _breathingAnimation.value),
+                            Color(0xFFFFBA93)
+                                .withOpacity(0.35 * _breathingAnimation.value),
+                            Color(0xFFFF2C60)
+                                .withOpacity(0.15 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -166,10 +171,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 );
               },
             ),
-            
+
             // Floating partikül efektleri
-            ...List.generate(6, (index) => 
-              AnimatedBuilder(
+            ...List.generate(
+              6,
+              (index) => AnimatedBuilder(
                 animation: _floatingController,
                 builder: (context, child) {
                   double offset = _floatingAnimation.value + (index * 3);
@@ -198,7 +204,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 },
               ),
             ),
-            
+
             // Ana içerik
             FadeTransition(
               opacity: _fadeAnimation,
@@ -208,13 +214,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   child: Column(
                     children: [
                       Spacer(flex: 2),
-                      
+
                       // Logo bölümü - Canlı animasyonlarla
                       AnimatedBuilder(
-                        animation: Listenable.merge([_logoAnimation, _breathingAnimation]),
+                        animation: Listenable.merge(
+                            [_logoAnimation, _breathingAnimation]),
                         builder: (context, child) {
                           return Transform.scale(
-                            scale: _logoAnimation.value * _breathingAnimation.value,
+                            scale: _logoAnimation.value *
+                                _breathingAnimation.value,
                             child: Transform.rotate(
                               angle: (1 - _logoAnimation.value) * 0.1,
                               child: Stack(
@@ -227,8 +235,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                     decoration: BoxDecoration(
                                       gradient: RadialGradient(
                                         colors: [
-                                          Color(0xFFFF2C60).withOpacity(0.1 * _breathingAnimation.value),
-                                          Color(0xFFFF6B9D).withOpacity(0.05 * _breathingAnimation.value),
+                                          Color(0xFFFF2C60).withOpacity(
+                                              0.1 * _breathingAnimation.value),
+                                          Color(0xFFFF6B9D).withOpacity(
+                                              0.05 * _breathingAnimation.value),
                                           Colors.transparent,
                                         ],
                                       ),
@@ -263,7 +273,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                       borderRadius: BorderRadius.circular(160),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Color(0xFFFFFFFF).withOpacity(0.2),
+                                          color: Color(0xFFFFFFFF)
+                                              .withOpacity(0.2),
                                           blurRadius: 20,
                                           spreadRadius: 5,
                                         ),
@@ -285,9 +296,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           );
                         },
                       ),
-                      
+
                       Spacer(flex: 1),
-                      
+
                       // Alt başlık - Floating animasyon
                       AnimatedBuilder(
                         animation: _floatingAnimation,
@@ -310,7 +321,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                             Color(0xFFFF4081),
                                             Color(0xFFE91E63),
                                           ],
-                                        ).createShader(Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                                        ).createShader(Rect.fromLTWH(
+                                            0.0, 0.0, 200.0, 70.0)),
                                     ),
                                   ),
                                   SizedBox(height: 12),
@@ -330,17 +342,25 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           );
                         },
                       ),
-                      
+
                       Spacer(flex: 1),
-                      
+
                       // Butonlar bölümü - Hover efektleri eklenmiş
                       AnimatedBuilder(
                         animation: _buttonAnimationController,
                         builder: (context, child) {
                           return Transform.translate(
-                            offset: Offset(0, 30 * (1 - Curves.easeOutBack.transform(_buttonAnimationController.value))),
+                            offset: Offset(
+                                0,
+                                30 *
+                                    (1 -
+                                        Curves.easeOutBack.transform(
+                                            _buttonAnimationController.value))),
                             child: Transform.scale(
-                              scale: 0.8 + (0.2 * Curves.elasticOut.transform(_buttonAnimationController.value)),
+                              scale: 0.8 +
+                                  (0.2 *
+                                      Curves.elasticOut.transform(
+                                          _buttonAnimationController.value)),
                               child: Opacity(
                                 opacity: _buttonAnimationController.value,
                                 child: Column(
@@ -349,9 +369,19 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                     AnimatedBuilder(
                                       animation: _buttonAnimationController,
                                       builder: (context, child) {
-                                        double buttonDelay = (_buttonAnimationController.value - 0.2).clamp(0.0, 1.0) / 0.8;
+                                        double buttonDelay =
+                                            (_buttonAnimationController.value -
+                                                        0.2)
+                                                    .clamp(0.0, 1.0) /
+                                                0.8;
                                         return Transform.translate(
-                                          offset: Offset(-20 * (1 - Curves.easeOutCubic.transform(buttonDelay)), 0),
+                                          offset: Offset(
+                                              -20 *
+                                                  (1 -
+                                                      Curves.easeOutCubic
+                                                          .transform(
+                                                              buttonDelay)),
+                                              0),
                                           child: Transform.rotate(
                                             angle: -0.05 * (1 - buttonDelay),
                                             child: Opacity(
@@ -363,7 +393,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                                 () {
                                                   Navigator.push(
                                                     context,
-                                                    _createPageRoute(LoginScreen()),
+                                                    _createPageRoute(
+                                                        LoginScreen()),
                                                   );
                                                 },
                                               ),
@@ -372,16 +403,26 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                         );
                                       },
                                     ),
-                                    
+
                                     SizedBox(height: 16),
-                                    
+
                                     // Üye Ol butonu
                                     AnimatedBuilder(
                                       animation: _buttonAnimationController,
                                       builder: (context, child) {
-                                        double buttonDelay2 = (_buttonAnimationController.value - 0.4).clamp(0.0, 1.0) / 0.6;
+                                        double buttonDelay2 =
+                                            (_buttonAnimationController.value -
+                                                        0.4)
+                                                    .clamp(0.0, 1.0) /
+                                                0.6;
                                         return Transform.translate(
-                                          offset: Offset(20 * (1 - Curves.easeOutCubic.transform(buttonDelay2)), 0),
+                                          offset: Offset(
+                                              20 *
+                                                  (1 -
+                                                      Curves.easeOutCubic
+                                                          .transform(
+                                                              buttonDelay2)),
+                                              0),
                                           child: Transform.rotate(
                                             angle: 0.05 * (1 - buttonDelay2),
                                             child: Opacity(
@@ -393,7 +434,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                                 () {
                                                   Navigator.push(
                                                     context,
-                                                    _createPageRoute(RegisterScreen()),
+                                                    _createPageRoute(
+                                                        RegisterScreen()),
                                                   );
                                                 },
                                               ),
@@ -402,7 +444,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                                         );
                                       },
                                     ),
-                                    
                                   ],
                                 ),
                               ),
@@ -410,7 +451,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           );
                         },
                       ),
-                      
+
                       Spacer(flex: 1),
                     ],
                   ),
@@ -422,8 +463,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       ),
     );
   }
-  
-  Widget _buildAnimatedButton(String text, IconData icon, bool isPrimary, VoidCallback onPressed) {
+
+  Widget _buildAnimatedButton(
+      String text, IconData icon, bool isPrimary, VoidCallback onPressed) {
     return AnimatedBuilder(
       animation: _backgroundController,
       builder: (context, child) {
@@ -432,32 +474,40 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           height: 56,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            gradient: isPrimary ? LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFF2C60),
-                Color(0xFFFF6B9D),
-                Color(0xFFFF8BA7),
-              ],
-            ) : null,
+            gradient: isPrimary
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFF2C60),
+                      Color(0xFFFF6B9D),
+                      Color(0xFFFF8BA7),
+                    ],
+                  )
+                : null,
             color: isPrimary ? null : Colors.white.withOpacity(0.9),
-            border: isPrimary ? null : Border.all(
-              color: Color(0xFFFF2C60),
-              width: 2,
-            ),
+            border: isPrimary
+                ? null
+                : Border.all(
+                    color: Color(0xFFFF2C60),
+                    width: 2,
+                  ),
             boxShadow: [
               BoxShadow(
                 color: isPrimary
-                  ? Color(0xFFFF2C60).withOpacity(0.4 * _breathingAnimation.value)
-                  : Colors.black.withOpacity(0.05 * _breathingAnimation.value),
-                blurRadius: isPrimary ? 20 + (5 * _breathingAnimation.value) : 10,
+                    ? Color(0xFFFF2C60)
+                        .withOpacity(0.4 * _breathingAnimation.value)
+                    : Colors.black
+                        .withOpacity(0.05 * _breathingAnimation.value),
+                blurRadius:
+                    isPrimary ? 20 + (5 * _breathingAnimation.value) : 10,
                 offset: Offset(0, isPrimary ? 10 : 4),
                 spreadRadius: isPrimary ? 2 : 0,
               ),
               if (isPrimary)
                 BoxShadow(
-                  color: Colors.white.withOpacity(0.3 * _breathingAnimation.value),
+                  color:
+                      Colors.white.withOpacity(0.3 * _breathingAnimation.value),
                   blurRadius: 5,
                   offset: Offset(0, -2),
                 ),
@@ -501,7 +551,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
       },
     );
   }
-  
+
   PageRouteBuilder _createPageRoute(Widget destination) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => destination,
@@ -511,17 +561,17 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
           parent: animation,
           curve: Curves.fastOutSlowIn,
         );
-        
+
         var welcomeSlide = Tween<Offset>(
           begin: Offset.zero,
           end: Offset(-1.0, 0.0),
         ).animate(curvedAnimation);
-        
+
         var destinationSlide = Tween<Offset>(
           begin: Offset(1.0, 0.0),
           end: Offset.zero,
         ).animate(curvedAnimation);
-        
+
         return Stack(
           children: [
             SlideTransition(

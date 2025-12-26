@@ -175,7 +175,8 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
 });
 
 /// App state provider - manages auth + profile state
-final appStateProvider = StateNotifierProvider<AppStateNotifier, AppState>((ref) {
+final appStateProvider =
+    StateNotifierProvider<AppStateNotifier, AppState>((ref) {
   final repository = ref.watch(profileRepositoryProvider);
   return AppStateNotifier(repository);
 });
@@ -194,7 +195,8 @@ final hasProfileProvider = FutureProvider<bool>((ref) async {
 });
 
 /// Current user profile provider
-final currentProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+final currentProfileProvider =
+    FutureProvider<Map<String, dynamic>?>((ref) async {
   final repository = ref.watch(profileRepositoryProvider);
   return repository.getProfile();
 });

@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../repositories/profile_repository.dart';
 import 'welcome_screen.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 import 'create_profile_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -15,7 +15,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-
   late AnimationController _logoAnimationController;
   late AnimationController _dotsAnimationController;
   late Animation<double> _fadeAnimation;
@@ -89,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (hasProfile) {
         // Profil var, ana sayfaya git
-        _navigateTo(const HomeScreen());
+        _navigateTo(const MainScreen());
       } else {
         // Profil yok, profil oluşturma ekranına git
         _navigateTo(const CreateProfileScreen());
@@ -117,7 +116,8 @@ class _SplashScreenState extends State<SplashScreen>
         const begin = Offset(1.0, 0.0);
         const end = Offset.zero;
         const curve = Curves.ease;
-        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        var tween =
+            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
         return SlideTransition(position: animation.drive(tween), child: child);
       },
     );

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 class CampusGoLogo extends StatelessWidget {
   final double size;
-  
+
   const CampusGoLogo({
-    Key? key, 
-    this.size = 120, 
+    Key? key,
+    this.size = 120,
   }) : super(key: key);
 
   @override

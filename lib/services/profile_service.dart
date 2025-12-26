@@ -17,7 +17,8 @@ class ProfileService {
       if (currentUserId == null) return null;
 
       String fileName = 'photo_$photoIndex.jpg';
-      Reference ref = _storage.ref().child('users/$currentUserId/photos/$fileName');
+      Reference ref =
+          _storage.ref().child('users/$currentUserId/photos/$fileName');
 
       UploadTask uploadTask = ref.putFile(
         imageFile,
@@ -40,7 +41,8 @@ class ProfileService {
       if (currentUserId == null) return false;
 
       String fileName = 'photo_$photoIndex.jpg';
-      Reference ref = _storage.ref().child('users/$currentUserId/photos/$fileName');
+      Reference ref =
+          _storage.ref().child('users/$currentUserId/photos/$fileName');
 
       await ref.delete();
       return true;

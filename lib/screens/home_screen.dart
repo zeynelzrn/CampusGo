@@ -19,34 +19,19 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final AuthService _authService = AuthService();
   late CardSwiperController _cardSwiperController;
-  late AnimationController _matchAnimationController;
-  late Animation<double> _matchScaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _cardSwiperController = CardSwiperController();
-
-    _matchAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 500),
-      vsync: this,
-    );
-
-    _matchScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _matchAnimationController,
-        curve: Curves.elasticOut,
-      ),
-    );
   }
 
   @override
   void dispose() {
     _cardSwiperController.dispose();
-    _matchAnimationController.dispose();
     super.dispose();
   }
 
@@ -179,7 +164,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileEditScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileEditScreen()),
                 );
               },
               icon: const Icon(Icons.person, color: Color(0xFFFF2C60)),
@@ -242,7 +228,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
       child: CardSwiper(
         controller: _cardSwiperController,
         cardsCount: state.profiles.length,
-        numberOfCardsDisplayed: state.profiles.length >= 3 ? 3 : state.profiles.length,
+        numberOfCardsDisplayed:
+            state.profiles.length >= 3 ? 3 : state.profiles.length,
         backCardOffset: const Offset(0, 40),
         padding: const EdgeInsets.symmetric(vertical: 20),
         onSwipe: _onSwipe,
@@ -252,7 +239,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
           right: true,
           up: true,
         ),
-        cardBuilder: (context, index, horizontalOffsetPercentage, verticalOffsetPercentage) {
+        cardBuilder: (context, index, horizontalOffsetPercentage,
+            verticalOffsetPercentage) {
           if (index >= state.profiles.length) return const SizedBox();
 
           final profile = state.profiles[index];
@@ -351,7 +339,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF2C60),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -415,7 +404,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFF2C60),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -432,7 +422,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
@@ -524,26 +515,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
   }
 
   void _showMatchDialog(UserProfile profile) {
-    _matchAnimationController.forward(from: 0.0);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => ScaleTransition(
-        scale: _matchScaleAnimation,
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          child: MatchPopup(
-            matchedProfile: profile,
-            onSendMessage: () {
-              Navigator.pop(context);
-              // TODO: Navigate to chat screen
-            },
-            onKeepSwiping: () {
-              Navigator.pop(context);
-            },
-          ),
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => MatchPopup(
+          matchedProfile: profile,
+          onSendMessage: () {
+            Navigator.pop(context);
+            // TODO: Navigate to chat screen
+          },
+          onKeepSwiping: () {
+            Navigator.pop(context);
+          },
         ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
       ),
     );
   }

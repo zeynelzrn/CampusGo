@@ -2,13 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import '../services/profile_service.dart';
+import '../services/seed_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
-import 'welcome_screen.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -36,8 +33,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   bool _isLoading = false;
   bool _isSaving = false;
-  bool _isDeleting = false;
-
 
   final List<String> _allInterests = [
     'Müzik',
@@ -268,7 +263,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       if (success) {
         if (mounted) {
-          _showSuccess('Profil Kaydedildi', subtitle: 'Değişiklikleriniz başarıyla güncellendi');
+          _showSuccess('Profil Kaydedildi',
+              subtitle: 'Değişiklikleriniz başarıyla güncellendi');
           await Future.delayed(const Duration(milliseconds: 500));
           if (mounted) Navigator.pop(context, true);
         }
@@ -304,10 +300,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: Text(
           'Profili Düzenle',
           style: GoogleFonts.poppins(
@@ -400,7 +393,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     _buildInterestsSelector(),
                   ]),
                   const SizedBox(height: 24),
-                  _buildDeleteAccountSection(),
+                  _buildDeveloperSection(),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -467,9 +460,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         decoration: BoxDecoration(
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
-          border: isMainPhoto
-              ? Border.all(color: Colors.pink, width: 2)
-              : null,
+          border: isMainPhoto ? Border.all(color: Colors.pink, width: 2) : null,
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -633,8 +624,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           return suggestions.take(10);
         }
         final query = textEditingValue.text.toLowerCase();
-        return suggestions.where((option) =>
-            option.toLowerCase().contains(query)).take(20);
+        return suggestions
+            .where((option) => option.toLowerCase().contains(query))
+            .take(20);
       },
       initialValue: TextEditingValue(text: controller.text),
       onSelected: (String selection) {
@@ -845,65 +837,94 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  Widget _buildDeleteAccountSection() {
+  bool _isResetting = false;
+
+  Widget _buildDeveloperSection() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.orange.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.shade100),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red[400]),
+              Icon(Icons.developer_mode, color: Colors.orange[700]),
               const SizedBox(width: 8),
               Text(
-                'Tehlikeli Bölge',
+                'Geliştirici Araçları',
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: Colors.red[700],
+                  color: Colors.orange[800],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
-            'Hesabınızı sildiğinizde tüm verileriniz kalıcı olarak silinecektir. Bu işlem geri alınamaz.',
+            'Demo verilerini sıfırlayarak tüm profilleri, beğenileri ve eşleşmeleri yeniden oluşturabilirsiniz.',
             style: GoogleFonts.poppins(
-              fontSize: 13,
-              color: Colors.grey[600],
+              fontSize: 12,
+              color: Colors.orange[700],
             ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isDeleting ? null : _showDeleteAccountDialog,
-              icon: _isDeleting
-                  ? const SizedBox(
+          GestureDetector(
+            onTap: _isResetting ? null : _resetDemoData,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _isResetting
+                      ? [Colors.grey[400]!, Colors.grey[500]!]
+                      : [Colors.orange[600]!, Colors.deepOrange],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: _isResetting
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_isResetting)
+                    const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : const Icon(Icons.delete_forever),
-              label: Text(
-                _isDeleting ? 'Siliniyor...' : 'Hesabımı Sil',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                  else
+                    const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isResetting
+                        ? 'Sıfırlanıyor...'
+                        : 'Tüm Demo Verileri Sıfırla',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -912,217 +933,72 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  void _showDeleteAccountDialog() {
-    final passwordController = TextEditingController();
-    bool isPasswordVisible = false;
-    String? errorMessage;
-
-    showDialog(
+  Future<void> _resetDemoData() async {
+    // Önce onay al
+    final confirmed = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.red[400]),
-              const SizedBox(width: 8),
-              Text(
-                'Hesabı Sil',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bu işlem geri alınamaz! Hesabınız ve tüm verileriniz kalıcı olarak silinecektir.',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Devam etmek için şifrenizi girin:',
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordController,
-                obscureText: !isPasswordVisible,
-                style: GoogleFonts.poppins(),
-                decoration: InputDecoration(
-                  hintText: 'Şifreniz',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      isPasswordVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setDialogState(() {
-                        isPasswordVisible = !isPasswordVisible;
-                      });
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  errorText: errorMessage,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'İptal',
-                style: GoogleFonts.poppins(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (passwordController.text.isEmpty) {
-                  setDialogState(() {
-                    errorMessage = 'Şifre gerekli';
-                  });
-                  return;
-                }
-
-                Navigator.pop(context);
-                await _deleteAccount(passwordController.text);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                'Hesabı Sil',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-            ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
+            const SizedBox(width: 8),
+            const Text('Emin misiniz?'),
           ],
         ),
+        content: Text(
+          'Bu işlem tüm demo profillerini, beğenilerinizi ve eşleşmelerinizi silip yeniden oluşturacak.\n\nSenin profilin korunacak.',
+          style: GoogleFonts.poppins(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'İptal',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange[600],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              'Sıfırla',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
-  }
 
-  Future<void> _deleteAccount(String password) async {
-    setState(() => _isDeleting = true);
+    if (confirmed != true) return;
+
+    setState(() => _isResetting = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showError('Kullanıcı oturumu bulunamadı');
-        setState(() => _isDeleting = false);
-        return;
-      }
+      final seedService = SeedService();
+      final result = await seedService.resetAllDemoData();
 
-      // Re-authenticate user with password
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-
-      try {
-        await user.reauthenticateWithCredential(credential);
-      } on FirebaseAuthException catch (e) {
-        String message = 'Şifre doğrulanamadı';
-        if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-          message = 'Şifre yanlış';
-        } else if (e.code == 'too-many-requests') {
-          message = 'Çok fazla deneme. Lütfen daha sonra tekrar deneyin.';
-        }
-        _showError(message);
-        setState(() => _isDeleting = false);
-        return;
-      }
-
-      final userId = user.uid;
-
-      // Delete user's photos from Storage
-      try {
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('profile_images/$userId');
-        final listResult = await storageRef.listAll();
-        for (final item in listResult.items) {
-          await item.delete();
-        }
-      } catch (e) {
-        // Storage deletion might fail if no photos exist, continue anyway
-      }
-
-      // Delete user's matches
-      try {
-        final matchesQuery = await FirebaseFirestore.instance
-            .collection('matches')
-            .where('users', arrayContains: userId)
-            .get();
-        for (final doc in matchesQuery.docs) {
-          await doc.reference.delete();
-        }
-      } catch (e) {
-        // Continue even if matches deletion fails
-      }
-
-      // Delete user's swipes
-      try {
-        await FirebaseFirestore.instance
-            .collection('swipes')
-            .doc(userId)
-            .delete();
-      } catch (e) {
-        // Continue even if swipes deletion fails
-      }
-
-      // Delete user's messages (conversations they're part of)
-      try {
-        final conversationsQuery = await FirebaseFirestore.instance
-            .collection('conversations')
-            .where('participants', arrayContains: userId)
-            .get();
-        for (final doc in conversationsQuery.docs) {
-          // Delete all messages in the conversation
-          final messagesQuery = await doc.reference.collection('messages').get();
-          for (final message in messagesQuery.docs) {
-            await message.reference.delete();
-          }
-          await doc.reference.delete();
-        }
-      } catch (e) {
-        // Continue even if messages deletion fails
-      }
-
-      // Delete user document from Firestore
-      await FirebaseFirestore.instance.collection('users').doc(userId).delete();
-
-      // Finally, delete the Firebase Auth account
-      await user.delete();
-
-      // Navigate to welcome screen
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => WelcomeScreen()),
-          (route) => false,
+        CustomNotification.success(
+          context,
+          'Veriler Sıfırlandı!',
+          subtitle:
+              '${result['profiles']} profil, ${result['likes']} beğeni oluşturuldu',
         );
       }
     } catch (e) {
-      _showError('Hesap silinirken bir hata oluştu: $e');
-      setState(() => _isDeleting = false);
+      if (mounted) {
+        CustomNotification.error(context, 'Sıfırlama başarısız: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isResetting = false);
+      }
     }
   }
 }

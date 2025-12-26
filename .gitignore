@@ -43,3 +43,20 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS build artifacts
+ios/build/
+ios/.symlinks/
+ios/Pods/
+
+# macOS build artifacts
+macos/build/
+macos/.symlinks/
+macos/Pods/
+
+# Firebase config (uncomment if you want to exclude)
+# ios/Runner/GoogleService-Info.plist
+# android/app/google-services.json
+
+# Local IDE settings
+.claude/

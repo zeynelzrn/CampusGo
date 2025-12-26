@@ -89,8 +89,7 @@ class _SwipeCardState extends State<SwipeCard> {
                   _buildProfilePhoto(),
 
                   // Photo navigation indicators
-                  if (widget.profile.photos.length > 1)
-                    _buildPhotoIndicators(),
+                  if (widget.profile.photos.length > 1) _buildPhotoIndicators(),
 
                   // Tap zones indicator (subtle)
                   _buildTapZones(),
@@ -107,8 +106,7 @@ class _SwipeCardState extends State<SwipeCard> {
                   _buildProfileInfo(),
 
                   // Detailed info sheet (expandable)
-                  if (_showDetails || widget.showFullInfo)
-                    _buildDetailSheet(),
+                  if (_showDetails || widget.showFullInfo) _buildDetailSheet(),
                 ],
               ),
             ),
@@ -1006,7 +1004,7 @@ class NoMoreProfilesWidget extends StatelessWidget {
   }
 }
 
-/// Beautiful Match popup widget - Tinder style
+/// Beautiful full-screen Match popup widget - Friendship themed
 class MatchPopup extends StatefulWidget {
   final UserProfile matchedProfile;
   final UserProfile? currentUserProfile;
@@ -1026,26 +1024,26 @@ class MatchPopup extends StatefulWidget {
 }
 
 class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
-  late AnimationController _confettiController;
-  late AnimationController _heartController;
-  late Animation<double> _heartAnimation;
+  late AnimationController _celebrationController;
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    _confettiController = AnimationController(
-      duration: const Duration(seconds: 2),
+    _celebrationController = AnimationController(
+      duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat();
 
-    _heartController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    _heartAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _heartController, curve: Curves.elasticOut),
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
-    _heartController.forward();
+    _scaleController.forward();
 
     // Haptic feedback on match
     HapticFeedback.heavyImpact();
@@ -1053,210 +1051,258 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _confettiController.dispose();
-    _heartController.dispose();
+    _celebrationController.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFFFF2C60).withValues(alpha: 0.95),
-            const Color(0xFFFF6B9D).withValues(alpha: 0.95),
-            const Color(0xFFFF8FB1).withValues(alpha: 0.95),
-          ],
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFFF2C60), // Ana pembe/kırmızı
+              Color(0xFFFF6B9D), // Açık pembe
+              Color(0xFFFF8C42), // Turuncu
+            ],
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Floating hearts background
-          ..._buildFloatingHearts(),
+        child: Stack(
+          children: [
+            // Floating stars/sparkles background
+            ..._buildFloatingSparkles(),
 
-          // Main content
-          SafeArea(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // "It's a Match!" text
-                  ScaleTransition(
-                    scale: _heartAnimation,
-                    child: Column(
-                      children: [
-                        Text(
-                          "It's a",
-                          style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w300,
-                            color: Colors.white,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                        ShaderMask(
-                          shaderCallback: (bounds) => LinearGradient(
-                            colors: [
-                              Colors.white,
-                              Colors.white.withValues(alpha: 0.9),
-                            ],
-                          ).createShader(bounds),
-                          child: Text(
-                            'MATCH!',
-                            style: GoogleFonts.poppins(
-                              fontSize: 56,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 8,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            // Main content
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 40),
 
-                  const SizedBox(height: 16),
-
-                  Text(
-                    'Sen ve ${widget.matchedProfile.name} birbirinizi beğendiniz',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w400,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // Profile photos
-                  ScaleTransition(
-                    scale: _heartAnimation,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // Current user photo (if available)
-                        _buildProfileCircle(
-                          widget.currentUserProfile?.primaryPhoto,
-                          isCurrentUser: true,
-                        ),
-                        // Heart in the middle
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                          padding: const EdgeInsets.all(12),
+                      // Celebration icon
+                      ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: Container(
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Colors.white.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 15,
-                              ),
-                            ],
                           ),
                           child: const Icon(
-                            Icons.favorite_rounded,
-                            color: Color(0xFFFF2C60),
-                            size: 28,
-                          ),
-                        ),
-                        // Matched profile photo
-                        _buildProfileCircle(
-                          widget.matchedProfile.primaryPhoto,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 60),
-
-                  // Action buttons
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Column(
-                      children: [
-                        // Send message button
-                        Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
+                            Icons.celebration_rounded,
+                            size: 60,
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
                           ),
-                          child: ElevatedButton.icon(
-                            onPressed: widget.onSendMessage,
-                            icon: const Icon(Icons.send_rounded),
-                            label: Text(
-                              'Mesaj Gönder',
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // "Yeni Arkadaş!" text
+                      ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: Column(
+                          children: [
+                            Text(
+                              "Yeni",
                               style: GoogleFonts.poppins(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w600,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w300,
+                                color: Colors.white,
+                                letterSpacing: 4,
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFFFF2C60),
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
+                            ShaderMask(
+                              shaderCallback: (bounds) => const LinearGradient(
+                                colors: [
+                                  Colors.white,
+                                  Color(0xFFFFE57F),
+                                ],
+                              ).createShader(bounds),
+                              child: Text(
+                                'ARKADAŞ!',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 4,
+                                  shadows: [
+                                    Shadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
+                      ),
 
-                        const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                        // Keep swiping button
-                        TextButton(
-                          onPressed: widget.onKeepSwiping,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          'Sen ve ${widget.matchedProfile.name} artık arkadaşsınız!',
+                          style: GoogleFonts.poppins(
+                            fontSize: 17,
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontWeight: FontWeight.w400,
+                            height: 1.4,
                           ),
-                          child: Text(
-                            'Kaydırmaya Devam Et',
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+                          textAlign: TextAlign.center,
                         ),
-                      ],
-                    ),
+                      ),
+
+                      const SizedBox(height: 50),
+
+                      // Profile photos
+                      ScaleTransition(
+                        scale: _scaleAnimation,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Current user photo (if available)
+                            _buildProfileCircle(
+                              widget.currentUserProfile?.primaryPhoto,
+                              isCurrentUser: true,
+                            ),
+                            // Handshake/connection icon in the middle
+                            Container(
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.handshake_rounded,
+                                color: Color(0xFF667eea),
+                                size: 32,
+                              ),
+                            ),
+                            // Matched profile photo
+                            _buildProfileCircle(
+                              widget.matchedProfile.primaryPhoto,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 60),
+
+                      // Action buttons
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          children: [
+                            // Send message button
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton.icon(
+                                onPressed: widget.onSendMessage,
+                                icon: const Icon(Icons.chat_bubble_rounded),
+                                label: Text(
+                                  'Mesaj Gönder',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF667eea),
+                                  shadowColor: Colors.transparent,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 18),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Keep swiping button
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  width: 2,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: TextButton(
+                                onPressed: widget.onKeepSwiping,
+                                style: TextButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Keşfetmeye Devam Et',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 40),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProfileCircle(String? photoUrl, {bool isCurrentUser = false}) {
     return Container(
-      width: 120,
-      height: 120,
+      width: 130,
+      height: 130,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
@@ -1266,8 +1312,8 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 20,
-            spreadRadius: 2,
+            blurRadius: 25,
+            spreadRadius: 3,
           ),
         ],
       ),
@@ -1285,7 +1331,8 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
                   child: Icon(
                     Icons.person,
                     size: 50,
-                    color: isCurrentUser ? const Color(0xFFFF2C60) : Colors.grey,
+                    color:
+                        isCurrentUser ? const Color(0xFF667eea) : Colors.grey,
                   ),
                 ),
               )
@@ -1301,27 +1348,36 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
     );
   }
 
-  List<Widget> _buildFloatingHearts() {
-    return List.generate(8, (index) {
-      final random = index * 0.1;
+  List<Widget> _buildFloatingSparkles() {
+    return List.generate(12, (index) {
+      final random = index * 0.15;
+      final isLeft = index % 2 == 0;
       return Positioned(
-        left: (index % 2 == 0) ? (index * 40.0) : null,
-        right: (index % 2 == 1) ? (index * 30.0) : null,
-        top: 100.0 + (index * 60.0),
+        left: isLeft ? (index * 30.0) : null,
+        right: !isLeft ? ((index - 1) * 25.0) : null,
+        top: 80.0 + (index * 50.0),
         child: AnimatedBuilder(
-          animation: _confettiController,
+          animation: _celebrationController,
           builder: (context, child) {
             return Transform.translate(
               offset: Offset(
-                10 * math.sin(_confettiController.value * 2 * math.pi + random),
-                -100 * _confettiController.value,
+                15 *
+                    math.sin(
+                        _celebrationController.value * 2 * math.pi + random),
+                20 *
+                    math.cos(
+                        _celebrationController.value * 2 * math.pi + random),
               ),
-              child: Opacity(
-                opacity: 1 - _confettiController.value,
+              child: Transform.rotate(
+                angle: _celebrationController.value * 2 * math.pi,
                 child: Icon(
-                  Icons.favorite,
-                  color: Colors.white.withValues(alpha: 0.3),
-                  size: 24 + (index * 4).toDouble(),
+                  index % 3 == 0
+                      ? Icons.star_rounded
+                      : index % 3 == 1
+                          ? Icons.auto_awesome
+                          : Icons.flare_rounded,
+                  color: Colors.white.withValues(alpha: 0.25),
+                  size: 20 + (index * 2).toDouble(),
                 ),
               ),
             );

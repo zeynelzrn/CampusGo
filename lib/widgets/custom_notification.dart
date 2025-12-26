@@ -30,20 +30,38 @@ class CustomNotification {
   }
 
   // Convenience methods
-  static void success(BuildContext context, String message, {String? subtitle}) {
-    show(context: context, message: message, subtitle: subtitle, type: NotificationType.success);
+  static void success(BuildContext context, String message,
+      {String? subtitle}) {
+    show(
+        context: context,
+        message: message,
+        subtitle: subtitle,
+        type: NotificationType.success);
   }
 
   static void error(BuildContext context, String message, {String? subtitle}) {
-    show(context: context, message: message, subtitle: subtitle, type: NotificationType.error);
+    show(
+        context: context,
+        message: message,
+        subtitle: subtitle,
+        type: NotificationType.error);
   }
 
-  static void warning(BuildContext context, String message, {String? subtitle}) {
-    show(context: context, message: message, subtitle: subtitle, type: NotificationType.warning);
+  static void warning(BuildContext context, String message,
+      {String? subtitle}) {
+    show(
+        context: context,
+        message: message,
+        subtitle: subtitle,
+        type: NotificationType.warning);
   }
 
   static void info(BuildContext context, String message, {String? subtitle}) {
-    show(context: context, message: message, subtitle: subtitle, type: NotificationType.info);
+    show(
+        context: context,
+        message: message,
+        subtitle: subtitle,
+        type: NotificationType.info);
   }
 }
 

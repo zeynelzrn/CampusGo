@@ -8,13 +8,14 @@ import '../providers/profile_provider.dart';
 import '../repositories/profile_repository.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 
 class CreateProfileScreen extends ConsumerStatefulWidget {
   const CreateProfileScreen({super.key});
 
   @override
-  ConsumerState<CreateProfileScreen> createState() => _CreateProfileScreenState();
+  ConsumerState<CreateProfileScreen> createState() =>
+      _CreateProfileScreenState();
 }
 
 class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
@@ -179,14 +180,16 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       lookingFor: _selectedLookingFor,
     );
 
-    final success = await ref.read(profileCreationProvider.notifier).createProfile(
-      profileData: profileData,
-      imageFile: _selectedImage!,
-    );
+    final success =
+        await ref.read(profileCreationProvider.notifier).createProfile(
+              profileData: profileData,
+              imageFile: _selectedImage!,
+            );
 
     if (success && mounted) {
       // Show success notification
-      _showSuccess('Profil Oluşturuldu', subtitle: 'Keşfetmeye başlayabilirsin!');
+      _showSuccess('Profil Oluşturuldu',
+          subtitle: 'Keşfetmeye başlayabilirsin!');
 
       // Update app state and navigate after short delay
       await Future.delayed(const Duration(milliseconds: 800));
@@ -194,7 +197,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
         ref.read(appStateProvider.notifier).setAuthenticated();
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          MaterialPageRoute(builder: (context) => const MainScreen()),
         );
       }
     }
@@ -205,7 +208,8 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     final creationState = ref.watch(profileCreationProvider);
 
     // Show error if any
-    ref.listen<ProfileCreationState>(profileCreationProvider, (previous, current) {
+    ref.listen<ProfileCreationState>(profileCreationProvider,
+        (previous, current) {
       if (current.error != null && previous?.error != current.error) {
         _showError(current.error!);
       }
@@ -532,13 +536,15 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             return suggestions.take(10);
           }
           final query = textEditingValue.text.toLowerCase();
-          return suggestions.where((option) =>
-              option.toLowerCase().contains(query)).take(20);
+          return suggestions
+              .where((option) => option.toLowerCase().contains(query))
+              .take(20);
         },
         onSelected: (String selection) {
           controller.text = selection;
         },
-        fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+        fieldViewBuilder:
+            (context, textController, focusNode, onFieldSubmitted) {
           // Sync initial value only once
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (controller.text.isNotEmpty && textController.text.isEmpty) {
@@ -576,7 +582,8 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFFFF2C60), width: 2),
+                borderSide:
+                    const BorderSide(color: Color(0xFFFF2C60), width: 2),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),

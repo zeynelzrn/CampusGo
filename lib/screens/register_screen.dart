@@ -4,11 +4,14 @@ import '../services/auth_service.dart';
 import 'create_profile_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
   @override
   _RegisterScreenState createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStateMixin {
+class _RegisterScreenState extends State<RegisterScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -18,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   bool _isLoading = false;
-  
+
   late AnimationController _animationController;
   late AnimationController _buttonAnimationController;
   late Animation<double> _fadeAnimation;
@@ -29,33 +32,36 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
-      duration: Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    
+
     _buttonAnimationController = AnimationController(
-      duration: Duration(milliseconds: 300), // Hızlı geçiş
+      duration: const Duration(milliseconds: 300), // Hızlı geçiş
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
-    
+
     _buttonScaleAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(parent: _buttonAnimationController, curve: Curves.easeOutBack),
+      CurvedAnimation(
+          parent: _buttonAnimationController, curve: Curves.easeOutBack),
     );
-    
+
     _buttonGlowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _buttonAnimationController, curve: Curves.easeOut),
+      CurvedAnimation(
+          parent: _buttonAnimationController, curve: Curves.easeOut),
     );
-    
+
     _buttonRotateAnimation = Tween<double>(begin: 0.0, end: 0.02).animate(
-      CurvedAnimation(parent: _buttonAnimationController, curve: Curves.elasticOut),
+      CurvedAnimation(
+          parent: _buttonAnimationController, curve: Curves.elasticOut),
     );
-    
+
     _animationController.forward();
   }
 
@@ -113,7 +119,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
     return Scaffold(
       body: Container(
         height: MediaQuery.of(context).size.height,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -137,8 +143,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Color(0xFFFF2C60).withOpacity(0.1),
-                      Color(0xFFFFBA93).withOpacity(0.2),
+                      const Color(0xFFFF2C60).withOpacity(0.1),
+                      const Color(0xFFFFBA93).withOpacity(0.2),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -154,15 +160,15 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Color(0xFFFFBA93).withOpacity(0.3),
-                      Color(0xFFFF2C60).withOpacity(0.1),
+                      const Color(0xFFFFBA93).withOpacity(0.3),
+                      const Color(0xFFFF2C60).withOpacity(0.1),
                     ],
                   ),
                   shape: BoxShape.circle,
                 ),
               ),
             ),
-            
+
             // Ana içerik
             SafeArea(
               child: FadeTransition(
@@ -172,7 +178,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                     // Üst kısım - Scrollable content
                     Expanded(
                       child: SingleChildScrollView(
-                        padding: EdgeInsets.all(24.0),
+                        padding: const EdgeInsets.all(24.0),
                         child: Form(
                           key: _formKey,
                           child: Column(
@@ -187,22 +193,22 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                     BoxShadow(
                                       color: Colors.black.withOpacity(0.1),
                                       blurRadius: 10,
-                                      offset: Offset(0, 4),
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
                                 child: IconButton(
                                   onPressed: () => Navigator.pop(context),
-                                  icon: Icon(
+                                  icon: const Icon(
                                     Icons.arrow_back_ios_new,
                                     color: Color(0xFFFF2C60),
                                     size: 20,
                                   ),
                                 ),
                               ),
-                              
-                              SizedBox(height: 40),
-                              
+
+                              const SizedBox(height: 40),
+
                               // Başlık bölümü
                               Center(
                                 child: Column(
@@ -213,15 +219,16 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                         fontSize: 32,
                                         fontWeight: FontWeight.w700,
                                         foreground: Paint()
-                                          ..shader = LinearGradient(
+                                          ..shader = const LinearGradient(
                                             colors: [
                                               Color(0xFFFF2C60),
                                               Color(0xFFFF6B9D),
                                             ],
-                                          ).createShader(Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                                          ).createShader(Rect.fromLTWH(
+                                              0.0, 0.0, 200.0, 70.0)),
                                       ),
                                     ),
-                                    SizedBox(height: 8),
+                                    const SizedBox(height: 8),
                                     Text(
                                       'Kampüs hayatında yeni başlangıçlar seni bekliyor',
                                       textAlign: TextAlign.center,
@@ -234,9 +241,9 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                   ],
                                 ),
                               ),
-                              
-                              SizedBox(height: 50),
-                              
+
+                              const SizedBox(height: 50),
+
                               // Form alanları
                               _buildModernTextField(
                                 controller: _emailController,
@@ -251,15 +258,17 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                   if (!value.endsWith('.edu.tr')) {
                                     return 'Sadece .edu.tr uzantılı e-postalar kabul edilir';
                                   }
-                                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                  if (!RegExp(
+                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                      .hasMatch(value)) {
                                     return 'Geçerli bir e-posta adresi girin';
                                   }
                                   return null;
                                 },
                               ),
-                              
-                              SizedBox(height: 20),
-                              
+
+                              const SizedBox(height: 20),
+
                               _buildModernTextField(
                                 controller: _passwordController,
                                 label: 'Şifre',
@@ -268,8 +277,10 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 obscureText: _obscurePassword,
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                    color: Color(0xFFFF2C60),
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: const Color(0xFFFF2C60),
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -287,9 +298,9 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                   return null;
                                 },
                               ),
-                              
-                              SizedBox(height: 20),
-                              
+
+                              const SizedBox(height: 20),
+
                               _buildModernTextField(
                                 controller: _confirmPasswordController,
                                 label: 'Şifre Onayı',
@@ -298,12 +309,15 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                 obscureText: _obscureConfirmPassword,
                                 suffixIcon: IconButton(
                                   icon: Icon(
-                                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                                    color: Color(0xFFFF2C60),
+                                    _obscureConfirmPassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    color: const Color(0xFFFF2C60),
                                   ),
                                   onPressed: () {
                                     setState(() {
-                                      _obscureConfirmPassword = !_obscureConfirmPassword;
+                                      _obscureConfirmPassword =
+                                          !_obscureConfirmPassword;
                                     });
                                   },
                                 ),
@@ -317,17 +331,19 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                   return null;
                                 },
                               ),
-                              
-                              SizedBox(height: 30),
-                              
+
+                              const SizedBox(height: 30),
+
                               // KVKK Onayı
                               Container(
-                                padding: EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.7),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: _agreeToTerms ? Color(0xFFFF2C60) : Colors.grey[300]!,
+                                    color: _agreeToTerms
+                                        ? const Color(0xFFFF2C60)
+                                        : Colors.grey[300]!,
                                     width: 1,
                                   ),
                                 ),
@@ -336,10 +352,17 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                     Container(
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(6),
-                                        gradient: _agreeToTerms ? LinearGradient(
-                                          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
-                                        ) : null,
-                                        color: _agreeToTerms ? null : Colors.grey[300],
+                                        gradient: _agreeToTerms
+                                            ? const LinearGradient(
+                                                colors: [
+                                                  Color(0xFFFF2C60),
+                                                  Color(0xFFFF6B9D)
+                                                ],
+                                              )
+                                            : null,
+                                        color: _agreeToTerms
+                                            ? null
+                                            : Colors.grey[300],
                                       ),
                                       child: Checkbox(
                                         value: _agreeToTerms,
@@ -349,24 +372,27 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                         side: BorderSide.none,
                                       ),
                                     ),
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                     Expanded(
                                       child: GestureDetector(
-                                        onTap: () => _toggleTermsAgreement(!_agreeToTerms),
+                                        onTap: () => _toggleTermsAgreement(
+                                            !_agreeToTerms),
                                         child: RichText(
                                           text: TextSpan(
                                             style: GoogleFonts.poppins(
                                               fontSize: 14,
                                               color: Colors.grey[700],
                                             ),
-                                            children: [
-                                              TextSpan(text: 'KVKK kapsamında '),
+                                            children: const [
+                                              TextSpan(
+                                                  text: 'KVKK kapsamında '),
                                               TextSpan(
                                                 text: 'Aydınlatma Metni',
                                                 style: TextStyle(
                                                   color: Color(0xFFFF2C60),
                                                   fontWeight: FontWeight.w600,
-                                                  decoration: TextDecoration.underline,
+                                                  decoration:
+                                                      TextDecoration.underline,
                                                 ),
                                               ),
                                               TextSpan(text: "'ni okudum ve "),
@@ -375,10 +401,12 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                                 style: TextStyle(
                                                   color: Color(0xFFFF2C60),
                                                   fontWeight: FontWeight.w600,
-                                                  decoration: TextDecoration.underline,
+                                                  decoration:
+                                                      TextDecoration.underline,
                                                 ),
                                               ),
-                                              TextSpan(text: "'nı kabul ediyorum."),
+                                              TextSpan(
+                                                  text: "'nı kabul ediyorum."),
                                             ],
                                           ),
                                         ),
@@ -392,10 +420,10 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                         ),
                       ),
                     ),
-                    
+
                     // Alt kısım - Sabit butonlar
                     Container(
-                      padding: EdgeInsets.all(24.0),
+                      padding: const EdgeInsets.all(24.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -412,29 +440,41 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                     height: 56,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(16),
-                                      gradient: _agreeToTerms ? LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          Color(0xFFFF2C60),
-                                          Color(0xFFFF6B9D),
-                                          Color(0xFFFF8BA7),
-                                        ],
-                                      ) : LinearGradient(
-                                        colors: [Colors.grey[300]!, Colors.grey[400]!],
-                                      ),
+                                      gradient: _agreeToTerms
+                                          ? const LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color(0xFFFF2C60),
+                                                Color(0xFFFF6B9D),
+                                                Color(0xFFFF8BA7),
+                                              ],
+                                            )
+                                          : LinearGradient(
+                                              colors: [
+                                                Colors.grey[300]!,
+                                                Colors.grey[400]!
+                                              ],
+                                            ),
                                       boxShadow: [
                                         if (_agreeToTerms) ...[
                                           BoxShadow(
-                                            color: Color(0xFFFF2C60).withOpacity(0.4 * _buttonGlowAnimation.value),
-                                            blurRadius: 20 + (10 * _buttonGlowAnimation.value),
-                                            offset: Offset(0, 10),
-                                            spreadRadius: 2 * _buttonGlowAnimation.value,
+                                            color: const Color(0xFFFF2C60)
+                                                .withOpacity(0.4 *
+                                                    _buttonGlowAnimation.value),
+                                            blurRadius: 20 +
+                                                (10 *
+                                                    _buttonGlowAnimation.value),
+                                            offset: const Offset(0, 10),
+                                            spreadRadius:
+                                                2 * _buttonGlowAnimation.value,
                                           ),
                                           BoxShadow(
-                                            color: Colors.white.withOpacity(0.3 * _buttonGlowAnimation.value),
+                                            color: Colors.white.withOpacity(
+                                                0.3 *
+                                                    _buttonGlowAnimation.value),
                                             blurRadius: 5,
-                                            offset: Offset(0, -2),
+                                            offset: const Offset(0, -2),
                                           ),
                                         ],
                                       ],
@@ -445,89 +485,138 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                         if (_agreeToTerms)
                                           Positioned.fill(
                                             child: AnimatedBuilder(
-                                              animation: _buttonAnimationController,
+                                              animation:
+                                                  _buttonAnimationController,
                                               builder: (context, child) {
                                                 return Container(
                                                   decoration: BoxDecoration(
-                                                    borderRadius: BorderRadius.circular(16),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            16),
                                                     gradient: LinearGradient(
-                                                      begin: Alignment(-1.0 + (2.0 * _buttonGlowAnimation.value), 0.0),
-                                                      end: Alignment(1.0 + (2.0 * _buttonGlowAnimation.value), 0.0),
+                                                      begin: Alignment(
+                                                          -1.0 +
+                                                              (2.0 *
+                                                                  _buttonGlowAnimation
+                                                                      .value),
+                                                          0.0),
+                                                      end: Alignment(
+                                                          1.0 +
+                                                              (2.0 *
+                                                                  _buttonGlowAnimation
+                                                                      .value),
+                                                          0.0),
                                                       colors: [
                                                         Colors.transparent,
-                                                        Colors.white.withOpacity(0.3 * _buttonGlowAnimation.value),
+                                                        Colors.white
+                                                            .withOpacity(0.3 *
+                                                                _buttonGlowAnimation
+                                                                    .value),
                                                         Colors.transparent,
                                                       ],
-                                                      stops: [0.0, 0.5, 1.0],
+                                                      stops: const [
+                                                        0.0,
+                                                        0.5,
+                                                        1.0
+                                                      ],
                                                     ),
                                                   ),
                                                 );
                                               },
                                             ),
                                           ),
-                                        
+
                                         // Ana buton
                                         Material(
                                           color: Colors.transparent,
                                           child: InkWell(
-                                            onTap: _agreeToTerms && !_isLoading ? () async {
-                                              if (_formKey.currentState!.validate()) {
-                                                setState(() => _isLoading = true);
+                                            onTap: _agreeToTerms && !_isLoading
+                                                ? () async {
+                                                    if (_formKey.currentState!
+                                                        .validate()) {
+                                                      setState(() =>
+                                                          _isLoading = true);
 
-                                                final result = await _authService.register(
-                                                  email: _emailController.text.trim(),
-                                                  password: _passwordController.text,
-                                                );
-
-                                                setState(() => _isLoading = false);
-
-                                                if (result['success']) {
-                                                  _buttonAnimationController.reverse().then((_) {
-                                                    _buttonAnimationController.forward();
-                                                  });
-
-                                                  if (mounted) {
-                                                    _showModernNotification(
-                                                      message: 'Hesabın başarıyla oluşturuldu! Hoş geldin!',
-                                                      isSuccess: true,
-                                                      icon: Icons.celebration_rounded,
-                                                    );
-
-                                                    // Kısa gecikme ile yönlendir
-                                                    await Future.delayed(const Duration(milliseconds: 800));
-
-                                                    if (mounted) {
-                                                      Navigator.pushReplacement(
-                                                        context,
-                                                        MaterialPageRoute(builder: (context) => const CreateProfileScreen()),
+                                                      final result =
+                                                          await _authService
+                                                              .register(
+                                                        email: _emailController
+                                                            .text
+                                                            .trim(),
+                                                        password:
+                                                            _passwordController
+                                                                .text,
                                                       );
+
+                                                      setState(() =>
+                                                          _isLoading = false);
+
+                                                      if (result['success']) {
+                                                        _buttonAnimationController
+                                                            .reverse()
+                                                            .then((_) {
+                                                          _buttonAnimationController
+                                                              .forward();
+                                                        });
+
+                                                        if (mounted) {
+                                                          _showModernNotification(
+                                                            message:
+                                                                'Hesabın başarıyla oluşturuldu! Hoş geldin!',
+                                                            isSuccess: true,
+                                                            icon: Icons
+                                                                .celebration_rounded,
+                                                          );
+
+                                                          // Kısa gecikme ile yönlendir
+                                                          await Future.delayed(
+                                                              const Duration(
+                                                                  milliseconds:
+                                                                      800));
+
+                                                          if (mounted) {
+                                                            Navigator
+                                                                .pushReplacement(
+                                                              context,
+                                                              MaterialPageRoute(
+                                                                  builder:
+                                                                      (context) =>
+                                                                          const CreateProfileScreen()),
+                                                            );
+                                                          }
+                                                        }
+                                                      } else {
+                                                        if (mounted) {
+                                                          _showModernNotification(
+                                                            message:
+                                                                result['error'],
+                                                            isSuccess: false,
+                                                          );
+                                                        }
+                                                      }
                                                     }
                                                   }
-                                                } else {
-                                                  if (mounted) {
-                                                    _showModernNotification(
-                                                      message: result['error'],
-                                                      isSuccess: false,
-                                                    );
-                                                  }
-                                                }
-                                              }
-                                            } : null,
-                                            borderRadius: BorderRadius.circular(16),
-                                            splashColor: Colors.white.withOpacity(0.3),
-                                            highlightColor: Colors.white.withOpacity(0.1),
+                                                : null,
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            splashColor:
+                                                Colors.white.withOpacity(0.3),
+                                            highlightColor:
+                                                Colors.white.withOpacity(0.1),
                                             child: SizedBox(
                                               width: double.infinity,
                                               height: 56,
                                               child: Center(
                                                 child: Row(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
                                                   children: [
                                                     if (_isLoading) ...[
                                                       const SizedBox(
                                                         width: 20,
                                                         height: 20,
-                                                        child: CircularProgressIndicator(
+                                                        child:
+                                                            CircularProgressIndicator(
                                                           color: Colors.white,
                                                           strokeWidth: 2,
                                                         ),
@@ -535,9 +624,11 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                                       const SizedBox(width: 8),
                                                       Text(
                                                         'Kaydediliyor...',
-                                                        style: GoogleFonts.poppins(
+                                                        style:
+                                                            GoogleFonts.poppins(
                                                           fontSize: 18,
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                           color: Colors.white,
                                                         ),
                                                       ),
@@ -550,19 +641,24 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                                       const SizedBox(width: 10),
                                                       Text(
                                                         'Hesap Oluştur',
-                                                        style: GoogleFonts.poppins(
+                                                        style:
+                                                            GoogleFonts.poppins(
                                                           fontSize: 18,
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                           color: Colors.white,
                                                         ),
                                                       ),
                                                     ] else ...[
                                                       Text(
                                                         'Hesap Oluştur',
-                                                        style: GoogleFonts.poppins(
+                                                        style:
+                                                            GoogleFonts.poppins(
                                                           fontSize: 18,
-                                                          fontWeight: FontWeight.w600,
-                                                          color: Colors.grey[600],
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              Colors.grey[600],
                                                         ),
                                                       ),
                                                     ],
@@ -579,9 +675,9 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                               );
                             },
                           ),
-                          
-                          SizedBox(height: 16),
-                          
+
+                          const SizedBox(height: 16),
+
                           // Giriş yap linki
                           TextButton(
                             onPressed: () => Navigator.pop(context),
@@ -593,7 +689,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
                                     text: 'Zaten hesabın var mı? ',
                                     style: TextStyle(color: Colors.grey[600]),
                                   ),
-                                  TextSpan(
+                                  const TextSpan(
                                     text: 'Giriş Yap',
                                     style: TextStyle(
                                       color: Color(0xFFFF2C60),
@@ -634,7 +730,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -650,18 +746,18 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
           labelText: label,
           hintText: hint,
           prefixIcon: Container(
-            margin: EdgeInsets.all(12),
-            padding: EdgeInsets.all(8),
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFFFF2C60).withOpacity(0.1),
-                  Color(0xFFFF6B9D).withOpacity(0.1),
+                  const Color(0xFFFF2C60).withOpacity(0.1),
+                  const Color(0xFFFF6B9D).withOpacity(0.1),
                 ],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: Color(0xFFFF2C60), size: 20),
+            child: Icon(icon, color: const Color(0xFFFF2C60), size: 20),
           ),
           suffixIcon: suffixIcon,
           labelStyle: GoogleFonts.poppins(
@@ -680,7 +776,7 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(
+            borderSide: const BorderSide(
               color: Color(0xFFFF2C60),
               width: 2,
             ),
@@ -692,7 +788,8 @@ class _RegisterScreenState extends State<RegisterScreen> with TickerProviderStat
               width: 1,
             ),
           ),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         validator: validator,
       ),
@@ -762,13 +859,11 @@ class _ModernNotificationState extends State<_ModernNotification>
 
   @override
   Widget build(BuildContext context) {
-    final Color primaryColor = widget.isSuccess
-        ? const Color(0xFFFF2C60)
-        : const Color(0xFFE53935);
+    final Color primaryColor =
+        widget.isSuccess ? const Color(0xFFFF2C60) : const Color(0xFFE53935);
 
-    final Color bgColor = widget.isSuccess
-        ? const Color(0xFFFFF0F3)
-        : const Color(0xFFFFEBEE);
+    final Color bgColor =
+        widget.isSuccess ? const Color(0xFFFFF0F3) : const Color(0xFFFFEBEE);
 
     final IconData iconData = widget.icon ??
         (widget.isSuccess ? Icons.check_circle_rounded : Icons.error_rounded);
@@ -831,8 +926,14 @@ class _ModernNotificationState extends State<_ModernNotification>
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: widget.isSuccess
-                                        ? [const Color(0xFFFF2C60), const Color(0xFFFF6B9D)]
-                                        : [const Color(0xFFE53935), const Color(0xFFEF5350)],
+                                        ? [
+                                            const Color(0xFFFF2C60),
+                                            const Color(0xFFFF6B9D)
+                                          ]
+                                        : [
+                                            const Color(0xFFE53935),
+                                            const Color(0xFFEF5350)
+                                          ],
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
@@ -843,7 +944,8 @@ class _ModernNotificationState extends State<_ModernNotification>
                                     ),
                                   ],
                                 ),
-                                child: Icon(iconData, color: Colors.white, size: 24),
+                                child: Icon(iconData,
+                                    color: Colors.white, size: 24),
                               ),
                             );
                           },
@@ -877,7 +979,8 @@ class _ModernNotificationState extends State<_ModernNotification>
                             ],
                           ),
                         ),
-                        Icon(Icons.close_rounded, color: Colors.grey[400], size: 20),
+                        Icon(Icons.close_rounded,
+                            color: Colors.grey[400], size: 20),
                       ],
                     ),
                   ),

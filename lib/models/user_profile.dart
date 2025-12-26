@@ -62,7 +62,9 @@ class UserProfile {
       'interests': interests,
       'gender': gender,
       'lookingFor': lookingFor,
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
       if (location != null) 'location': location,
     };
   }
@@ -73,10 +75,7 @@ class UserProfile {
       : 'https://via.placeholder.com/400x600?text=No+Photo';
 
   /// Check if profile is complete
-  bool get isComplete =>
-      name.isNotEmpty &&
-      age > 0 &&
-      photos.isNotEmpty;
+  bool get isComplete => name.isNotEmpty && age > 0 && photos.isNotEmpty;
 
   @override
   String toString() => 'UserProfile(id: $id, name: $name, age: $age)';
@@ -84,7 +83,9 @@ class UserProfile {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is UserProfile && runtimeType == other.runtimeType && id == other.id;
+      other is UserProfile &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;

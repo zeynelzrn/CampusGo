@@ -79,12 +79,18 @@ class ProfileRepository {
       final photos = data['photos'] as List<dynamic>?;
 
       // All fields must be present and non-empty
-      final isComplete = name != null && name.isNotEmpty &&
-             age != null && age >= 18 &&
-             university != null && university.isNotEmpty &&
-             department != null && department.isNotEmpty &&
-             bio != null && bio.isNotEmpty &&
-             photos != null && photos.isNotEmpty;
+      final isComplete = name != null &&
+          name.isNotEmpty &&
+          age != null &&
+          age >= 18 &&
+          university != null &&
+          university.isNotEmpty &&
+          department != null &&
+          department.isNotEmpty &&
+          bio != null &&
+          bio.isNotEmpty &&
+          photos != null &&
+          photos.isNotEmpty;
 
       return isComplete;
     } catch (e) {
@@ -145,9 +151,9 @@ class ProfileRepository {
       };
 
       await _firestore.collection('users').doc(userId).set(
-        data,
-        SetOptions(merge: true),
-      );
+            data,
+            SetOptions(merge: true),
+          );
     } on FirebaseException catch (e) {
       throw Exception('Profil kaydedilirken hata: ${e.message}');
     }

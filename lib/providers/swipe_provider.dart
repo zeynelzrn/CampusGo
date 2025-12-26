@@ -48,8 +48,11 @@ class SwipeState {
       isLoading: isLoading ?? this.isLoading,
       hasMore: hasMore ?? this.hasMore,
       error: clearError ? null : (error ?? this.error),
-      lastDocument: clearLastDocument ? null : (lastDocument ?? this.lastDocument),
-      lastSwipedProfile: clearLastSwiped ? null : (lastSwipedProfile ?? this.lastSwipedProfile),
+      lastDocument:
+          clearLastDocument ? null : (lastDocument ?? this.lastDocument),
+      lastSwipedProfile: clearLastSwiped
+          ? null
+          : (lastSwipedProfile ?? this.lastSwipedProfile),
       isMatch: clearMatch ? false : (isMatch ?? this.isMatch),
       genderFilter: genderFilter ?? this.genderFilter,
     );
@@ -114,7 +117,8 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
       List<UserProfile> filteredProfiles = [];
 
       // Keep fetching until we have enough profiles or no more data
-      while (filteredProfiles.length < minCardsInStack && attempts < maxAttempts) {
+      while (
+          filteredProfiles.length < minCardsInStack && attempts < maxAttempts) {
         final batch = await _repository.fetchUserBatch(
           lastDocument: state.lastDocument,
           genderFilter: state.genderFilter,
@@ -130,11 +134,12 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
         }
 
         // Apply client-side filtering
-        final newProfiles = batch.where((profile) =>
-            !state.excludedIds.contains(profile.id) &&
-            !state.profiles.any((p) => p.id == profile.id) &&
-            !filteredProfiles.any((p) => p.id == profile.id)
-        ).toList();
+        final newProfiles = batch
+            .where((profile) =>
+                !state.excludedIds.contains(profile.id) &&
+                !state.profiles.any((p) => p.id == profile.id) &&
+                !filteredProfiles.any((p) => p.id == profile.id))
+            .toList();
 
         filteredProfiles.addAll(newProfiles);
 
@@ -188,7 +193,8 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
   }
 
   /// Record swipe action and check for match
-  Future<void> _recordSwipeAction(String targetUserId, SwipeActionType actionType) async {
+  Future<void> _recordSwipeAction(
+      String targetUserId, SwipeActionType actionType) async {
     try {
       final isMatch = await _repository.recordSwipeAction(
         targetUserId: targetUserId,
@@ -196,7 +202,9 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
       );
 
       // If it's a like and resulted in a match, notify
-      if (isMatch && (actionType == SwipeActionType.like || actionType == SwipeActionType.superlike)) {
+      if (isMatch &&
+          (actionType == SwipeActionType.like ||
+              actionType == SwipeActionType.superlike)) {
         state = state.copyWith(isMatch: true);
       }
     } catch (e) {
