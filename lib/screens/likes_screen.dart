@@ -4,11 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_profile.dart';
 import '../widgets/custom_notification.dart';
+import '../widgets/swipe_card.dart';
 import '../services/seed_service.dart';
+import '../services/chat_service.dart';
+import '../providers/likes_provider.dart';
+import 'chat_detail_screen.dart';
 
 class LikesScreen extends ConsumerStatefulWidget {
   const LikesScreen({super.key});
@@ -18,169 +21,16 @@ class LikesScreen extends ConsumerStatefulWidget {
 }
 
 class _LikesScreenState extends ConsumerState<LikesScreen> {
-  List<UserProfile> _likedByUsers = [];
-  Set<String> _eliminatedUserIds = {}; // Dislike atılan kullanıcılar
-  Set<String> _dismissingUserIds = {}; // Çıkış animasyonu oynayan kartlar
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadLikedByUsers();
+    // Initialize eliminated IDs from repository
+    _initializeEliminatedIds();
   }
 
-  Future<void> _loadLikedByUsers() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      if (currentUserId == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      debugPrint('Loading likes for user: $currentUserId');
-
-      // Step 1: Query actions where toUserId == currentUserId (people who swiped on me)
-      final actionsSnapshot = await FirebaseFirestore.instance
-          .collection('actions')
-          .where('toUserId', isEqualTo: currentUserId)
-          .get();
-
-      debugPrint(
-          'Found ${actionsSnapshot.docs.length} actions targeting current user');
-
-      // Step 2: Filter only likes and superLikes, collect fromUserIds
-      List<String> likedByUserIds = [];
-      for (var doc in actionsSnapshot.docs) {
-        final data = doc.data();
-        final type = data['type'] as String?;
-        final fromUserId = data['fromUserId'] as String?;
-
-        debugPrint('Action: fromUserId=$fromUserId, type=$type');
-
-        if (fromUserId != null && (type == 'like' || type == 'superlike')) {
-          likedByUserIds.add(fromUserId);
-        }
-      }
-
-      debugPrint('Users who liked me: ${likedByUserIds.length}');
-
-      if (likedByUserIds.isEmpty) {
-        setState(() {
-          _likedByUsers = [];
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Step 3: Get users I've already swiped on (to mark as eliminated or filter out)
-      final myActionsSnapshot = await FirebaseFirestore.instance
-          .collection('actions')
-          .where('fromUserId', isEqualTo: currentUserId)
-          .get();
-
-      Set<String> eliminatedIds = {};
-      Set<String> dismissedIds = {}; // Tamamen silinen (X'e basılan)
-      Set<String> likedBackIds = {}; // Like attıklarım (match olacaklar)
-
-      for (var doc in myActionsSnapshot.docs) {
-        final data = doc.data();
-        final toUserId = data['toUserId'] as String?;
-        final type = data['type'] as String?;
-
-        if (toUserId != null) {
-          if (type == 'dislike') {
-            eliminatedIds.add(toUserId);
-          } else if (type == 'dismissed') {
-            dismissedIds.add(toUserId);
-          } else if (type == 'like' || type == 'superlike') {
-            likedBackIds.add(toUserId);
-          }
-        }
-      }
-
-      debugPrint('Eliminated users: ${eliminatedIds.length}');
-      debugPrint('Dismissed users: ${dismissedIds.length}');
-      debugPrint('Liked back users: ${likedBackIds.length}');
-
-      // Like attıklarımı ve dismissed olanları listeden çıkar
-      likedByUserIds = likedByUserIds
-          .where(
-              (id) => !likedBackIds.contains(id) && !dismissedIds.contains(id))
-          .toList();
-
-      debugPrint('After filtering: ${likedByUserIds.length} users remain');
-
-      // Step 4: Filter out users we've already matched with
-      final matchesSnapshot = await FirebaseFirestore.instance
-          .collection('matches')
-          .where('users', arrayContains: currentUserId)
-          .get();
-
-      Set<String> matchedUserIds = {};
-      for (var doc in matchesSnapshot.docs) {
-        final users = List<String>.from(doc.data()['users'] ?? []);
-        matchedUserIds.addAll(users.where((id) => id != currentUserId));
-      }
-
-      debugPrint('Already matched with: ${matchedUserIds.length} users');
-
-      likedByUserIds =
-          likedByUserIds.where((id) => !matchedUserIds.contains(id)).toList();
-
-      debugPrint(
-          'After filtering matches: ${likedByUserIds.length} users remain');
-
-      if (likedByUserIds.isEmpty) {
-        setState(() {
-          _likedByUsers = [];
-          _isLoading = false;
-        });
-        return;
-      }
-
-      // Step 5: Fetch user profiles
-      List<UserProfile> profiles = [];
-      for (String userId in likedByUserIds) {
-        try {
-          final userDoc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .get();
-
-          if (userDoc.exists && userDoc.data() != null) {
-            final data = userDoc.data()!;
-            profiles.add(UserProfile(
-              id: userId,
-              name: data['name'] ?? '',
-              age: data['age'] ?? 0,
-              bio: data['bio'] ?? '',
-              photos: List<String>.from(data['photos'] ?? []),
-              university: data['university'] ?? '',
-              department: data['department'] ?? '',
-              interests: List<String>.from(data['interests'] ?? []),
-            ));
-            debugPrint('Loaded profile for: ${data['name']}');
-          } else {
-            debugPrint('User $userId not found or has no data');
-          }
-        } catch (e) {
-          debugPrint('Error loading profile for $userId: $e');
-        }
-      }
-
-      debugPrint('Total profiles loaded: ${profiles.length}');
-
-      setState(() {
-        _likedByUsers = profiles;
-        _eliminatedUserIds = eliminatedIds;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading liked by users: $e');
-      setState(() => _isLoading = false);
-    }
+  Future<void> _initializeEliminatedIds() async {
+    final eliminatedIds = await ref.read(likesRepositoryProvider).getEliminatedUserIds();
+    ref.read(likesUIProvider.notifier).initializeEliminatedIds(eliminatedIds);
   }
 
   Future<void> _likeUser(UserProfile user) async {
@@ -190,73 +40,22 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
       final currentUserId = FirebaseAuth.instance.currentUser?.uid;
       if (currentUserId == null) return;
 
-      // Generate action ID (same format as SwipeRepository)
-      final actionId = '${currentUserId}_${user.id}';
+      // Use repository to like user
+      final result = await ref.read(likesRepositoryProvider).likeUser(user.id);
 
-      // Record the like action
-      await FirebaseFirestore.instance.collection('actions').doc(actionId).set({
-        'fromUserId': currentUserId,
-        'toUserId': user.id,
-        'type': 'like',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      if (result['success'] == true) {
+        // Create chat room for the match
+        final chatService = ChatService();
+        await chatService.createMatchChat(currentUserId, user.id);
 
-      // Since they already liked us (that's why they're in this list),
-      // this is definitely a match - create match document
-      final sortedIds = [currentUserId, user.id]..sort();
-      final matchId = '${sortedIds[0]}_${sortedIds[1]}';
-
-      // Check if match already exists
-      final existingMatch = await FirebaseFirestore.instance
-          .collection('matches')
-          .doc(matchId)
-          .get();
-
-      if (!existingMatch.exists) {
-        // Create match document
-        await FirebaseFirestore.instance
-            .collection('matches')
-            .doc(matchId)
-            .set({
-          'users': sortedIds,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        // Add to each user's matches subcollection
-        final batch = FirebaseFirestore.instance.batch();
-
-        batch.set(
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(currentUserId)
-              .collection('matches')
-              .doc(user.id),
-          {'timestamp': FieldValue.serverTimestamp(), 'matchId': matchId},
-        );
-
-        batch.set(
-          FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.id)
-              .collection('matches')
-              .doc(currentUserId),
-          {'timestamp': FieldValue.serverTimestamp(), 'matchId': matchId},
-        );
-
-        await batch.commit();
-      }
-
-      // Remove from list and show match notification
-      setState(() {
-        _likedByUsers.removeWhere((u) => u.id == user.id);
-      });
-
-      if (mounted) {
-        CustomNotification.success(
-          context,
-          'Yeni Arkadas!',
-          subtitle: '${user.name} ile eslestiniz!',
-        );
+        // Show full-screen Match Popup
+        if (mounted) {
+          _showMatchScreen(user);
+        }
+      } else {
+        if (mounted) {
+          CustomNotification.error(context, 'Bir hata olustu');
+        }
       }
     } catch (e) {
       debugPrint('Error liking user: $e');
@@ -266,28 +65,78 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     }
   }
 
+  /// Show full-screen Match Popup (same as Discovery screen)
+  void _showMatchScreen(UserProfile matchedProfile) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => MatchPopup(
+          matchedProfile: matchedProfile,
+          onSendMessage: () {
+            Navigator.pop(context);
+            // Navigate to chat with the matched user
+            _navigateToChat(matchedProfile);
+          },
+          onKeepSwiping: () {
+            Navigator.pop(context);
+          },
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
+  }
+
+  /// Navigate to chat screen with matched user
+  void _navigateToChat(UserProfile matchedProfile) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Generate chat ID (same format as ChatService)
+    final sortedIds = [currentUserId, matchedProfile.id]..sort();
+    final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+
+    // Navigate to chat detail screen
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            chatId: chatId,
+            peerId: matchedProfile.id,
+            peerName: matchedProfile.name,
+            peerImage: matchedProfile.primaryPhoto,
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _dislikeUser(UserProfile user) async {
     HapticFeedback.mediumImpact();
 
     try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      if (currentUserId == null) return;
+      // Use repository to dislike user
+      final result = await ref.read(likesRepositoryProvider).dislikeUser(user.id);
 
-      // Generate action ID (same format as SwipeRepository)
-      final actionId = '${currentUserId}_${user.id}';
-
-      // Record the dislike action
-      await FirebaseFirestore.instance.collection('actions').doc(actionId).set({
-        'fromUserId': currentUserId,
-        'toUserId': user.id,
-        'type': 'dislike',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      // Elendi olarak işaretle (listeden silme)
-      setState(() {
-        _eliminatedUserIds.add(user.id);
-      });
+      if (result['success'] == true) {
+        // Mark as eliminated in UI state
+        ref.read(likesUIProvider.notifier).markAsEliminated(user.id);
+      } else {
+        if (mounted) {
+          CustomNotification.error(context, 'Bir hata olustu');
+        }
+      }
     } catch (e) {
       debugPrint('Error disliking user: $e');
       if (mounted) {
@@ -298,48 +147,36 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
 
   /// Elenmiş kullanıcıyı tamamen listeden kaldır (X butonuna basıldığında)
   Future<void> _dismissUser(UserProfile user) async {
+    final uiState = ref.read(likesUIProvider);
+
     // Zaten animasyon oynatılıyorsa tekrar başlatma
-    if (_dismissingUserIds.contains(user.id)) return;
+    if (uiState.dismissingUserIds.contains(user.id)) return;
 
     HapticFeedback.mediumImpact();
 
     // Step 1: Çıkış animasyonunu başlat
-    setState(() {
-      _dismissingUserIds.add(user.id);
-    });
+    ref.read(likesUIProvider.notifier).startDismissing(user.id);
 
     // Step 2: Animasyon süresince bekle
     await Future.delayed(_animationDuration);
 
-    // Step 3: Animasyon bittikten sonra veritabanını güncelle ve listeden kaldır
+    // Step 3: Animasyon bittikten sonra veritabanını güncelle
     try {
-      final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-      if (currentUserId == null) return;
+      final result = await ref.read(likesRepositoryProvider).dismissUser(user.id);
 
-      // Generate action ID
-      final actionId = '${currentUserId}_${user.id}';
-
-      // Update action type to "dismissed"
-      await FirebaseFirestore.instance
-          .collection('actions')
-          .doc(actionId)
-          .update({'type': 'dismissed'});
-
-      // Listeden tamamen kaldır
-      if (mounted) {
-        setState(() {
-          _likedByUsers.removeWhere((u) => u.id == user.id);
-          _eliminatedUserIds.remove(user.id);
-          _dismissingUserIds.remove(user.id);
-        });
+      if (result['success'] == true) {
+        // Stream will automatically update the list
+        ref.read(likesUIProvider.notifier).finishDismissing(user.id);
+      } else {
+        if (mounted) {
+          ref.read(likesUIProvider.notifier).cancelDismissing(user.id);
+          CustomNotification.error(context, 'Bir hata olustu');
+        }
       }
     } catch (e) {
       debugPrint('Error dismissing user: $e');
       if (mounted) {
-        // Hata durumunda animasyonu geri al
-        setState(() {
-          _dismissingUserIds.remove(user.id);
-        });
+        ref.read(likesUIProvider.notifier).cancelDismissing(user.id);
         CustomNotification.error(context, 'Bir hata olustu');
       }
     }
@@ -366,18 +203,27 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the stream of received likes
+    final likesAsync = ref.watch(receivedLikesProvider);
+    final uiState = ref.watch(likesUIProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(likesAsync),
             Expanded(
-              child: _isLoading
-                  ? _buildLoadingState()
-                  : _likedByUsers.isEmpty
-                      ? _buildEmptyState()
-                      : _buildLikesList(),
+              child: likesAsync.when(
+                loading: () => _buildLoadingState(),
+                error: (error, stack) => _buildErrorState(error.toString()),
+                data: (likedByUsers) {
+                  if (likedByUsers.isEmpty) {
+                    return _buildEmptyState();
+                  }
+                  return _buildLikesList(likedByUsers, uiState);
+                },
+              ),
             ),
           ],
         ),
@@ -385,7 +231,55 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Bir hata olustu',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              error,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => ref.invalidate(receivedLikesProvider),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Tekrar Dene'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF2C60),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(AsyncValue<List<UserProfile>> likesAsync) {
+    final count = likesAsync.valueOrNull?.length ?? 0;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -419,16 +313,51 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Begeniler',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Begeniler',
+                      style: GoogleFonts.poppins(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Real-time indicator
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Canli',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
-                  '${_likedByUsers.length} kisi seni begendi',
+                  '$count kisi seni begendi',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -437,8 +366,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
               ],
             ),
           ),
+          // Refresh button (manual refresh still available)
           IconButton(
-            onPressed: _loadLikedByUsers,
+            onPressed: () => ref.invalidate(receivedLikesProvider),
             icon: Icon(
               Icons.refresh_rounded,
               color: Colors.grey[600],
@@ -471,14 +401,13 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   }
 
   Future<void> _seedDemoLikes() async {
-    setState(() => _isLoading = true);
-
     try {
       final seedService = SeedService();
       final count = await seedService.seedDemoLikesToCurrentUser();
 
       if (count > 0) {
-        await _loadLikedByUsers();
+        // Invalidate the provider to refresh the stream
+        ref.invalidate(receivedLikesProvider);
         if (mounted) {
           CustomNotification.success(
             context,
@@ -487,14 +416,12 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
           );
         }
       } else {
-        setState(() => _isLoading = false);
         if (mounted) {
           CustomNotification.error(context, 'Demo veri eklenemedi');
         }
       }
     } catch (e) {
       debugPrint('Error seeding demo likes: $e');
-      setState(() => _isLoading = false);
       if (mounted) {
         CustomNotification.error(context, 'Bir hata olustu');
       }
@@ -616,9 +543,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     );
   }
 
-  Widget _buildLikesList() {
+  Widget _buildLikesList(List<UserProfile> likedByUsers, LikesUIState uiState) {
     return RefreshIndicator(
-      onRefresh: _loadLikedByUsers,
+      onRefresh: () async => ref.invalidate(receivedLikesProvider),
       color: const Color(0xFFFF2C60),
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
@@ -628,11 +555,11 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
           mainAxisSpacing: 16,
           childAspectRatio: 0.75,
         ),
-        itemCount: _likedByUsers.length,
+        itemCount: likedByUsers.length,
         itemBuilder: (context, index) {
-          final user = _likedByUsers[index];
-          final isEliminated = _eliminatedUserIds.contains(user.id);
-          final isDismissing = _dismissingUserIds.contains(user.id);
+          final user = likedByUsers[index];
+          final isEliminated = uiState.eliminatedUserIds.contains(user.id);
+          final isDismissing = uiState.dismissingUserIds.contains(user.id);
           return _buildLikeCard(
             user,
             isEliminated: isEliminated,

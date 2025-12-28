@@ -30,6 +30,7 @@ class SeedService {
         ],
         'interests': ['Kitap', 'Kahve', 'Yoga', 'Seyahat'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true, // Demo kullanici bayragi - GERCEK KULLANICILAR KORUNUR
       },
       {
         'name': 'Zeynep',
@@ -46,6 +47,7 @@ class SeedService {
         ],
         'interests': ['Seyahat', 'Fotoğrafçılık', 'Müzik', 'Dans'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Selin',
@@ -62,6 +64,7 @@ class SeedService {
         ],
         'interests': ['Hukuk', 'Kitap', 'Yoga', 'Doğa'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Defne',
@@ -77,6 +80,7 @@ class SeedService {
         ],
         'interests': ['Müzik', 'Resim', 'Gitar', 'Sinema'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Ahmet',
@@ -92,6 +96,7 @@ class SeedService {
         ],
         'interests': ['Müzik', 'Teknoloji', 'Gitar', 'Kod'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Can',
@@ -108,6 +113,7 @@ class SeedService {
         ],
         'interests': ['Spor', 'Sinema', 'Basketbol', 'Yüzme'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Emre',
@@ -124,6 +130,7 @@ class SeedService {
         ],
         'interests': ['Girişimcilik', 'Teknoloji', 'Kitap', 'Koşu'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Burak',
@@ -140,6 +147,7 @@ class SeedService {
         ],
         'interests': ['Futbol', 'Oyun', 'Film', 'Müzik'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Ece',
@@ -156,6 +164,7 @@ class SeedService {
         ],
         'interests': ['Tıp', 'Yoga', 'Yemek', 'Seyahat'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Deniz',
@@ -172,6 +181,7 @@ class SeedService {
         ],
         'interests': ['Sörf', 'Kamp', 'Doğa', 'Fotoğrafçılık'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Kaan',
@@ -188,6 +198,7 @@ class SeedService {
         ],
         'interests': ['Yazılım', 'Kahve', 'Oyun', 'Anime'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
       {
         'name': 'Merve',
@@ -203,6 +214,7 @@ class SeedService {
         ],
         'interests': ['Moda', 'Tasarım', 'Alışveriş', 'Fotoğraf'],
         'createdAt': FieldValue.serverTimestamp(),
+        'isDemoUser': true,
       },
     ];
 
@@ -214,22 +226,42 @@ class SeedService {
     await batch.commit();
   }
 
-  /// Tüm test profillerini sil (mevcut kullanıcı hariç)
+  /// Tüm test profillerini sil (SADECE isDemoUser: true olanlar)
+  /// GERCEK KULLANICILAR KORUNUR!
   Future<void> clearTestProfiles() async {
     final currentUserId = _auth.currentUser?.uid;
     final snapshot = await _firestore.collection('users').get();
     final batch = _firestore.batch();
+    int deletedCount = 0;
+    int protectedCount = 0;
 
     for (final doc in snapshot.docs) {
-      // Mevcut kullanıcıyı silme
-      if (doc.id != currentUserId) {
-        batch.delete(doc.reference);
+      final data = doc.data();
+      final isDemoUser = data['isDemoUser'] == true;
+
+      // GUVENLIK KONTROLU:
+      // 1. Mevcut kullaniciyi ASLA silme
+      // 2. isDemoUser: true OLMAYAN kullanicilari ASLA silme
+      if (doc.id == currentUserId) {
+        protectedCount++;
+        debugPrint('SeedService: KORUNDU (mevcut kullanici): ${data['name'] ?? doc.id}');
+        continue;
       }
+
+      if (!isDemoUser) {
+        protectedCount++;
+        debugPrint('SeedService: KORUNDU (gercek kullanici): ${data['name'] ?? data['email'] ?? doc.id}');
+        continue;
+      }
+
+      // Sadece demo kullaniciyi sil
+      batch.delete(doc.reference);
+      deletedCount++;
     }
 
     await batch.commit();
-    debugPrint(
-        'SeedService: Cleared ${snapshot.docs.length - 1} demo profiles');
+    debugPrint('SeedService: Silindi: $deletedCount demo profil');
+    debugPrint('SeedService: Korundu: $protectedCount gercek profil');
   }
 
   /// Demo kullanıcıların mevcut kullanıcıyı beğenmesini sağla

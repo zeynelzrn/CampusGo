@@ -9,6 +9,7 @@ import '../repositories/profile_repository.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
 import 'main_screen.dart';
+import 'welcome_screen.dart';
 
 class CreateProfileScreen extends ConsumerStatefulWidget {
   const CreateProfileScreen({super.key});
@@ -266,31 +267,113 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
 
   Widget _buildHeader() {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
-          ).createShader(bounds),
-          child: Text(
-            'Profilini Oluştur',
-            style: GoogleFonts.poppins(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+        // Geri butonu - WelcomeScreen'e döner
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF2C60).withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: IconButton(
+            onPressed: () => _showExitConfirmDialog(),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Color(0xFFFF2C60),
+              size: 22,
             ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Diğer kullanıcıların seni tanıması için\nprofilini tamamla',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.grey[600],
-            height: 1.5,
+        const SizedBox(height: 24),
+        // Başlık - ortalanmış
+        Center(
+          child: Column(
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                ).createShader(bounds),
+                child: Text(
+                  'Profilini Oluştur',
+                  style: GoogleFonts.poppins(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Diğer kullanıcıların seni tanıması için\nprofilini tamamla',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+
+  void _showExitConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Profil Oluşturmayı İptal Et',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Profil oluşturmadan çıkmak istediğinize emin misiniz? Tüm girdiğiniz bilgiler kaybolacak.',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: Colors.grey[600],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Devam Et',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Dialog'u kapat
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF2C60),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Çıkış Yap',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

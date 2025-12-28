@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/profile_service.dart';
-import '../services/seed_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
 
@@ -392,8 +391,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   _buildSection('İlgi Alanları', [
                     _buildInterestsSelector(),
                   ]),
-                  const SizedBox(height: 24),
-                  _buildDeveloperSection(),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -837,168 +834,4 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
-  bool _isResetting = false;
-
-  Widget _buildDeveloperSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.developer_mode, color: Colors.orange[700]),
-              const SizedBox(width: 8),
-              Text(
-                'Geliştirici Araçları',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange[800],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Demo verilerini sıfırlayarak tüm profilleri, beğenileri ve eşleşmeleri yeniden oluşturabilirsiniz.',
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.orange[700],
-            ),
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: _isResetting ? null : _resetDemoData,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _isResetting
-                      ? [Colors.grey[400]!, Colors.grey[500]!]
-                      : [Colors.orange[600]!, Colors.deepOrange],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: _isResetting
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.4),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (_isResetting)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  else
-                    const Icon(
-                      Icons.refresh_rounded,
-                      color: Colors.white,
-                    ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _isResetting
-                        ? 'Sıfırlanıyor...'
-                        : 'Tüm Demo Verileri Sıfırla',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _resetDemoData() async {
-    // Önce onay al
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange[700]),
-            const SizedBox(width: 8),
-            const Text('Emin misiniz?'),
-          ],
-        ),
-        content: Text(
-          'Bu işlem tüm demo profillerini, beğenilerinizi ve eşleşmelerinizi silip yeniden oluşturacak.\n\nSenin profilin korunacak.',
-          style: GoogleFonts.poppins(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'İptal',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange[600],
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              'Sıfırla',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() => _isResetting = true);
-
-    try {
-      final seedService = SeedService();
-      final result = await seedService.resetAllDemoData();
-
-      if (mounted) {
-        CustomNotification.success(
-          context,
-          'Veriler Sıfırlandı!',
-          subtitle:
-              '${result['profiles']} profil, ${result['likes']} beğeni oluşturuldu',
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        CustomNotification.error(context, 'Sıfırlama başarısız: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isResetting = false);
-      }
-    }
-  }
 }

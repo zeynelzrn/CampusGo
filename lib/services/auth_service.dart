@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notificationService = NotificationService();
 
   // Mevcut kullanıcıyı al
   User? get currentUser => _auth.currentUser;
@@ -23,6 +25,9 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
+        // Save FCM token on successful registration
+        await _notificationService.saveTokenToFirestore(user.uid);
+        _notificationService.listenToTokenRefresh(user.uid);
         return {'success': true, 'user': user};
       }
 
@@ -34,7 +39,7 @@ class AuthService {
           errorMessage = 'Şifre çok zayıf';
           break;
         case 'email-already-in-use':
-          errorMessage = 'Bu e-posta zaten kullanımda';
+          errorMessage = 'Bu e-posta adresi zaten kullanımda. Lütfen giriş yapın.';
           break;
         case 'invalid-email':
           errorMessage = 'Geçersiz e-posta adresi';
@@ -48,7 +53,7 @@ class AuthService {
       if (errorStr.contains('network')) {
         return {'success': false, 'error': 'İnternet bağlantısı yok'};
       } else if (errorStr.contains('email-already-in-use')) {
-        return {'success': false, 'error': 'Bu e-posta zaten kullanımda'};
+        return {'success': false, 'error': 'Bu e-posta adresi zaten kullanımda. Lütfen giriş yapın.'};
       }
       return {'success': false, 'error': 'Kayıt hatası. Lütfen tekrar deneyin.'};
     }
@@ -68,6 +73,9 @@ class AuthService {
       User? user = result.user;
 
       if (user != null) {
+        // Save FCM token on successful login
+        await _notificationService.saveTokenToFirestore(user.uid);
+        _notificationService.listenToTokenRefresh(user.uid);
         return {'success': true, 'user': user};
       }
 
@@ -119,6 +127,11 @@ class AuthService {
 
   // Çıkış yap
   Future<void> signOut() async {
+    // Delete FCM token before signing out
+    final user = _auth.currentUser;
+    if (user != null) {
+      await _notificationService.deleteTokenFromFirestore(user.uid);
+    }
     await _auth.signOut();
   }
 

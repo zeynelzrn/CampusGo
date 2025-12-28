@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
 
@@ -192,24 +193,28 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
     }
   }
 
-  /// Record swipe action and check for match
+  /// Record swipe action and check for MUTUAL match
   Future<void> _recordSwipeAction(
       String targetUserId, SwipeActionType actionType) async {
     try {
-      final isMatch = await _repository.recordSwipeAction(
+      final result = await _repository.recordSwipeAction(
         targetUserId: targetUserId,
         actionType: actionType,
       );
 
-      // If it's a like and resulted in a match, notify
-      if (isMatch &&
+      final success = result['success'] as bool? ?? false;
+      final isMatch = result['isMatch'] as bool? ?? false;
+
+      // Only show match animation if MUTUAL like (both users liked each other)
+      if (success && isMatch &&
           (actionType == SwipeActionType.like ||
               actionType == SwipeActionType.superlike)) {
         state = state.copyWith(isMatch: true);
+        debugPrint('SwipeProvider: IT\'S A MATCH! Showing match animation.');
       }
     } catch (e) {
       // Silent fail for background operation
-      print('Error recording swipe: $e');
+      debugPrint('SwipeProvider: Error recording swipe: $e');
     }
   }
 

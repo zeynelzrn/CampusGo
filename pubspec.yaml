@@ -27,11 +27,34 @@ dependencies:
   cached_network_image: ^3.3.1
   # Shimmer effect
   shimmer: ^3.0.0
+  # Push Notifications
+  firebase_messaging: ^15.1.6
+  flutter_local_notifications: ^18.0.1
+  # In-App Overlay Notifications
+  overlay_support: ^2.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.14.2
+
+# App Icon Configuration
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  # Android Adaptive Icon Settings
+  adaptive_icon_background: "#FF2C60"  # CampusGo ana pembe rengi
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
 
 flutter:
   uses-material-design: true

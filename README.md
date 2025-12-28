@@ -65,10 +65,15 @@ Uygulama 5 ana sekmeden olusmaktadir:
 - Mesaj gonderme secenegi
 
 ### Bildirim Sistemi
-- Ozel tasarim bildirimler
-- Basari, hata, uyari ve bilgi tipleri
-- Animasyonlu giris/cikis
-- Swipe ile kapatma
+- **Push Notifications** - Firebase Cloud Messaging (FCM)
+- **In-App Overlay** - Foreground'da renkli banner bildirimleri
+- **Firestore Stream** - iOS fallback (ucresiz hesap destegi)
+- **Cloud Functions** - Sunucu tarafli bildirim tetikleme
+- Begeni bildirimi (pembe gradient)
+- Mesaj bildirimi (mor gradient)
+- Eslesme bildirimi (pembe-turuncu gradient)
+- Haptic feedback
+- Bildirime tiklayinca ilgili ekrana yonlendirme
 
 ### Hesap Yonetimi
 - Profil duzenleme
@@ -89,6 +94,9 @@ Uygulama 5 ana sekmeden olusmaktadir:
 | **Authentication** | Firebase Auth |
 | **Database** | Cloud Firestore |
 | **Storage** | Firebase Storage |
+| **Push Notifications** | Firebase Cloud Messaging (FCM) |
+| **Cloud Functions** | Firebase Functions (TypeScript) |
+| **In-App Notifications** | overlay_support |
 | **UI/UX** | Material Design, Google Fonts |
 | **Animasyonlar** | Custom Animations, Shimmer |
 
@@ -130,7 +138,16 @@ cd ..
    - `GoogleService-Info.plist` (iOS) ve `google-services.json` (Android) dosyalarini indir
    - `lib/firebase_options.dart` dosyasini guncelle
 
-5. **Uygulamayi calistir**
+5. **Cloud Functions kur (Bildirimler icin)**
+```bash
+cd functions
+npm install
+npm run build
+firebase deploy --only functions
+cd ..
+```
+
+6. **Uygulamayi calistir**
 ```bash
 # iOS
 flutter run -d ios
@@ -169,6 +186,7 @@ lib/
 ├── services/                  # Is mantigi servisleri
 │   ├── auth_service.dart      # Kimlik dogrulama
 │   ├── profile_service.dart   # Profil islemleri
+│   ├── notification_service.dart  # FCM ve bildirim yonetimi
 │   └── seed_service.dart      # Test verisi olusturma
 ├── widgets/                   # Yeniden kullanilabilir widgetlar
 │   ├── campus_logo.dart       # Logo widget
@@ -176,6 +194,12 @@ lib/
 │   └── swipe_card.dart        # Swipe karti widget
 ├── firebase_options.dart      # Firebase yapilandirmasi
 └── main.dart                  # Uygulama girisi
+
+functions/                     # Firebase Cloud Functions
+├── src/
+│   └── index.ts              # Bildirim trigger fonksiyonlari
+├── package.json              # Node.js bagimliliklari
+└── tsconfig.json             # TypeScript yapilandirmasi
 ```
 
 ---
@@ -243,8 +267,8 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/Runner-*
 
 ## Gelecek Ozellikler
 
-- [ ] Gercek zamanli mesajlasma
-- [ ] Push bildirimleri
+- [x] Gercek zamanli mesajlasma
+- [x] Push bildirimleri (FCM + Firestore Stream)
 - [ ] Konum bazli arkadas onerisi
 - [ ] Premium uyelik sistemi
 - [ ] Profil dogrulama

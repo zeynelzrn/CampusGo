@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-enum NotificationType { success, error, warning, info }
+enum NotificationType { success, error, warning, info, like, message }
 
 class CustomNotification {
   static void show({
@@ -62,6 +62,30 @@ class CustomNotification {
         message: message,
         subtitle: subtitle,
         type: NotificationType.info);
+  }
+
+  /// Show a pink-themed notification for likes
+  static void like(BuildContext context, String message,
+      {String? subtitle, VoidCallback? onTap}) {
+    show(
+      context: context,
+      message: message,
+      subtitle: subtitle,
+      type: NotificationType.like,
+      onTap: onTap,
+    );
+  }
+
+  /// Show a blue-purple themed notification for messages
+  static void message(BuildContext context, String message,
+      {String? subtitle, VoidCallback? onTap}) {
+    show(
+      context: context,
+      message: message,
+      subtitle: subtitle,
+      type: NotificationType.message,
+      onTap: onTap,
+    );
   }
 }
 
@@ -287,6 +311,24 @@ class _NotificationWidgetState extends State<_NotificationWidget>
             const Color(0xFF64B5F6),
           ],
           shadowColor: const Color(0xFF2196F3),
+        );
+      case NotificationType.like:
+        return _NotificationConfig(
+          icon: Icons.favorite_rounded,
+          gradientColors: [
+            const Color(0xFFFF2C60),
+            const Color(0xFFFF6B9D),
+          ],
+          shadowColor: const Color(0xFFFF2C60),
+        );
+      case NotificationType.message:
+        return _NotificationConfig(
+          icon: Icons.chat_bubble_rounded,
+          gradientColors: [
+            const Color(0xFF7C4DFF),
+            const Color(0xFFB388FF),
+          ],
+          shadowColor: const Color(0xFF7C4DFF),
         );
     }
   }

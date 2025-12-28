@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/swipe_provider.dart';
 import '../models/user_profile.dart';
 import '../widgets/swipe_card.dart';
 import '../services/seed_service.dart';
 import '../widgets/custom_notification.dart';
+import 'chat_detail_screen.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -842,7 +844,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           matchedProfile: profile,
           onSendMessage: () {
             Navigator.pop(context);
-            // TODO: Navigate to chat
+            // Navigate to chat with the matched user
+            _navigateToChat(profile);
           },
           onKeepSwiping: () {
             Navigator.pop(context);
@@ -862,5 +865,30 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
+  }
+
+  /// Navigate to chat screen with matched user
+  void _navigateToChat(UserProfile matchedProfile) {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    // Generate chat ID (same format as ChatService)
+    final sortedIds = [currentUserId, matchedProfile.id]..sort();
+    final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+
+    // Navigate to chat detail screen
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            chatId: chatId,
+            peerId: matchedProfile.id,
+            peerName: matchedProfile.name,
+            peerImage: matchedProfile.primaryPhoto,
+          ),
+        ),
+      );
+    }
   }
 }

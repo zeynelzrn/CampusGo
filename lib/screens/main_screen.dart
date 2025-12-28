@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/notification_service.dart';
 import 'discover_screen.dart';
 import 'likes_screen.dart';
-import 'matches_screen.dart';
+import 'chat_list_screen.dart';
 import 'profile_edit_screen.dart';
 import 'settings_screen.dart';
 
@@ -120,33 +121,57 @@ class _DirectionalLockPageViewState extends State<_DirectionalLockPageView> {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+
+  const MainScreen({super.key, this.initialIndex = 2});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 2; // Start at discover (middle)
+  late int _currentIndex;
   late PageController _pageController;
 
   final List<Widget> _screens = [
     const ProfileEditScreen(),
     const LikesScreen(),
     const DiscoverScreen(),
-    const MatchesScreen(),
+    const ChatListScreen(),
     const SettingsScreen(),
   ];
 
   @override
   void initState() {
     super.initState();
+    // Uygulama her açıldığında token'ı sessizce güncelle
+    NotificationService.instance.getAndSaveToken();
+
+    // Firestore Stream notification listener başlat (iOS fallback)
+    NotificationService.instance.listenToInAppNotifications();
+
+    // Navigasyon callback'i ayarla
+    NotificationService.setNavigationCallback(_navigateToTab);
+
+    _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  void _navigateToTab(int index) {
+    if (mounted) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    // Listener'ı durdur
+    NotificationService.instance.stopListeningToNotifications();
     super.dispose();
   }
 

@@ -571,62 +571,59 @@ class _LoginScreenState extends State<LoginScreen>
 
                             const SizedBox(height: 30),
 
-                            // BENİ HATIRLA - MODERN VERSİYON (saçmalık mesajlar kaldırıldı)
-                            Row(
-                              children: [
-                                // Sol - Beni hatırla (modern, temiz)
-                                Expanded(
-                                  flex: 3,
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      setState(
-                                          () => _rememberMe = !_rememberMe);
-                                    },
-                                    child: AnimatedContainer(
-                                      duration:
-                                          const Duration(milliseconds: 250),
-                                      height: 58,
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
+                            // BENİ HATIRLA - RESPONSIVE LAYOUT
+                            // Dar ekranlarda alt alta, geniş ekranlarda yan yana
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                // 320px altındaki ekranlarda Column kullan
+                                final isNarrow = constraints.maxWidth < 320;
+
+                                final rememberMeWidget = GestureDetector(
+                                  onTap: () {
+                                    setState(() => _rememberMe = !_rememberMe);
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    height: 58,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: _rememberMe
+                                          ? const Color(0xFFFF2C60).withValues(alpha: 0.1)
+                                          : Colors.white.withValues(alpha: 0.8),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
                                         color: _rememberMe
-                                            ? const Color(0xFFFF2C60)
-                                                .withOpacity(0.1)
-                                            : Colors.white.withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: _rememberMe
-                                              ? const Color(0xFFFF2C60)
-                                                  .withOpacity(0.4)
-                                              : Colors.grey.withOpacity(0.3),
-                                          width: 2,
-                                        ),
+                                            ? const Color(0xFFFF2C60).withValues(alpha: 0.4)
+                                            : Colors.grey.withValues(alpha: 0.3),
+                                        width: 2,
                                       ),
-                                      child: Row(
-                                        children: [
-                                          AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 250),
-                                            width: 22,
-                                            height: 22,
-                                            decoration: BoxDecoration(
-                                              color: _rememberMe
-                                                  ? const Color(0xFFFF2C60)
-                                                  : Colors.grey[300],
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: _rememberMe
-                                                ? const Icon(Icons.check,
-                                                    size: 16,
-                                                    color: Colors.white)
-                                                : null,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AnimatedContainer(
+                                          duration: const Duration(milliseconds: 250),
+                                          width: 22,
+                                          height: 22,
+                                          decoration: BoxDecoration(
+                                            color: _rememberMe
+                                                ? const Color(0xFFFF2C60)
+                                                : Colors.grey[300],
+                                            borderRadius: BorderRadius.circular(6),
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
+                                          child: _rememberMe
+                                              ? const Icon(Icons.check,
+                                                  size: 16, color: Colors.white)
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
                                             child: Text(
                                               'Beni hatırla',
                                               style: GoogleFonts.poppins(
-                                                fontSize: 15,
+                                                fontSize: 14,
                                                 color: _rememberMe
                                                     ? const Color(0xFFFF2C60)
                                                     : Colors.grey[700],
@@ -634,55 +631,79 @@ class _LoginScreenState extends State<LoginScreen>
                                               ),
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                ),
+                                );
 
-                                const SizedBox(width: 12),
-
-                                // Sağ - Şifremi unuttum (daha geniş)
-                                Expanded(
-                                  flex: 2,
-                                  child: GestureDetector(
-                                    onTap: () => _showForgotPasswordDialog(),
-                                    child: Container(
-                                      height: 58,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 16),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            const Color(0xFFFF2C60)
-                                                .withOpacity(0.1),
-                                            const Color(0xFFFF6B9D)
-                                                .withOpacity(0.05),
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: const Color(0xFFFF2C60)
-                                              .withOpacity(0.3),
-                                          width: 1.5,
-                                        ),
+                                final forgotPasswordWidget = GestureDetector(
+                                  onTap: () => _showForgotPasswordDialog(),
+                                  child: Container(
+                                    height: 58,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 16),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                                          const Color(0xFFFF6B9D).withValues(alpha: 0.05),
+                                        ],
                                       ),
-                                      child: Center(
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
                                         child: Text(
                                           'Şifremi unuttum',
                                           style: GoogleFonts.poppins(
-                                            fontSize: 12.5,
+                                            fontSize: 13,
                                             color: const Color(0xFFFF2C60),
                                             fontWeight: FontWeight.w600,
                                           ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 2,
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                );
+
+                                if (isNarrow) {
+                                  // Dar ekran: Alt alta
+                                  return Column(
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: rememberMeWidget,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: forgotPasswordWidget,
+                                      ),
+                                    ],
+                                  );
+                                } else {
+                                  // Geniş ekran: Yan yana
+                                  return Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: rememberMeWidget,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        flex: 2,
+                                        child: forgotPasswordWidget,
+                                      ),
+                                    ],
+                                  );
+                                }
+                              },
                             ),
 
                             const SizedBox(height: 50),
