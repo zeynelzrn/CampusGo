@@ -22,6 +22,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _showOnlineStatus = true;
   bool _showDistance = true;
+  // ignore: unused_field - Used in debug functions for loading state
   bool _isDebugLoading = false;
 
   // Admin password for Debug Panel access
@@ -282,7 +283,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFFFF2C60),
+            activeTrackColor: const Color(0xFFFF2C60).withValues(alpha: 0.5),
+            activeThumbColor: const Color(0xFFFF2C60),
           ),
         ],
       ),
