@@ -61,3 +61,8 @@ lib/firebase_options.dart
 
 # Local IDE settings
 .claude/
+
+# Android Signing Keys (Güvenlik İçin Ekstra)
+*.jks
+*.keystore
+key.properties
