@@ -54,9 +54,10 @@ macos/build/
 macos/.symlinks/
 macos/Pods/
 
-# Firebase config (uncomment if you want to exclude)
-# ios/Runner/GoogleService-Info.plist
-# android/app/google-services.json
+# Firebase config files (sensitive - never commit)
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+lib/firebase_options.dart
 
 # Local IDE settings
 .claude/

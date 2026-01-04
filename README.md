@@ -133,10 +133,15 @@ cd ..
 ```
 
 4. **Firebase yapilandirmasi**
-   - Firebase Console'dan proje olustur
-   - iOS ve Android uygulamalarini ekle
-   - `GoogleService-Info.plist` (iOS) ve `google-services.json` (Android) dosyalarini indir
-   - `lib/firebase_options.dart` dosyasini guncelle
+
+   > **Not:** Bu proje guvenlik nedeniyle Firebase yapilandirma dosyalarini (`google-services.json`, `GoogleService-Info.plist`, `firebase_options.dart`) icermemektedir.
+
+   Projeyi yerel ortaminizda calistirmak icin:
+   - Firebase Console'dan kendi projenizi olusturun
+   - iOS ve Android uygulamalarini ekleyin
+   - Android icin `google-services.json` dosyasini `android/app/` klasorune ekleyin
+   - iOS icin `GoogleService-Info.plist` dosyasini `ios/Runner/` klasorune ekleyin
+   - `flutterfire configure` komutu ile `lib/firebase_options.dart` dosyasini olusturun
 
 5. **Cloud Functions kur (Bildirimler icin)**
 ```bash
