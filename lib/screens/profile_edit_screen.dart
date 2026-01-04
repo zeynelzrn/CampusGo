@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
@@ -75,6 +77,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _hasChanges = false;
+
+  // Initial values for change detection
+  String _initialName = '';
+  String _initialAge = '';
+  String _initialBio = '';
+  String _initialUniversity = '';
+  String _initialDepartment = '';
+  String _initialGender = 'Erkek';
+  String _initialLookingFor = 'Kadın';
+  String _initialGrade = '';
+  String _initialInstagram = '';
+  String _initialLinkedin = '';
+  List<String> _initialInterests = [];
+  List<String> _initialClubs = [];
+  List<String> _initialIntents = [];
+  List<String?> _initialPhotoUrls = List.filled(6, null);
 
   final List<String> _allInterests = [
     'Müzik',
@@ -103,10 +122,70 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    _addListeners();
+  }
+
+  void _addListeners() {
+    _nameController.addListener(_checkForChanges);
+    _ageController.addListener(_checkForChanges);
+    _bioController.addListener(_checkForChanges);
+    _universityController.addListener(_checkForChanges);
+    _departmentController.addListener(_checkForChanges);
+    _instagramController.addListener(_checkForChanges);
+    _linkedinController.addListener(_checkForChanges);
+  }
+
+  void _checkForChanges() {
+    // Skip check if still loading initial data
+    if (_isLoading) return;
+
+    final hasChanges =
+        // String comparisons with trim()
+        _nameController.text.trim() != _initialName.trim() ||
+        _ageController.text.trim() != _initialAge.trim() ||
+        _bioController.text.trim() != _initialBio.trim() ||
+        _universityController.text.trim() != _initialUniversity.trim() ||
+        _departmentController.text.trim() != _initialDepartment.trim() ||
+        _instagramController.text.trim() != _initialInstagram.trim() ||
+        _linkedinController.text.trim() != _initialLinkedin.trim() ||
+        _selectedGender != _initialGender ||
+        _lookingFor != _initialLookingFor ||
+        _selectedGrade != _initialGrade ||
+        // Set-based deep comparison for lists (order doesn't matter)
+        !_setEquals(_selectedInterests, _initialInterests) ||
+        !_setEquals(_selectedClubs, _initialClubs) ||
+        !_setEquals(_selectedIntents, _initialIntents) ||
+        !_photoListEquals(_photoUrls, _localPhotos, _initialPhotoUrls);
+
+    if (hasChanges != _hasChanges) {
+      setState(() => _hasChanges = hasChanges);
+    }
+  }
+
+  /// Deep comparison using Set - returns true if both lists have same elements
+  bool _setEquals(List<String> a, List<String> b) {
+    return setEquals(a.toSet(), b.toSet());
+  }
+
+  bool _photoListEquals(List<String?> currentUrls, List<File?> localPhotos, List<String?> initialUrls) {
+    for (int i = 0; i < 6; i++) {
+      // If there's a local photo, it means user added/changed a photo
+      if (localPhotos[i] != null) return false;
+      // If URL changed
+      if (currentUrls[i] != initialUrls[i]) return false;
+    }
+    return true;
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_checkForChanges);
+    _ageController.removeListener(_checkForChanges);
+    _bioController.removeListener(_checkForChanges);
+    _universityController.removeListener(_checkForChanges);
+    _departmentController.removeListener(_checkForChanges);
+    _instagramController.removeListener(_checkForChanges);
+    _linkedinController.removeListener(_checkForChanges);
     _nameController.dispose();
     _ageController.dispose();
     _bioController.dispose();
@@ -161,9 +240,33 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       for (int i = 0; i < photos.length && i < 6; i++) {
         _photoUrls[i] = photos[i];
       }
+
+      // Save initial values for change detection
+      _saveInitialValues();
     }
 
-    setState(() => _isLoading = false);
+    // Ensure _hasChanges is false after loading completes
+    setState(() {
+      _isLoading = false;
+      _hasChanges = false;
+    });
+  }
+
+  void _saveInitialValues() {
+    _initialName = _nameController.text;
+    _initialAge = _ageController.text;
+    _initialBio = _bioController.text;
+    _initialUniversity = _universityController.text;
+    _initialDepartment = _departmentController.text;
+    _initialGender = _selectedGender;
+    _initialLookingFor = _lookingFor;
+    _initialGrade = _selectedGrade;
+    _initialInstagram = _instagramController.text;
+    _initialLinkedin = _linkedinController.text;
+    _initialInterests = List<String>.from(_selectedInterests);
+    _initialClubs = List<String>.from(_selectedClubs);
+    _initialIntents = List<String>.from(_selectedIntents);
+    _initialPhotoUrls = List<String?>.from(_photoUrls);
   }
 
   Future<void> _pickImage(int index) async {
@@ -235,6 +338,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     _photoUrls[index] = null;
                     _localPhotos[index] = null;
                   });
+                  _checkForChanges();
                 },
               ),
             const SizedBox(height: 20),
@@ -258,6 +362,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           _localPhotos[index] = File(image.path);
           _photoUrls[index] = null;
         });
+        _checkForChanges();
       }
     } catch (e) {
       _showError('Fotoğraf seçilemedi');
@@ -330,10 +435,35 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       if (success) {
         if (mounted) {
-          _showSuccess('Profil Kaydedildi',
-              subtitle: 'Değişiklikleriniz başarıyla güncellendi');
-          await Future.delayed(const Duration(milliseconds: 500));
-          if (mounted) Navigator.pop(context, true);
+          // Update photo URLs with uploaded ones and clear local photos
+          for (int i = 0; i < 6; i++) {
+            if (finalPhotoUrls[i] != null) {
+              _photoUrls[i] = finalPhotoUrls[i];
+            }
+            _localPhotos[i] = null;
+          }
+
+          // Save new initial values (current state becomes the new baseline)
+          _saveInitialValues();
+
+          // Reset hasChanges flag
+          setState(() => _hasChanges = false);
+
+          // Close keyboard
+          FocusScope.of(context).unfocus();
+
+          // Show success SnackBar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Değişiklikler başarıyla kaydedildi ✅'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         }
       } else {
         _showError('Profil kaydedilemedi');
@@ -342,17 +472,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       _showError('Bir hata oluştu: $e');
     }
 
-    setState(() => _isSaving = false);
+    if (mounted) {
+      setState(() => _isSaving = false);
+    }
   }
 
   void _showError(String message) {
     if (!mounted) return;
     CustomNotification.error(context, message);
-  }
-
-  void _showSuccess(String message, {String? subtitle}) {
-    if (!mounted) return;
-    CustomNotification.success(context, message, subtitle: subtitle);
   }
 
   void _showWarning(String message) {
@@ -361,7 +488,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   /// Navigate to UserProfileScreen to preview own profile as others see it
-  /// Uses a fancy Scale + Fade transition animation
+  /// Uses real-time form data (not saved to Firestore yet) for instant preview
   void _previewProfile() {
     final currentUserId = _profileService.currentUserId;
     if (currentUserId == null) {
@@ -369,10 +496,49 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       return;
     }
 
+    // Build photo list: prioritize local photos, then remote URLs
+    final List<String> previewPhotos = [];
+    for (int i = 0; i < 6; i++) {
+      if (_localPhotos[i] != null) {
+        // Local file - use file:// URI for preview
+        previewPhotos.add(_localPhotos[i]!.path);
+      } else if (_photoUrls[i] != null) {
+        previewPhotos.add(_photoUrls[i]!);
+      }
+    }
+
+    // Create temporary UserProfile from current form state
+    final previewProfile = UserProfile(
+      id: currentUserId,
+      name: _nameController.text.trim().isEmpty
+          ? 'İsimsiz'
+          : _nameController.text.trim(),
+      age: int.tryParse(_ageController.text) ?? 0,
+      bio: _bioController.text.trim(),
+      university: _universityController.text.trim(),
+      department: _departmentController.text.trim(),
+      photos: previewPhotos,
+      interests: List<String>.from(_selectedInterests),
+      gender: _selectedGender,
+      lookingFor: _lookingFor,
+      grade: _selectedGrade,
+      clubs: List<String>.from(_selectedClubs),
+      socialLinks: {
+        if (_instagramController.text.trim().isNotEmpty)
+          'instagram': _instagramController.text.trim(),
+        if (_linkedinController.text.trim().isNotEmpty)
+          'linkedin': _linkedinController.text.trim(),
+      },
+      intent: List<String>.from(_selectedIntents),
+    );
+
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            UserProfileScreen(userId: currentUserId),
+            UserProfileScreen(
+          userId: currentUserId,
+          previewProfile: previewProfile,
+        ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           // Scale + Fade transition for a premium feel
           return FadeTransition(
@@ -448,31 +614,85 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ),
         title: const SizedBox.shrink(),
         actions: [
-          // Kaydet Butonu
+          // Kaydet Butonu - AnimatedSwitcher ile pürüzsüz geçiş
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: TextButton(
-              onPressed: _isSaving ? null : _saveProfile,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.indigo,
-              ),
-              child: _isSaving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.indigo,
+            child: SizedBox(
+              width: 90, // Sabit genişlik - layout shift önleme
+              height: 36,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  // Fade + Scale geçişi (0.9 → 1.0)
+                  return FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.9, end: 1.0).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
                       ),
-                    )
-                  : Text(
-                      'Kaydet',
-                      style: GoogleFonts.poppins(
-                        color: Colors.indigo,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      child: child,
                     ),
+                  );
+                },
+                child: _isSaving
+                    ? Container(
+                        key: const ValueKey('save_loading'),
+                        alignment: Alignment.center,
+                        child: const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.indigo,
+                          ),
+                        ),
+                      )
+                    : _hasChanges
+                        // DURUM B: Aktif - Flat, canlı buton (gölge yok)
+                        ? GestureDetector(
+                            key: const ValueKey('save_enabled'),
+                            onTap: _saveProfile,
+                            child: Container(
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: Colors.indigo,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              child: Text(
+                                'Kaydet',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        // DURUM A: Pasif - Silik, sade metin
+                        : Container(
+                            key: const ValueKey('save_disabled'),
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Text(
+                              'Kaydet',
+                              style: GoogleFonts.poppins(
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.w400,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+              ),
             ),
           ),
         ],
@@ -884,7 +1104,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'Erkek',
             Icons.male,
             _selectedGender == 'Erkek',
-            () => setState(() => _selectedGender = 'Erkek'),
+            () {
+              setState(() => _selectedGender = 'Erkek');
+              _checkForChanges();
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -893,7 +1116,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'Kadın',
             Icons.female,
             _selectedGender == 'Kadın',
-            () => setState(() => _selectedGender = 'Kadın'),
+            () {
+              setState(() => _selectedGender = 'Kadın');
+              _checkForChanges();
+            },
           ),
         ),
       ],
@@ -908,7 +1134,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'Erkek',
             Icons.male,
             _lookingFor == 'Erkek',
-            () => setState(() => _lookingFor = 'Erkek'),
+            () {
+              setState(() => _lookingFor = 'Erkek');
+              _checkForChanges();
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -917,7 +1146,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'Kadın',
             Icons.female,
             _lookingFor == 'Kadın',
-            () => setState(() => _lookingFor = 'Kadın'),
+            () {
+              setState(() => _lookingFor = 'Kadın');
+              _checkForChanges();
+            },
           ),
         ),
         const SizedBox(width: 12),
@@ -926,7 +1158,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             'Herkes',
             Icons.people,
             _lookingFor == 'Herkes',
-            () => setState(() => _lookingFor = 'Herkes'),
+            () {
+              setState(() => _lookingFor = 'Herkes');
+              _checkForChanges();
+            },
           ),
         ),
       ],
@@ -988,6 +1223,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 _showWarning('En fazla 5 ilgi alanı seçebilirsiniz');
               }
             });
+            _checkForChanges();
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1023,6 +1259,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             setState(() {
               _selectedGrade = isSelected ? '' : grade;
             });
+            _checkForChanges();
           },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1075,6 +1312,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     _showWarning('En fazla 3 topluluk seçebilirsiniz');
                   }
                 });
+                _checkForChanges();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1140,6 +1378,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     _showWarning('En fazla 3 niyet seçebilirsiniz');
                   }
                 });
+                _checkForChanges();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,9 +9,14 @@ import '../models/user_profile.dart';
 class UserProfileScreen extends StatefulWidget {
   final String userId;
 
+  /// Optional preview profile - if provided, skip Firestore fetch
+  /// Used for real-time preview in ProfileEditScreen
+  final UserProfile? previewProfile;
+
   const UserProfileScreen({
     super.key,
     required this.userId,
+    this.previewProfile,
   });
 
   @override
@@ -29,6 +35,42 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   /// Check if viewing own profile (Preview Mode)
   bool get _isOwnProfile => _userService.currentUserId == widget.userId;
 
+  /// Check if a photo path is a local file (not a network URL)
+  bool _isLocalFile(String path) {
+    return path.startsWith('/') || path.startsWith('file://');
+  }
+
+  /// Build image widget that handles both local files and network URLs
+  Widget _buildPhotoWidget(String photoPath, {BoxFit fit = BoxFit.cover}) {
+    if (_isLocalFile(photoPath)) {
+      return Image.file(
+        File(photoPath.replaceFirst('file://', '')),
+        fit: fit,
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: const Color(0xFF5C6BC0),
+          child: const Icon(Icons.broken_image, size: 50, color: Colors.white),
+        ),
+      );
+    } else {
+      return CachedNetworkImage(
+        imageUrl: photoPath,
+        fit: fit,
+        placeholder: (context, url) => Container(
+          color: Colors.grey[300],
+          child: const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => Container(
+          color: const Color(0xFF5C6BC0),
+          child: const Icon(Icons.person, size: 100, color: Colors.white),
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +81,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     try {
       debugPrint('Loading profile for user: ${widget.userId}');
       debugPrint('Is own profile (Preview Mode): $_isOwnProfile');
+      debugPrint('Has previewProfile: ${widget.previewProfile != null}');
+
+      // If previewProfile is provided, use it directly (real-time preview mode)
+      if (widget.previewProfile != null) {
+        if (mounted) {
+          setState(() {
+            _profile = widget.previewProfile;
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
       // If viewing own profile, skip block checks
       if (_isOwnProfile) {
@@ -495,24 +549,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             background: Stack(
               fit: StackFit.expand,
               children: [
-                // Profile Photo
+                // Profile Photo (supports both local files and network URLs)
                 if (profile.photos.isNotEmpty)
-                  CachedNetworkImage(
-                    imageUrl: profile.photos.first,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: const Color(0xFF5C6BC0),
-                      child: const Icon(Icons.person, size: 100, color: Colors.white),
-                    ),
-                  )
+                  _buildPhotoWidget(profile.photos.first)
                 else
                   Container(
                     decoration: const BoxDecoration(
@@ -805,21 +844,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     ),
                     itemCount: profile.photos.length,
                     itemBuilder: (context, index) {
+                      final photoPath = profile.photos[index];
                       return GestureDetector(
-                        onTap: () => _showFullScreenPhoto(profile.photos[index]),
+                        onTap: () => _showFullScreenPhoto(photoPath),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: CachedNetworkImage(
-                            imageUrl: profile.photos[index],
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[300],
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.error),
-                            ),
-                          ),
+                          child: _buildPhotoWidget(photoPath),
                         ),
                       );
                     },
@@ -884,7 +914,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  void _showFullScreenPhoto(String imageUrl) {
+  void _showFullScreenPhoto(String photoPath) {
+    final isLocal = _isLocalFile(photoPath);
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -899,10 +931,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           body: Center(
             child: InteractiveViewer(
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.contain,
-              ),
+              child: isLocal
+                  ? Image.file(
+                      File(photoPath.replaceFirst('file://', '')),
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const Icon(
+                        Icons.broken_image,
+                        size: 100,
+                        color: Colors.white,
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: photoPath,
+                      fit: BoxFit.contain,
+                    ),
             ),
           ),
         ),

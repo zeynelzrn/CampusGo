@@ -29,7 +29,8 @@
       "Bash(cd:*)",
       "Bash(git reflog:*)",
       "Bash(git gc:*)",
-      "Bash(cd /Users/zeynelzeren/campusgo kopyası/campusgo_project && git log:*)"
+      "Bash(cd /Users/zeynelzeren/campusgo kopyası/campusgo_project && git log:*)",
+      "Bash(dart run:*)"
     ]
   }
 }

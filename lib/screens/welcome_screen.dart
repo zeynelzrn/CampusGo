@@ -104,9 +104,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFDF6F0),
-              Color(0xFFF8EDE3),
-              Color(0xFFFDF6F0),
+              Color(0xFFF5F8FF), // Soft buz mavisi
+              Color(0xFFE8F0FE), // Açık indigo tonu
+              Color(0xFFF0F4FF), // Ferah mavi-beyaz
             ],
             stops: [0.0, 0.5, 1.0],
           ),
@@ -129,9 +129,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         gradient: RadialGradient(
                           colors: [
                             Color(0xFF5C6BC0)
-                                .withOpacity(0.15 * _breathingAnimation.value),
-                            Color(0xFFFF7043)
-                                .withOpacity(0.25 * _breathingAnimation.value),
+                                .withValues(alpha: 0.18 * _breathingAnimation.value),
+                            Color(0xFF42A5F5)
+                                .withValues(alpha: 0.12 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -157,10 +157,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           colors: [
-                            Color(0xFFFF7043)
-                                .withOpacity(0.35 * _breathingAnimation.value),
-                            Color(0xFF5C6BC0)
-                                .withOpacity(0.15 * _breathingAnimation.value),
+                            Color(0xFF7C4DFF)
+                                .withValues(alpha: 0.20 * _breathingAnimation.value),
+                            Color(0xFF00BCD4)
+                                .withValues(alpha: 0.15 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
                         ),
@@ -265,30 +265,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       ),
                                     ),
                                   ),
-                                  // Ana logo
-                                  Container(
+                                  // Ana logo - PNG olduğu için kırpma yok
+                                  Image.asset(
+                                    'assets/images/campus_logo_welcome.png',
                                     width: 320,
                                     height: 320,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(160),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Color(0xFFFFFFFF)
-                                              .withOpacity(0.2),
-                                          blurRadius: 20,
-                                          spreadRadius: 5,
-                                        ),
-                                      ],
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(160),
-                                      child: Image.asset(
-                                        'assets/images/campus_logo_welcome.png',
-                                        width: 320,
-                                        height: 320,
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
+                                    fit: BoxFit.contain,
                                   ),
                                 ],
                               ),

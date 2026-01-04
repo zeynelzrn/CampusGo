@@ -273,16 +273,16 @@ class _LoginScreenState extends State<LoginScreen>
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
             colors: [
-              Color(0xFFF8EDE3),
-              Color(0xFFFDF6F0),
-              Color(0xFFF0F4F8),
+              Color(0xFFF0F4FF), // Buz mavisi
+              Color(0xFFF5F8FF), // Soft beyaz-mavi
+              Color(0xFFE8F0FE), // Açık indigo tonu
             ],
             stops: [0.0, 0.6, 1.0],
           ),
         ),
         child: Stack(
           children: [
-            // Dekoratif şekiller
+            // Dekoratif şekiller - Modern mavi tonlar
             Positioned(
               top: -60,
               left: -100,
@@ -290,10 +290,11 @@ class _LoginScreenState extends State<LoginScreen>
                 width: 300,
                 height: 300,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: RadialGradient(
                     colors: [
-                      const Color(0xFFFF7043).withOpacity(0.2),
-                      const Color(0xFF5C6BC0).withOpacity(0.15),
+                      const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                      const Color(0xFF42A5F5).withValues(alpha: 0.10),
+                      Colors.transparent,
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -307,10 +308,30 @@ class _LoginScreenState extends State<LoginScreen>
                 width: 150,
                 height: 150,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF7986CB).withOpacity(0.1),
-                      const Color(0xFFFF7043).withOpacity(0.15),
+                      const Color(0xFF7C4DFF).withValues(alpha: 0.12),
+                      const Color(0xFF00BCD4).withValues(alpha: 0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            // Alt köşe blob
+            Positioned(
+              bottom: -80,
+              right: -60,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF7986CB).withValues(alpha: 0.15),
+                      const Color(0xFF64B5F6).withValues(alpha: 0.10),
+                      Colors.transparent,
                     ],
                   ),
                   shape: BoxShape.circle,

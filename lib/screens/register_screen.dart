@@ -124,16 +124,16 @@ class _RegisterScreenState extends State<RegisterScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFDF6F0),
-              Color(0xFFF8EDE3),
-              Color(0xFFFDF6F0),
+              Color(0xFFF5F8FF), // Soft buz mavisi
+              Color(0xFFE8F0FE), // Açık indigo tonu
+              Color(0xFFF0F4FF), // Ferah mavi-beyaz
             ],
             stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: Stack(
           children: [
-            // Dekoratif şekiller
+            // Dekoratif şekiller - Modern mavi tonlar
             Positioned(
               top: -100,
               right: -50,
@@ -141,10 +141,11 @@ class _RegisterScreenState extends State<RegisterScreen>
                 width: 200,
                 height: 200,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF5C6BC0).withOpacity(0.1),
-                      const Color(0xFFFF7043).withOpacity(0.2),
+                      const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                      const Color(0xFF42A5F5).withValues(alpha: 0.10),
+                      Colors.transparent,
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -158,10 +159,30 @@ class _RegisterScreenState extends State<RegisterScreen>
                 width: 250,
                 height: 250,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: RadialGradient(
                     colors: [
-                      const Color(0xFFFF7043).withOpacity(0.3),
-                      const Color(0xFF5C6BC0).withOpacity(0.1),
+                      const Color(0xFF7C4DFF).withValues(alpha: 0.18),
+                      const Color(0xFF00BCD4).withValues(alpha: 0.12),
+                      Colors.transparent,
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            // Sağ alt köşe blob
+            Positioned(
+              bottom: 150,
+              right: -80,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF7986CB).withValues(alpha: 0.12),
+                      const Color(0xFF64B5F6).withValues(alpha: 0.08),
+                      Colors.transparent,
                     ],
                   ),
                   shape: BoxShape.circle,
