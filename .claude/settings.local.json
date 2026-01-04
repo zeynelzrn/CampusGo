@@ -22,7 +22,14 @@
       "Bash(xcode-select:*)",
       "Bash(cat:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git rm --cached android/app/google-services.json ios/Runner/GoogleService-Info.plist lib/firebase_options.dart)",
+      "Bash(bfg --delete-files google-services.json)",
+      "Bash(bfg --delete-files GoogleService-Info.plist)",
+      "Bash(cd:*)",
+      "Bash(git reflog:*)",
+      "Bash(git gc:*)",
+      "Bash(cd /Users/zeynelzeren/campusgo kopyası/campusgo_project && git log:*)"
     ]
   }
 }
