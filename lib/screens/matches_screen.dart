@@ -55,7 +55,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -99,7 +99,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
           ),
           const SizedBox(height: 16),
           Text(
@@ -124,13 +124,13 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.chat_bubble_outline_rounded,
                 size: 80,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 32),
@@ -158,8 +158,8 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFFFF2C60).withValues(alpha: 0.1),
-                    const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                    const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                    const Color(0xFF7986CB).withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -176,7 +176,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                         ),
                         child: const Icon(
                           Icons.handshake_rounded,
-                          color: Color(0xFFFF2C60),
+                          color: Color(0xFF5C6BC0),
                           size: 28,
                         ),
                       ),
@@ -195,7 +195,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Iki kisi birbirini begendikten sonra arkadaslik baslar ve sohbet edebilirsiniz!',
+                              'Iki kisi birbirini selam gonderince baglanti kurulur ve sohbet edebilirsiniz!',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 color: Colors.grey[600],
@@ -258,7 +258,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: match.hasUnreadMessage
-                          ? const Color(0xFFFF2C60)
+                          ? const Color(0xFF5C6BC0)
                           : Colors.grey[200]!,
                       width: 2,
                     ),
@@ -332,7 +332,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                           width: 8,
                           height: 8,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFFF2C60),
+                            color: Color(0xFF5C6BC0),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -367,7 +367,7 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     color: match.hasUnreadMessage
-                        ? const Color(0xFFFF2C60)
+                        ? const Color(0xFF5C6BC0)
                         : Colors.grey[400],
                     fontWeight: match.hasUnreadMessage
                         ? FontWeight.w600

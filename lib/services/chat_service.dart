@@ -334,6 +334,37 @@ class ChatService {
     }
   }
 
+  /// Clear all messages in a chat (keeps the chat but removes messages)
+  Future<bool> clearChat(String chatId) async {
+    final userId = currentUserId;
+    if (userId == null) return false;
+
+    try {
+      // Delete all messages
+      final messagesSnapshot =
+          await _chatsCollection.doc(chatId).collection('messages').get();
+
+      final batch = _firestore.batch();
+      for (final doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Reset chat metadata (but keep the chat)
+      batch.update(_chatsCollection.doc(chatId), {
+        'lastMessage': null,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'lastMessageSenderId': null,
+        'readBy': FieldValue.arrayUnion([userId]),
+      });
+
+      await batch.commit();
+      return true;
+    } catch (e) {
+      print('Error clearing chat: $e');
+      return false;
+    }
+  }
+
   /// Delete a chat and all its messages
   Future<bool> deleteChat(String chatId) async {
     final userId = currentUserId;

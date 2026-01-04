@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../services/chat_service.dart';
+import '../services/user_service.dart';
 
 /// Repository for swipe-related Firestore operations
 class SwipeRepository {
@@ -33,22 +34,34 @@ class SwipeRepository {
   CollectionReference<Map<String, dynamic>> get _matchesCollection =>
       _firestore.collection('matches');
 
-  /// Fetch ALL action IDs for the current user (for client-side filtering)
+  /// Fetch ALL exclusion IDs for the current user (for client-side filtering)
+  /// This includes:
+  /// 1. Users already swiped (actions)
+  /// 2. BLACKLIST: blocked_users (I blocked them) + blocked_by (they blocked me)
   /// This is called once on init and stored in memory
   Future<Set<String>> fetchAllActionIds() async {
     final userId = currentUserId;
     if (userId == null) return {};
 
     try {
-      // Get all actions where current user is the initiator
-      final snapshot =
-          await _actionsCollection.where('fromUserId', isEqualTo: userId).get();
+      debugPrint('========== FETCHING EXCLUSION LIST ==========');
 
-      debugPrint('SwipeRepository: Found ${snapshot.docs.length} actions for user $userId');
+      // Fetch actions and blacklist in parallel
+      final userService = UserService();
+      final results = await Future.wait([
+        _actionsCollection.where('fromUserId', isEqualTo: userId).get(),
+        userService.getAllRestrictedUserIds(), // BLACKLIST
+      ]);
 
-      // Extract target user IDs
+      final actionsSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
+      final restrictedIds = results[1] as Set<String>;
+
+      debugPrint('SwipeRepository: Found ${actionsSnapshot.docs.length} actions for user $userId');
+      debugPrint('SwipeRepository: Found ${restrictedIds.length} restricted (blocked) users');
+
+      // Extract target user IDs from actions
       final actionIds = <String>{};
-      for (final doc in snapshot.docs) {
+      for (final doc in actionsSnapshot.docs) {
         final data = doc.data();
         final toUserId = data['toUserId'] as String?;
         final actionType = data['type'] as String?;
@@ -61,12 +74,33 @@ class SwipeRepository {
       // Also add current user's own ID to exclusion set
       actionIds.add(userId);
 
-      debugPrint('SwipeRepository: Total excluded IDs: ${actionIds.length}');
-      return actionIds;
+      // COMBINE: actions + blacklist
+      final allExcludedIds = <String>{
+        ...actionIds,
+        ...restrictedIds,
+      };
+
+      // Log restricted users
+      for (final id in restrictedIds) {
+        debugPrint('  - Excluding $id (BLOCKED/BLACKLIST)');
+      }
+
+      debugPrint('Total swiped: ${actionIds.length - 1}'); // -1 for self
+      debugPrint('Total blocked: ${restrictedIds.length}');
+      debugPrint('SwipeRepository: Total excluded IDs: ${allExcludedIds.length}');
+      debugPrint('==============================================');
+
+      return allExcludedIds;
     } catch (e) {
       debugPrint('Error fetching action IDs: $e');
       return {userId}; // At minimum, exclude self
     }
+  }
+
+  /// Refresh exclusion list (call after blocking someone)
+  Future<Set<String>> refreshExclusionList() async {
+    debugPrint('SwipeRepository: Refreshing exclusion list after block action');
+    return await fetchAllActionIds();
   }
 
   /// Fetch a batch of users with pagination

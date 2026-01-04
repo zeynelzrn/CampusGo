@@ -128,9 +128,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           colors: [
-                            Color(0xFFFF2C60)
+                            Color(0xFF5C6BC0)
                                 .withOpacity(0.15 * _breathingAnimation.value),
-                            Color(0xFFFFBA93)
+                            Color(0xFFFF7043)
                                 .withOpacity(0.25 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
@@ -157,9 +157,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       decoration: BoxDecoration(
                         gradient: RadialGradient(
                           colors: [
-                            Color(0xFFFFBA93)
+                            Color(0xFFFF7043)
                                 .withOpacity(0.35 * _breathingAnimation.value),
-                            Color(0xFFFF2C60)
+                            Color(0xFF5C6BC0)
                                 .withOpacity(0.15 * _breathingAnimation.value),
                             Colors.transparent,
                           ],
@@ -188,11 +188,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         width: 4 + (index % 3) * 2,
                         height: 4 + (index % 3) * 2,
                         decoration: BoxDecoration(
-                          color: Color(0xFFFF2C60),
+                          color: Color(0xFF5C6BC0),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Color(0xFFFF2C60).withOpacity(0.5),
+                              color: Color(0xFF5C6BC0).withOpacity(0.5),
                               blurRadius: 8,
                               spreadRadius: 2,
                             ),
@@ -235,9 +235,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                     decoration: BoxDecoration(
                                       gradient: RadialGradient(
                                         colors: [
-                                          Color(0xFFFF2C60).withOpacity(
+                                          Color(0xFF5C6BC0).withOpacity(
                                               0.1 * _breathingAnimation.value),
-                                          Color(0xFFFF6B9D).withOpacity(
+                                          Color(0xFF7986CB).withOpacity(
                                               0.05 * _breathingAnimation.value),
                                           Colors.transparent,
                                         ],
@@ -317,9 +317,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                       foreground: Paint()
                                         ..shader = LinearGradient(
                                           colors: [
-                                            Color(0xFFFF2C60),
-                                            Color(0xFFFF4081),
-                                            Color(0xFFE91E63),
+                                            Color(0xFF5C6BC0),
+                                            Color(0xFF7986CB),
+                                            Color(0xFF3F51B5),
                                           ],
                                         ).createShader(Rect.fromLTWH(
                                             0.0, 0.0, 200.0, 70.0)),
@@ -479,9 +479,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFFFF2C60),
-                      Color(0xFFFF6B9D),
-                      Color(0xFFFF8BA7),
+                      Color(0xFF5C6BC0),
+                      Color(0xFF7986CB),
+                      Color(0xFF9FA8DA),
                     ],
                   )
                 : null,
@@ -489,13 +489,13 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             border: isPrimary
                 ? null
                 : Border.all(
-                    color: Color(0xFFFF2C60),
+                    color: Color(0xFF5C6BC0),
                     width: 2,
                   ),
             boxShadow: [
               BoxShadow(
                 color: isPrimary
-                    ? Color(0xFFFF2C60)
+                    ? Color(0xFF5C6BC0)
                         .withOpacity(0.4 * _breathingAnimation.value)
                     : Colors.black
                         .withOpacity(0.05 * _breathingAnimation.value),
@@ -520,17 +520,17 @@ class _WelcomeScreenState extends State<WelcomeScreen>
               borderRadius: BorderRadius.circular(16),
               splashColor: isPrimary
                   ? Colors.white.withOpacity(0.3)
-                  : Color(0xFFFF2C60).withOpacity(0.2),
+                  : Color(0xFF5C6BC0).withOpacity(0.2),
               highlightColor: isPrimary
                   ? Colors.white.withOpacity(0.1)
-                  : Color(0xFFFF2C60).withOpacity(0.1),
+                  : Color(0xFF5C6BC0).withOpacity(0.1),
               child: Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
                       icon,
-                      color: isPrimary ? Colors.white : Color(0xFFFF2C60),
+                      color: isPrimary ? Colors.white : Color(0xFF5C6BC0),
                       size: 22,
                     ),
                     SizedBox(width: 10),
@@ -539,7 +539,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       style: GoogleFonts.poppins(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: isPrimary ? Colors.white : Color(0xFFFF2C60),
+                        color: isPrimary ? Colors.white : Color(0xFF5C6BC0),
                       ),
                     ),
                   ],

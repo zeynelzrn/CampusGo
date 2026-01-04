@@ -168,14 +168,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       builder: (context) => const ProfileEditScreen()),
                 );
               },
-              icon: const Icon(Icons.person, color: Color(0xFFFF2C60)),
+              icon: const Icon(Icons.person, color: Color(0xFF5C6BC0)),
             ),
           ),
 
           // Logo
           ShaderMask(
             shaderCallback: (bounds) => const LinearGradient(
-              colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+              colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
             ).createShader(bounds),
             child: Text(
               'CampusGo',
@@ -202,7 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             child: IconButton(
               onPressed: _logout,
-              icon: const Icon(Icons.logout, color: Color(0xFFFF2C60)),
+              icon: const Icon(Icons.logout, color: Color(0xFF5C6BC0)),
             ),
           ),
         ],
@@ -267,14 +267,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF2C60).withValues(alpha: 0.2),
+                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
               ],
             ),
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
               strokeWidth: 3,
             ),
           ),
@@ -337,7 +337,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF2C60),
+                backgroundColor: const Color(0xFF5C6BC0),
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -362,13 +362,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.search_off,
                 size: 64,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 24),
@@ -402,7 +402,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF2C60),
+                    backgroundColor: const Color(0xFF5C6BC0),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
@@ -453,7 +453,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
               ),
               const SizedBox(height: 16),
               Text(

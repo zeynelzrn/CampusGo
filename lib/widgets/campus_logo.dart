@@ -23,7 +23,7 @@ class CampusGoLogo extends StatelessWidget {
             width: size,
             height: size,
             decoration: BoxDecoration(
-              color: Color(0xFFFF2C60),
+              color: Color(0xFF5C6BC0),
               shape: BoxShape.circle,
             ),
             child: Center(

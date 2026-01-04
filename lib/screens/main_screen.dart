@@ -223,7 +223,7 @@ class _SlidingNavigationBar extends StatelessWidget {
   // Navigation item verileri
   static const List<_NavItemData> _items = [
     _NavItemData(Icons.person_outline_rounded, Icons.person_rounded, 'Profil'),
-    _NavItemData(Icons.favorite_border_rounded, Icons.favorite_rounded, 'Begeniler'),
+    _NavItemData(Icons.waving_hand_outlined, Icons.waving_hand_rounded, 'Istekler'),
     _NavItemData(Icons.explore_outlined, Icons.explore_rounded, 'Kesif'),
     _NavItemData(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Sohbet'),
     _NavItemData(Icons.settings_outlined, Icons.settings_rounded, 'Ayarlar'),
@@ -284,9 +284,9 @@ class _SlidingNavigationBar extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [
-                          Color(0xFFFF2C60),
-                          Color(0xFFFF6B9D),
-                          Color(0xFFFF8A65),
+                          Color(0xFF5C6BC0),
+                          Color(0xFF7986CB),
+                          Color(0xFF9FA8DA),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -294,7 +294,7 @@ class _SlidingNavigationBar extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFF2C60).withValues(alpha: 0.45),
+                          color: const Color(0xFF5C6BC0).withValues(alpha: 0.45),
                           blurRadius: 16,
                           spreadRadius: 1,
                           offset: const Offset(0, 6),

@@ -64,7 +64,7 @@ class CustomNotification {
         type: NotificationType.info);
   }
 
-  /// Show a pink-themed notification for likes
+  /// Show an indigo-themed notification for connection requests
   static void like(BuildContext context, String message,
       {String? subtitle, VoidCallback? onTap}) {
     show(
@@ -314,12 +314,12 @@ class _NotificationWidgetState extends State<_NotificationWidget>
         );
       case NotificationType.like:
         return _NotificationConfig(
-          icon: Icons.favorite_rounded,
+          icon: Icons.waving_hand_rounded,
           gradientColors: [
-            const Color(0xFFFF2C60),
-            const Color(0xFFFF6B9D),
+            const Color(0xFF5C6BC0),
+            const Color(0xFF7986CB),
           ],
-          shadowColor: const Color(0xFFFF2C60),
+          shadowColor: const Color(0xFF5C6BC0),
         );
       case NotificationType.message:
         return _NotificationConfig(

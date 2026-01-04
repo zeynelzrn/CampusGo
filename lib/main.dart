@@ -117,14 +117,14 @@ class _MyAppState extends State<MyApp> {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -141,7 +141,7 @@ class _MyAppState extends State<MyApp> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(
-                          Icons.favorite_rounded,
+                          Icons.waving_hand_rounded,
                           color: Colors.white,
                           size: 28,
                         ),
@@ -153,7 +153,7 @@ class _MyAppState extends State<MyApp> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              title.isNotEmpty ? title : 'Biri seni begendi!',
+                              title.isNotEmpty ? title : 'Biri seninle tanismak istiyor!',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -297,14 +297,14 @@ class _MyAppState extends State<MyApp> {
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF2C60), Color(0xFFFF8A65)],
+                    colors: [Color(0xFF5C6BC0), Color(0xFFFF7043)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -333,7 +333,7 @@ class _MyAppState extends State<MyApp> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              title.isNotEmpty ? title : 'Yeni Eslesme!',
+                              title.isNotEmpty ? title : 'Yeni Baglanti!',
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -341,7 +341,7 @@ class _MyAppState extends State<MyApp> {
                               ),
                             ),
                             Text(
-                              body.isNotEmpty ? body : 'Biriyle eslestiniz!',
+                              body.isNotEmpty ? body : 'Yeni bir arkadaslik kuruldu!',
                               style: GoogleFonts.poppins(
                                 color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: 13,
@@ -380,7 +380,7 @@ class _MyAppState extends State<MyApp> {
       subtitle: body.isNotEmpty
           ? Text(body, style: GoogleFonts.poppins(fontSize: 13))
           : null,
-      background: const Color(0xFFFF2C60),
+      background: const Color(0xFF5C6BC0),
       foreground: Colors.white,
       duration: const Duration(seconds: 4),
       slideDismissDirection: DismissDirection.up,

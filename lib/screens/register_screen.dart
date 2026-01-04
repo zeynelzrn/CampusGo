@@ -143,8 +143,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFFF2C60).withOpacity(0.1),
-                      const Color(0xFFFFBA93).withOpacity(0.2),
+                      const Color(0xFF5C6BC0).withOpacity(0.1),
+                      const Color(0xFFFF7043).withOpacity(0.2),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -160,8 +160,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFFFBA93).withOpacity(0.3),
-                      const Color(0xFFFF2C60).withOpacity(0.1),
+                      const Color(0xFFFF7043).withOpacity(0.3),
+                      const Color(0xFF5C6BC0).withOpacity(0.1),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -201,7 +201,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   onPressed: () => Navigator.pop(context),
                                   icon: const Icon(
                                     Icons.arrow_back_ios_new,
-                                    color: Color(0xFFFF2C60),
+                                    color: Color(0xFF5C6BC0),
                                     size: 20,
                                   ),
                                 ),
@@ -221,8 +221,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         foreground: Paint()
                                           ..shader = const LinearGradient(
                                             colors: [
-                                              Color(0xFFFF2C60),
-                                              Color(0xFFFF6B9D),
+                                              Color(0xFF5C6BC0),
+                                              Color(0xFF7986CB),
                                             ],
                                           ).createShader(Rect.fromLTWH(
                                               0.0, 0.0, 200.0, 70.0)),
@@ -280,7 +280,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     _obscurePassword
                                         ? Icons.visibility_off
                                         : Icons.visibility,
-                                    color: const Color(0xFFFF2C60),
+                                    color: const Color(0xFF5C6BC0),
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -312,7 +312,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     _obscureConfirmPassword
                                         ? Icons.visibility_off
                                         : Icons.visibility,
-                                    color: const Color(0xFFFF2C60),
+                                    color: const Color(0xFF5C6BC0),
                                   ),
                                   onPressed: () {
                                     setState(() {
@@ -342,7 +342,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: _agreeToTerms
-                                        ? const Color(0xFFFF2C60)
+                                        ? const Color(0xFF5C6BC0)
                                         : Colors.grey[300]!,
                                     width: 1,
                                   ),
@@ -355,8 +355,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         gradient: _agreeToTerms
                                             ? const LinearGradient(
                                                 colors: [
-                                                  Color(0xFFFF2C60),
-                                                  Color(0xFFFF6B9D)
+                                                  Color(0xFF5C6BC0),
+                                                  Color(0xFF7986CB)
                                                 ],
                                               )
                                             : null,
@@ -389,7 +389,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                               TextSpan(
                                                 text: 'Aydınlatma Metni',
                                                 style: TextStyle(
-                                                  color: Color(0xFFFF2C60),
+                                                  color: Color(0xFF5C6BC0),
                                                   fontWeight: FontWeight.w600,
                                                   decoration:
                                                       TextDecoration.underline,
@@ -399,7 +399,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                               TextSpan(
                                                 text: 'Kullanım Şartları',
                                                 style: TextStyle(
-                                                  color: Color(0xFFFF2C60),
+                                                  color: Color(0xFF5C6BC0),
                                                   fontWeight: FontWeight.w600,
                                                   decoration:
                                                       TextDecoration.underline,
@@ -445,9 +445,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
                                               colors: [
-                                                Color(0xFFFF2C60),
-                                                Color(0xFFFF6B9D),
-                                                Color(0xFFFF8BA7),
+                                                Color(0xFF5C6BC0),
+                                                Color(0xFF7986CB),
+                                                Color(0xFF9FA8DA),
                                               ],
                                             )
                                           : LinearGradient(
@@ -459,7 +459,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                       boxShadow: [
                                         if (_agreeToTerms) ...[
                                           BoxShadow(
-                                            color: const Color(0xFFFF2C60)
+                                            color: const Color(0xFF5C6BC0)
                                                 .withOpacity(0.4 *
                                                     _buttonGlowAnimation.value),
                                             blurRadius: 20 +
@@ -692,7 +692,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   const TextSpan(
                                     text: 'Giriş Yap',
                                     style: TextStyle(
-                                      color: Color(0xFFFF2C60),
+                                      color: Color(0xFF5C6BC0),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -751,13 +751,13 @@ class _RegisterScreenState extends State<RegisterScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFFFF2C60).withOpacity(0.1),
-                  const Color(0xFFFF6B9D).withOpacity(0.1),
+                  const Color(0xFF5C6BC0).withOpacity(0.1),
+                  const Color(0xFF7986CB).withOpacity(0.1),
                 ],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: const Color(0xFFFF2C60), size: 20),
+            child: Icon(icon, color: const Color(0xFF5C6BC0), size: 20),
           ),
           suffixIcon: suffixIcon,
           labelStyle: GoogleFonts.poppins(
@@ -777,7 +777,7 @@ class _RegisterScreenState extends State<RegisterScreen>
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(
-              color: Color(0xFFFF2C60),
+              color: Color(0xFF5C6BC0),
               width: 2,
             ),
           ),
@@ -860,7 +860,7 @@ class _ModernNotificationState extends State<_ModernNotification>
   @override
   Widget build(BuildContext context) {
     final Color primaryColor =
-        widget.isSuccess ? const Color(0xFFFF2C60) : const Color(0xFFE53935);
+        widget.isSuccess ? const Color(0xFF5C6BC0) : const Color(0xFFE53935);
 
     final Color bgColor =
         widget.isSuccess ? const Color(0xFFFFF0F3) : const Color(0xFFFFEBEE);
@@ -927,8 +927,8 @@ class _ModernNotificationState extends State<_ModernNotification>
                                     end: Alignment.bottomRight,
                                     colors: widget.isSuccess
                                         ? [
-                                            const Color(0xFFFF2C60),
-                                            const Color(0xFFFF6B9D)
+                                            const Color(0xFF5C6BC0),
+                                            const Color(0xFF7986CB)
                                           ]
                                         : [
                                             const Color(0xFFE53935),

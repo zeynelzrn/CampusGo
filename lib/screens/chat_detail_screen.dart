@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../services/user_service.dart';
+import 'user_profile_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatId;
@@ -26,11 +28,13 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen>
     with TickerProviderStateMixin {
   final ChatService _chatService = ChatService();
+  final UserService _userService = UserService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
 
   bool _isSending = false;
+  bool _isMuted = false;
   late AnimationController _sendButtonController;
   late Animation<double> _sendButtonAnimation;
 
@@ -99,7 +103,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       leading: IconButton(
         icon: const Icon(
           Icons.arrow_back_ios_rounded,
-          color: Color(0xFFFF2C60),
+          color: Color(0xFF5C6BC0),
         ),
         onPressed: () => Navigator.pop(context),
       ),
@@ -113,7 +117,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                 width: 2,
               ),
             ),
@@ -173,7 +177,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -189,7 +193,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   Widget _buildLoadingState() {
     return const Center(
       child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
       ),
     );
   }
@@ -206,8 +210,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFFFF2C60).withValues(alpha: 0.15),
-                    const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                    const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                    const Color(0xFF7986CB).withValues(alpha: 0.1),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -215,12 +219,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
               child: const Icon(
                 Icons.waving_hand_rounded,
                 size: 64,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'Yeni esleme!',
+              'Yeni Baglanti!',
               style: GoogleFonts.poppins(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -229,7 +233,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              '${widget.peerName} ile eslestiniz!\nIlk mesaji gonder ve sohbete basla.',
+              '${widget.peerName} ile baglanti kurdunuz!\nIlk mesaji gonder ve sohbete basla.',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 15,
@@ -265,12 +269,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+            colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+              color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -389,7 +393,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                 decoration: BoxDecoration(
                   gradient: isMe
                       ? const LinearGradient(
-                          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
@@ -404,7 +408,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                   boxShadow: [
                     BoxShadow(
                       color: isMe
-                          ? const Color(0xFFFF2C60).withValues(alpha: 0.25)
+                          ? const Color(0xFF5C6BC0).withValues(alpha: 0.25)
                           : Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -439,7 +443,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                         Icons.done_all_rounded,
                         size: 14,
                         color: message.isRead
-                            ? const Color(0xFFFF2C60)
+                            ? const Color(0xFF5C6BC0)
                             : Colors.grey[400],
                       ),
                     ],
@@ -481,7 +485,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: _focusNode.hasFocus
-                      ? const Color(0xFFFF2C60).withValues(alpha: 0.5)
+                      ? const Color(0xFF5C6BC0).withValues(alpha: 0.5)
                       : Colors.transparent,
                   width: 2,
                 ),
@@ -555,14 +559,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                 height: 50,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -649,25 +653,44 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
               label: 'Profili Gor',
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Navigate to profile
+                _viewProfile();
+              },
+            ),
+            _buildOptionItem(
+              icon: _isMuted
+                  ? Icons.notifications_active_outlined
+                  : Icons.notifications_off_outlined,
+              label: _isMuted ? 'Bildirimleri Ac' : 'Bildirimleri Sessize Al',
+              onTap: () {
+                Navigator.pop(context);
+                _toggleMuteNotifications();
+              },
+            ),
+            _buildOptionItem(
+              icon: Icons.cleaning_services_rounded,
+              label: 'Sohbeti Temizle',
+              color: Colors.orange,
+              onTap: () {
+                Navigator.pop(context);
+                _showClearChatDialog();
+              },
+            ),
+            _buildOptionItem(
+              icon: Icons.flag_rounded,
+              label: 'Sikayet Et',
+              color: Colors.orange,
+              onTap: () {
+                Navigator.pop(context);
+                _showReportDialog();
               },
             ),
             _buildOptionItem(
               icon: Icons.block_rounded,
               label: 'Engelle',
-              color: Colors.orange,
-              onTap: () {
-                Navigator.pop(context);
-                _showBlockDialog();
-              },
-            ),
-            _buildOptionItem(
-              icon: Icons.delete_rounded,
-              label: 'Sohbeti Sil',
               color: Colors.red,
               onTap: () {
                 Navigator.pop(context);
-                _showDeleteDialog();
+                _showBlockDialog();
               },
             ),
             SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -675,6 +698,110 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
         ),
       ),
     );
+  }
+
+  void _viewProfile() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(userId: widget.peerId),
+      ),
+    );
+  }
+
+  void _toggleMuteNotifications() {
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _isMuted ? 'Sohbet sessize alindi' : 'Bildirimler acildi',
+          style: GoogleFonts.poppins(),
+        ),
+        backgroundColor: const Color(0xFF5C6BC0),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showClearChatDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Sohbeti Temizle?',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Bu sohbet gecmisi kalici olarak silinecek. Bu islem geri alinamaz.',
+          style: GoogleFonts.poppins(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Iptal',
+              style: GoogleFonts.poppins(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _clearChat();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Temizle',
+              style: GoogleFonts.poppins(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearChat() async {
+    try {
+      await _chatService.clearChat(widget.chatId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sohbet temizlendi',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Sohbet temizlenemedi: $e',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildOptionItem({
@@ -687,12 +814,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       leading: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: (color ?? const Color(0xFFFF2C60)).withValues(alpha: 0.1),
+          color: (color ?? const Color(0xFF5C6BC0)).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
-          color: color ?? const Color(0xFFFF2C60),
+          color: color ?? const Color(0xFF5C6BC0),
           size: 24,
         ),
       ),
@@ -715,38 +842,90 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   void _showBlockDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Engelle',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.block_rounded, color: Colors.red, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Kullaniciyi Engelle',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
         ),
-        content: Text(
-          '${widget.peerName} adli kullaniciyi engellemek istediginize emin misiniz?',
-          style: GoogleFonts.poppins(),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${widget.peerName} adli kullaniciyi engellemek istediginize emin misiniz?',
+              style: GoogleFonts.poppins(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bu kisi size mesaj atamaz ve profilinizi goremez.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.orange[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Block user
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _blockUser();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
             child: Text(
               'Engelle',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -754,48 +933,309 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     );
   }
 
-  void _showDeleteDialog() {
+  Future<void> _blockUser() async {
+    // Show loading indicator
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Sohbeti Sil',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
         ),
-        content: Text(
-          'Bu sohbeti silmek istediginize emin misiniz? Tum mesajlar silinecektir.',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _chatService.deleteChat(widget.chatId);
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Sil',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
       ),
     );
+
+    final success = await _userService.blockUser(widget.peerId);
+
+    if (mounted) {
+      // Close loading dialog
+      Navigator.pop(context);
+
+      if (success) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${widget.peerName} engellendi',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Navigate back to chat list (user shouldn't stay in blocked person's chat)
+        Navigator.pop(context);
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Engelleme basarisiz oldu. Lutfen tekrar deneyin.',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showReportDialog() {
+    String? selectedReason;
+    final TextEditingController descriptionController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.flag_rounded, color: Colors.orange, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Kullaniciyi Raporla',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sikayet sebebinizi secin:',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Report reason options
+                ...UserService.reportReasons.map((reason) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: selectedReason == reason.id
+                            ? const Color(0xFF5C6BC0)
+                            : Colors.grey.withValues(alpha: 0.3),
+                        width: selectedReason == reason.id ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      color: selectedReason == reason.id
+                          ? const Color(0xFF5C6BC0).withValues(alpha: 0.05)
+                          : null,
+                    ),
+                    child: RadioListTile<String>(
+                      value: reason.id,
+                      groupValue: selectedReason,
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedReason = value;
+                        });
+                      },
+                      title: Text(
+                        reason.label,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: selectedReason == reason.id
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      activeColor: const Color(0xFF5C6BC0),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      dense: true,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 12),
+                // Optional description field
+                Text(
+                  'Ek aciklama (istege bagli):',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: descriptionController,
+                  maxLines: 3,
+                  maxLength: 500,
+                  style: GoogleFonts.poppins(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Detay eklemek isterseniz buraya yazin...',
+                    hintStyle: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[400],
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF5C6BC0), width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                descriptionController.dispose();
+                Navigator.pop(dialogContext);
+              },
+              child: Text(
+                'Iptal',
+                style: GoogleFonts.poppins(color: Colors.grey[600]),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: selectedReason == null
+                  ? null
+                  : () async {
+                      Navigator.pop(dialogContext);
+                      await _reportUser(selectedReason!, descriptionController.text);
+                      descriptionController.dispose();
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                disabledBackgroundColor: Colors.grey[300],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: Text(
+                'Gonder',
+                style: GoogleFonts.poppins(
+                  color: selectedReason == null ? Colors.grey : Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reportUser(String reason, String description) async {
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+        ),
+      ),
+    );
+
+    final success = await _userService.reportUser(
+      targetUserId: widget.peerId,
+      reason: reason,
+      description: description.isNotEmpty ? description : null,
+      chatId: widget.chatId,
+    );
+
+    if (mounted) {
+      // Close loading dialog
+      Navigator.pop(context);
+
+      if (success) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Raporunuz alindi, tesekkurler!',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Rapor gonderilemedi. Lutfen tekrar deneyin.',
+                    style: GoogleFonts.poppins(),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 }

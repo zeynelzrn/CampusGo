@@ -8,6 +8,7 @@ import '../providers/swipe_provider.dart';
 import '../widgets/custom_notification.dart';
 import 'welcome_screen.dart';
 import 'splash_screen.dart';
+import 'blocked_users_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -46,7 +47,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildSettingsCard([
                       _buildSwitchTile(
                         icon: Icons.notifications_rounded,
-                        iconColor: const Color(0xFFFF2C60),
+                        iconColor: const Color(0xFF5C6BC0),
                         title: 'Bildirimler',
                         subtitle: 'Push bildirimleri al',
                         value: _notificationsEnabled,
@@ -77,6 +78,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         value: _showDistance,
                         onChanged: (value) {
                           setState(() => _showDistance = value);
+                        },
+                      ),
+                      const Divider(height: 1),
+                      _buildActionTile(
+                        icon: Icons.block_rounded,
+                        iconColor: Colors.red,
+                        title: 'Engellenen Kullanicilar',
+                        subtitle: 'Engelledigin kisileri yonet',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const BlockedUsersScreen(),
+                            ),
+                          );
                         },
                       ),
                     ]),
@@ -111,7 +127,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildSettingsCard([
                       _buildInfoTile(
                         icon: Icons.info_outline_rounded,
-                        iconColor: const Color(0xFFFF2C60),
+                        iconColor: const Color(0xFF5C6BC0),
                         title: 'Uygulama versiyonu',
                         value: '1.0.0',
                       ),
@@ -177,7 +193,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -283,8 +299,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeTrackColor: const Color(0xFFFF2C60).withValues(alpha: 0.5),
-            activeThumbColor: const Color(0xFFFF2C60),
+            activeTrackColor: const Color(0xFF5C6BC0).withValues(alpha: 0.5),
+            activeThumbColor: const Color(0xFF5C6BC0),
           ),
         ],
       ),
@@ -471,7 +487,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2C60),
+              backgroundColor: const Color(0xFF5C6BC0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -528,7 +544,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2C60),
+              backgroundColor: const Color(0xFF5C6BC0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -945,8 +961,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     // Option 1: Reset Matches and Chats
                     _buildAdminMenuItem(
                       icon: Icons.refresh_rounded,
-                      title: 'Tum Eslesme ve Sohbetleri Sifirla',
-                      subtitle: 'Kullanicilar kalir, iliskiler silinir',
+                      title: 'Tum Baglanti ve Sohbetleri Sifirla',
+                      subtitle: 'Kullanicilar kalir, baglantilar silinir',
                       color: Colors.orange,
                       onTap: () {
                         Navigator.pop(context);
@@ -1092,7 +1108,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Eslesmeleri Sifirla',
+                'Baglantilari Sifirla',
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
                   color: Colors.red,
@@ -1115,9 +1131,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildDeleteListItem('Tum eslesmeler (matches)'),
+            _buildDeleteListItem('Tum baglantilar (matches)'),
             _buildDeleteListItem('Tum sohbetler ve mesajlar (chats)'),
-            _buildDeleteListItem('Tum begeni/gecme aksiyonlari (actions)'),
+            _buildDeleteListItem('Tum istek/gecme aksiyonlari (actions)'),
             _buildDeleteListItem('Kullanici iliski verileri'),
             const SizedBox(height: 16),
             Container(
@@ -1398,7 +1414,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SnackBar(
             content: Text(
               'Basariyla sifirlandi!\n'
-              '$deletedMatches eslesme, $deletedChats sohbet, '
+              '$deletedMatches baglanti, $deletedChats sohbet, '
               '$deletedMessages mesaj, $deletedActions aksiyon, '
               '$clearedUserData kullanici verisi silindi.',
             ),

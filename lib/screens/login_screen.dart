@@ -122,12 +122,12 @@ class _LoginScreenState extends State<LoginScreen>
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF2C60).withOpacity(0.1),
+                    color: const Color(0xFF5C6BC0).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.lock_reset_rounded,
-                    color: Color(0xFFFF2C60),
+                    color: Color(0xFF5C6BC0),
                     size: 24,
                   ),
                 ),
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen>
                     hintText: 'ornek@universite.edu.tr',
                     prefixIcon: const Icon(
                       Icons.email_outlined,
-                      color: Color(0xFFFF2C60),
+                      color: Color(0xFF5C6BC0),
                     ),
                     labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
                     border: OutlineInputBorder(
@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen>
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: const BorderSide(
-                        color: Color(0xFFFF2C60),
+                        color: Color(0xFF5C6BC0),
                         width: 2,
                       ),
                     ),
@@ -230,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen>
                         }
                       },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF2C60),
+                  backgroundColor: const Color(0xFF5C6BC0),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -292,8 +292,8 @@ class _LoginScreenState extends State<LoginScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFFFBA93).withOpacity(0.2),
-                      const Color(0xFFFF2C60).withOpacity(0.15),
+                      const Color(0xFFFF7043).withOpacity(0.2),
+                      const Color(0xFF5C6BC0).withOpacity(0.15),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -309,8 +309,8 @@ class _LoginScreenState extends State<LoginScreen>
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFFF6B9D).withOpacity(0.1),
-                      const Color(0xFFFFBA93).withOpacity(0.15),
+                      const Color(0xFF7986CB).withOpacity(0.1),
+                      const Color(0xFFFF7043).withOpacity(0.15),
                     ],
                   ),
                   shape: BoxShape.circle,
@@ -339,7 +339,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFFFF2C60)
+                                    color: const Color(0xFF5C6BC0)
                                         .withOpacity(0.15),
                                     blurRadius: 20,
                                     offset: const Offset(0, 8),
@@ -350,7 +350,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 onPressed: () => Navigator.pop(context),
                                 icon: const Icon(
                                   Icons.arrow_back_ios_new,
-                                  color: Color(0xFFFF2C60),
+                                  color: Color(0xFF5C6BC0),
                                   size: 22,
                                 ),
                               ),
@@ -372,9 +372,9 @@ class _LoginScreenState extends State<LoginScreen>
                                       foreground: Paint()
                                         ..shader = const LinearGradient(
                                           colors: [
-                                            Color(0xFFFF2C60),
-                                            Color(0xFFFF4081),
-                                            Color(0xFFFF6B9D),
+                                            Color(0xFF5C6BC0),
+                                            Color(0xFF7986CB),
+                                            Color(0xFF7986CB),
                                           ],
                                         ).createShader(Rect.fromLTWH(
                                             0.0, 0.0, 300.0, 80.0)),
@@ -387,9 +387,9 @@ class _LoginScreenState extends State<LoginScreen>
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
-                                          const Color(0xFFFF2C60)
+                                          const Color(0xFF5C6BC0)
                                               .withOpacity(0.1),
-                                          const Color(0xFFFF6B9D)
+                                          const Color(0xFF7986CB)
                                               .withOpacity(0.05),
                                         ],
                                       ),
@@ -427,13 +427,13 @@ class _LoginScreenState extends State<LoginScreen>
                                     prefixIcon: Container(
                                       margin: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFF2C60)
+                                        color: const Color(0xFF5C6BC0)
                                             .withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Icon(
                                           Icons.alternate_email_rounded,
-                                          color: Color(0xFFFF2C60),
+                                          color: Color(0xFF5C6BC0),
                                           size: 22),
                                     ),
                                     labelStyle: GoogleFonts.poppins(
@@ -451,7 +451,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(18),
                                       borderSide: const BorderSide(
-                                          color: Color(0xFFFF2C60), width: 2.5),
+                                          color: Color(0xFF5C6BC0), width: 2.5),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(18),
@@ -502,13 +502,13 @@ class _LoginScreenState extends State<LoginScreen>
                                     prefixIcon: Container(
                                       margin: const EdgeInsets.all(12),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFF2C60)
+                                        color: const Color(0xFF5C6BC0)
                                             .withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Icon(
                                           Icons.lock_outline_rounded,
-                                          color: Color(0xFFFF2C60),
+                                          color: Color(0xFF5C6BC0),
                                           size: 22),
                                     ),
                                     suffixIcon: IconButton(
@@ -516,7 +516,7 @@ class _LoginScreenState extends State<LoginScreen>
                                         _obscurePassword
                                             ? Icons.visibility_off_outlined
                                             : Icons.visibility_outlined,
-                                        color: const Color(0xFFFF2C60),
+                                        color: const Color(0xFF5C6BC0),
                                         size: 22,
                                       ),
                                       onPressed: () {
@@ -540,7 +540,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     focusedBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(18),
                                       borderSide: const BorderSide(
-                                          color: Color(0xFFFF2C60), width: 2.5),
+                                          color: Color(0xFF5C6BC0), width: 2.5),
                                     ),
                                     errorBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(18),
@@ -588,12 +588,12 @@ class _LoginScreenState extends State<LoginScreen>
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
                                       color: _rememberMe
-                                          ? const Color(0xFFFF2C60).withValues(alpha: 0.1)
+                                          ? const Color(0xFF5C6BC0).withValues(alpha: 0.1)
                                           : Colors.white.withValues(alpha: 0.8),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: _rememberMe
-                                            ? const Color(0xFFFF2C60).withValues(alpha: 0.4)
+                                            ? const Color(0xFF5C6BC0).withValues(alpha: 0.4)
                                             : Colors.grey.withValues(alpha: 0.3),
                                         width: 2,
                                       ),
@@ -607,7 +607,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           height: 22,
                                           decoration: BoxDecoration(
                                             color: _rememberMe
-                                                ? const Color(0xFFFF2C60)
+                                                ? const Color(0xFF5C6BC0)
                                                 : Colors.grey[300],
                                             borderRadius: BorderRadius.circular(6),
                                           ),
@@ -625,7 +625,7 @@ class _LoginScreenState extends State<LoginScreen>
                                               style: GoogleFonts.poppins(
                                                 fontSize: 14,
                                                 color: _rememberMe
-                                                    ? const Color(0xFFFF2C60)
+                                                    ? const Color(0xFF5C6BC0)
                                                     : Colors.grey[700],
                                                 fontWeight: FontWeight.w500,
                                               ),
@@ -646,13 +646,13 @@ class _LoginScreenState extends State<LoginScreen>
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
-                                          const Color(0xFFFF2C60).withValues(alpha: 0.1),
-                                          const Color(0xFFFF6B9D).withValues(alpha: 0.05),
+                                          const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                                          const Color(0xFF7986CB).withValues(alpha: 0.05),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
-                                        color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                                        color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                                         width: 1.5,
                                       ),
                                     ),
@@ -663,7 +663,7 @@ class _LoginScreenState extends State<LoginScreen>
                                           'Şifremi unuttum',
                                           style: GoogleFonts.poppins(
                                             fontSize: 13,
-                                            color: const Color(0xFFFF2C60),
+                                            color: const Color(0xFF5C6BC0),
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -721,14 +721,14 @@ class _LoginScreenState extends State<LoginScreen>
                                       borderRadius: BorderRadius.circular(18),
                                       gradient: const LinearGradient(
                                         colors: [
-                                          Color(0xFFFF2C60),
-                                          Color(0xFFFF4081),
-                                          Color(0xFFFF6B9D)
+                                          Color(0xFF5C6BC0),
+                                          Color(0xFF7986CB),
+                                          Color(0xFF7986CB)
                                         ],
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: const Color(0xFFFF2C60)
+                                          color: const Color(0xFF5C6BC0)
                                               .withOpacity(0.5 +
                                                   (0.1 *
                                                       _pulseAnimation.value)),
@@ -983,13 +983,13 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: const Color(0xFFFF2C60)
+                                    color: const Color(0xFF5C6BC0)
                                         .withOpacity(0.3),
                                     width: 2,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFFFF2C60)
+                                      color: const Color(0xFF5C6BC0)
                                           .withOpacity(0.15),
                                       blurRadius: 20,
                                       offset: const Offset(0, 8),
@@ -1003,8 +1003,8 @@ class _LoginScreenState extends State<LoginScreen>
                                       decoration: BoxDecoration(
                                         gradient: const LinearGradient(
                                           colors: [
-                                            Color(0xFFFF2C60),
-                                            Color(0xFFFF6B9D)
+                                            Color(0xFF5C6BC0),
+                                            Color(0xFF7986CB)
                                           ],
                                         ),
                                         borderRadius: BorderRadius.circular(12),
@@ -1032,7 +1032,7 @@ class _LoginScreenState extends State<LoginScreen>
                                             'Hemen Aramıza Katıl!',
                                             style: GoogleFonts.poppins(
                                               fontSize: 17,
-                                              color: const Color(0xFFFF2C60),
+                                              color: const Color(0xFF5C6BC0),
                                               fontWeight: FontWeight.w700,
                                             ),
                                           ),
@@ -1041,7 +1041,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                     const Icon(
                                       Icons.arrow_forward_ios_rounded,
-                                      color: Color(0xFFFF2C60),
+                                      color: Color(0xFF5C6BC0),
                                       size: 20,
                                     ),
                                   ],
@@ -1129,7 +1129,7 @@ class _ModernNotificationState extends State<_ModernNotification>
   @override
   Widget build(BuildContext context) {
     final Color primaryColor =
-        widget.isSuccess ? const Color(0xFFFF2C60) : const Color(0xFFE53935);
+        widget.isSuccess ? const Color(0xFF5C6BC0) : const Color(0xFFE53935);
 
     final Color bgColor =
         widget.isSuccess ? const Color(0xFFFFF0F3) : const Color(0xFFFFEBEE);
@@ -1201,8 +1201,8 @@ class _ModernNotificationState extends State<_ModernNotification>
                                     end: Alignment.bottomRight,
                                     colors: widget.isSuccess
                                         ? [
-                                            const Color(0xFFFF2C60),
-                                            const Color(0xFFFF6B9D),
+                                            const Color(0xFF5C6BC0),
+                                            const Color(0xFF7986CB),
                                           ]
                                         : [
                                             const Color(0xFFE53935),

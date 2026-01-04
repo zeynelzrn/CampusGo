@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../services/user_service.dart';
 import 'chat_detail_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
+  final UserService _userService = UserService();
 
   @override
   Widget build(BuildContext context) {
@@ -26,42 +28,64 @@ class _ChatListScreenState extends State<ChatListScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: StreamBuilder<List<Chat>>(
-                stream: _chatService.watchChats(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return _buildLoadingState();
-                  }
+              child: StreamBuilder<Set<String>>(
+                // Get ALL restricted user IDs (BLACKLIST: blocked_users + blocked_by)
+                // This ensures MUTUAL INVISIBILITY - if either user blocked the other,
+                // the chat is hidden for both
+                stream: _userService.watchAllRestrictedUserIds(),
+                builder: (context, restrictedSnapshot) {
+                  final restrictedIds = restrictedSnapshot.data ?? <String>{};
 
-                  if (snapshot.hasError) {
-                    // Detayli hata loglama
-                    final error = snapshot.error;
-                    debugPrint('========== CHAT ERROR ==========');
-                    debugPrint('Error Type: ${error.runtimeType}');
-                    debugPrint('Error Message: $error');
-                    debugPrint('Stack Trace: ${snapshot.stackTrace}');
-                    debugPrint('=================================');
+                  return StreamBuilder<List<Chat>>(
+                    stream: _chatService.watchChats(),
+                    builder: (context, chatSnapshot) {
+                      if (chatSnapshot.connectionState == ConnectionState.waiting) {
+                        return _buildLoadingState();
+                      }
 
-                    // Index hatasi kontrolu
-                    final errorStr = error.toString();
-                    if (errorStr.contains('index') || errorStr.contains('Index')) {
-                      debugPrint('>>> COMPOSITE INDEX GEREKIYOR! <<<');
-                      debugPrint('Firebase Console\'da index olusturun veya asagidaki linke tiklayin.');
-                    }
-                    if (errorStr.contains('permission') || errorStr.contains('Permission')) {
-                      debugPrint('>>> PERMISSION DENIED! Firestore Rules kontrol edin. <<<');
-                    }
+                      if (chatSnapshot.hasError) {
+                        // Detayli hata loglama
+                        final error = chatSnapshot.error;
+                        debugPrint('========== CHAT ERROR ==========');
+                        debugPrint('Error Type: ${error.runtimeType}');
+                        debugPrint('Error Message: $error');
+                        debugPrint('Stack Trace: ${chatSnapshot.stackTrace}');
+                        debugPrint('=================================');
 
-                    return _buildErrorState(errorStr);
-                  }
+                        // Index hatasi kontrolu
+                        final errorStr = error.toString();
+                        if (errorStr.contains('index') || errorStr.contains('Index')) {
+                          debugPrint('>>> COMPOSITE INDEX GEREKIYOR! <<<');
+                          debugPrint('Firebase Console\'da index olusturun veya asagidaki linke tiklayin.');
+                        }
+                        if (errorStr.contains('permission') || errorStr.contains('Permission')) {
+                          debugPrint('>>> PERMISSION DENIED! Firestore Rules kontrol edin. <<<');
+                        }
 
-                  final chats = snapshot.data ?? [];
+                        return _buildErrorState(errorStr);
+                      }
 
-                  if (chats.isEmpty) {
-                    return _buildEmptyState();
-                  }
+                      final allChats = chatSnapshot.data ?? [];
 
-                  return _buildChatList(chats);
+                      // Filter out ALL restricted users (BLACKLIST)
+                      // This includes:
+                      // 1. Users I blocked (blocked_users)
+                      // 2. Users who blocked me (blocked_by)
+                      final chats = allChats.where((chat) {
+                        final isRestricted = restrictedIds.contains(chat.peerId);
+                        if (isRestricted) {
+                          debugPrint('Filtering out RESTRICTED user: ${chat.peerName} (${chat.peerId})');
+                        }
+                        return !isRestricted;
+                      }).toList();
+
+                      if (chats.isEmpty) {
+                        return _buildEmptyState();
+                      }
+
+                      return _buildChatList(chats);
+                    },
+                  );
                 },
               ),
             ),
@@ -90,7 +114,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
@@ -124,7 +148,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         color: unreadCount > 0
-                            ? const Color(0xFFFF2C60)
+                            ? const Color(0xFF5C6BC0)
                             : Colors.grey[600],
                         fontWeight:
                             unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
@@ -256,8 +280,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFFF2C60).withValues(alpha: 0.15),
-                          const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                          const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                          const Color(0xFF7986CB).withValues(alpha: 0.1),
                         ],
                       ),
                       shape: BoxShape.circle,
@@ -265,7 +289,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     child: const Icon(
                       Icons.chat_bubble_outline_rounded,
                       size: 80,
-                      color: Color(0xFFFF2C60),
+                      color: Color(0xFF5C6BC0),
                     ),
                   ),
                 );
@@ -304,8 +328,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFFF2C60).withValues(alpha: 0.1),
-            const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+            const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+            const Color(0xFF7986CB).withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -320,7 +344,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             child: const Icon(
               Icons.handshake_rounded,
-              color: Color(0xFFFF2C60),
+              color: Color(0xFF5C6BC0),
               size: 28,
             ),
           ),
@@ -339,7 +363,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Iki kisi birbirini begendikten sonra esleme olur ve sohbet edebilirsiniz!',
+                  'Iki kisi birbirine selam verdikten sonra baglanti kurulur ve sohbet edebilirsiniz!',
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: Colors.grey[600],
@@ -391,14 +415,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
             borderRadius: BorderRadius.circular(16),
             border: hasUnread
                 ? Border.all(
-                    color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                     width: 1,
                   )
                 : null,
             boxShadow: [
               BoxShadow(
                 color: hasUnread
-                    ? const Color(0xFFFF2C60).withValues(alpha: 0.1)
+                    ? const Color(0xFF5C6BC0).withValues(alpha: 0.1)
                     : Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
@@ -438,7 +462,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             height: 10,
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                               ),
                               shape: BoxShape.circle,
                             ),
@@ -470,7 +494,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: hasUnread
-                          ? const Color(0xFFFF2C60)
+                          ? const Color(0xFF5C6BC0)
                           : Colors.grey[400],
                       fontWeight:
                           hasUnread ? FontWeight.w600 : FontWeight.normal,
@@ -480,7 +504,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   Icon(
                     Icons.chevron_right_rounded,
                     color: hasUnread
-                        ? const Color(0xFFFF2C60)
+                        ? const Color(0xFF5C6BC0)
                         : Colors.grey[400],
                     size: 24,
                   ),
@@ -501,13 +525,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
         shape: BoxShape.circle,
         border: Border.all(
           color: chat.hasUnreadFor(_chatService.currentUserId ?? '')
-              ? const Color(0xFFFF2C60)
+              ? const Color(0xFF5C6BC0)
               : Colors.grey[200]!,
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF2C60).withValues(alpha: 0.2),
+            color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -524,7 +548,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+                          AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
                     ),
                   ),
                 ),
@@ -539,7 +563,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

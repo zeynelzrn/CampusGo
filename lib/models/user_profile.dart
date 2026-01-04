@@ -15,6 +15,12 @@ class UserProfile {
   final DateTime? createdAt;
   final GeoPoint? location;
 
+  // Zenginleştirilmiş Profil Alanları
+  final String grade; // Sınıf Seviyesi (Hazırlık, 1. Sınıf, 2. Sınıf, vb.)
+  final List<String> clubs; // Topluluklar/Kulüpler
+  final Map<String, String> socialLinks; // Sosyal medya linkleri (instagram, linkedin, vb.)
+  final List<String> intent; // Niyet (Kahve içmek, Ders çalışmak, Spor yapmak, vb.)
+
   const UserProfile({
     required this.id,
     required this.name,
@@ -28,6 +34,10 @@ class UserProfile {
     this.lookingFor = '',
     this.createdAt,
     this.location,
+    this.grade = '',
+    this.clubs = const [],
+    this.socialLinks = const {},
+    this.intent = const [],
   });
 
   /// Create from Firestore document
@@ -47,6 +57,10 @@ class UserProfile {
       lookingFor: data['lookingFor'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       location: data['location'] as GeoPoint?,
+      grade: data['grade'] as String? ?? '',
+      clubs: List<String>.from(data['clubs'] ?? []),
+      socialLinks: Map<String, String>.from(data['socialLinks'] ?? {}),
+      intent: List<String>.from(data['intent'] ?? []),
     );
   }
 
@@ -66,6 +80,10 @@ class UserProfile {
           ? Timestamp.fromDate(createdAt!)
           : FieldValue.serverTimestamp(),
       if (location != null) 'location': location,
+      'grade': grade,
+      'clubs': clubs,
+      'socialLinks': socialLinks,
+      'intent': intent,
     };
   }
 

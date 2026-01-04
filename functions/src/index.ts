@@ -156,9 +156,9 @@ export const onNewLike = functions.firestore
     try {
       // Prepare notification content
       const title = actionType === "superlike"
-        ? "Biri seni cok begendi!"
-        : "Biri seni begendi!";
-      const body = "Yeni bir hayranin var, hemen bak!";
+        ? "Süper Tanışma İsteği! ⭐"
+        : "Yeni Tanışma İsteği 👋";
+      const body = "Biri seninle tanışmak istiyor! Tıkla ve bak.";
 
       // ALWAYS write to Firestore for in-app notifications (iOS fallback)
       await writeInAppNotification(
@@ -236,8 +236,8 @@ export const onNewMatch = functions.firestore
 
     if (!users || users.length !== 2) return null;
 
-    const title = "Yeni Eslesme!";
-    const body = "Biriyle eslestin, hemen sohbete basla!";
+    const title = "Bağlantı Kuruldu! 🤝";
+    const body = "Yeni bir arkadaşlık başladı. Sohbete başla!";
 
     try {
       // Process both users

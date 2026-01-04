@@ -268,7 +268,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('Tekrar Dene'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2C60),
+              backgroundColor: const Color(0xFF5C6BC0),
               foregroundColor: Colors.white,
             ),
           ),
@@ -298,12 +298,12 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
               ),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
-              Icons.favorite_rounded,
+              Icons.waving_hand_rounded,
               color: Colors.white,
               size: 24,
             ),
@@ -316,7 +316,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                 Row(
                   children: [
                     Text(
-                      'Begeniler',
+                      'Istekler',
                       style: GoogleFonts.poppins(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -357,7 +357,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                   ],
                 ),
                 Text(
-                  '$count kisi seni begendi',
+                  '$count kisi seninle tanismak istiyor',
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.grey[600],
@@ -385,11 +385,11 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
           ),
           const SizedBox(height: 16),
           Text(
-            'Begeniler yukleniyor...',
+            'Istekler yukleniyor...',
             style: GoogleFonts.poppins(
               fontSize: 16,
               color: Colors.grey[600],
@@ -412,7 +412,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
           CustomNotification.success(
             context,
             'Demo veriler eklendi',
-            subtitle: '$count kisi seni begendi!',
+            subtitle: '$count kisi seninle tanismak istiyor!',
           );
         }
       } else {
@@ -438,18 +438,18 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
             Container(
               padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.favorite_border_rounded,
+                Icons.waving_hand_outlined,
                 size: 80,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 32),
             Text(
-              'Henuz begeni yok',
+              'Henuz istek yok',
               style: GoogleFonts.poppins(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -475,12 +475,12 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                   ),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                     ),
@@ -496,7 +496,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'Demo Begeni Ekle',
+                      'Demo Istek Ekle',
                       style: GoogleFonts.poppins(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -546,7 +546,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   Widget _buildLikesList(List<UserProfile> likedByUsers, LikesUIState uiState) {
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(receivedLikesProvider),
-      color: const Color(0xFFFF2C60),
+      color: const Color(0xFF5C6BC0),
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -655,7 +655,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                                   child: const Center(
                                     child: CircularProgressIndicator(
                                       valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFFFF2C60),
+                                        Color(0xFF5C6BC0),
                                       ),
                                     ),
                                   ),
@@ -753,18 +753,18 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFF2C60),
+                              color: const Color(0xFF5C6BC0),
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
                             child: const Icon(
-                              Icons.favorite_rounded,
+                              Icons.waving_hand_rounded,
                               color: Colors.white,
                               size: 16,
                             ),
@@ -831,14 +831,14 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFFF2C60).withValues(alpha: 0.5),
+                            color: const Color(0xFF5C6BC0).withValues(alpha: 0.5),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -999,12 +999,12 @@ class _ProfileDetailPage extends StatelessWidget {
                     width: 64,
                     height: 64,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.sentiment_dissatisfied_rounded,
-                      color: Color(0xFFFF2C60),
+                      color: Color(0xFF5C6BC0),
                       size: 36,
                     ),
                   ),
@@ -1109,14 +1109,14 @@ class _ProfileDetailPage extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                                 begin: Alignment.centerLeft,
                                 end: Alignment.centerRight,
                               ),
                               borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1366,8 +1366,8 @@ class _ProfileDetailPage extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
-                                          const Color(0xFFFF2C60).withValues(alpha: 0.1),
-                                          const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                                          const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                                          const Color(0xFF7986CB).withValues(alpha: 0.1),
                                         ],
                                       ),
                                       borderRadius: BorderRadius.circular(20),
@@ -1376,7 +1376,7 @@ class _ProfileDetailPage extends StatelessWidget {
                                       interest,
                                       style: GoogleFonts.poppins(
                                         fontSize: 13,
-                                        color: const Color(0xFFFF2C60),
+                                        color: const Color(0xFF5C6BC0),
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -1475,12 +1475,12 @@ class _ProfileDetailPage extends StatelessWidget {
                   // Like butonu (büyük)
                   _buildActionButton(
                     onTap: onLike,
-                    icon: Icons.favorite_rounded,
+                    icon: Icons.waving_hand_rounded,
                     size: 72,
                     iconSize: 34,
-                    colors: const [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                    colors: const [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                     iconColor: Colors.white,
-                    shadowColor: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                    shadowColor: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                     isGradient: true,
                   ),
                 ],
@@ -1498,12 +1498,12 @@ class _ProfileDetailPage extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+            color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(
             icon,
-            color: const Color(0xFFFF2C60),
+            color: const Color(0xFF5C6BC0),
             size: 18,
           ),
         ),

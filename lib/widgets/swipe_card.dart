@@ -150,7 +150,7 @@ class _SwipeCardState extends State<SwipeCard> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'LIKE',
+              'SELAM',
               style: GoogleFonts.poppins(
                 fontSize: 32,
                 fontWeight: FontWeight.w900,
@@ -212,7 +212,7 @@ class _SwipeCardState extends State<SwipeCard> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'SUPER LIKE',
+              'SÜPER',
               style: GoogleFonts.poppins(
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
@@ -286,13 +286,13 @@ class _SwipeCardState extends State<SwipeCard> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.person,
                 size: 60,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 16),
@@ -602,7 +602,7 @@ class _SwipeCardState extends State<SwipeCard> {
                       width: 4,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF2C60),
+                        color: const Color(0xFF5C6BC0),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -655,7 +655,7 @@ class _SwipeCardState extends State<SwipeCard> {
                       width: 4,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF2C60),
+                        color: const Color(0xFF5C6BC0),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -683,20 +683,20 @@ class _SwipeCardState extends State<SwipeCard> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFFFF2C60).withValues(alpha: 0.08),
-                            const Color(0xFFFF6B9D).withValues(alpha: 0.08),
+                            const Color(0xFF5C6BC0).withValues(alpha: 0.08),
+                            const Color(0xFF7986CB).withValues(alpha: 0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(25),
                         border: Border.all(
-                          color: const Color(0xFFFF2C60).withValues(alpha: 0.2),
+                          color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
                         ),
                       ),
                       child: Text(
                         interest,
                         style: GoogleFonts.poppins(
                           fontSize: 13,
-                          color: const Color(0xFFFF2C60),
+                          color: const Color(0xFF5C6BC0),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -721,13 +721,13 @@ class _SwipeCardState extends State<SwipeCard> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+              color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
               size: 22,
-              color: const Color(0xFFFF2C60),
+              color: const Color(0xFF5C6BC0),
             ),
           ),
           const SizedBox(width: 14),
@@ -825,7 +825,7 @@ class SwipeActionButtons extends StatelessWidget {
 
           // Like button
           _buildActionButton(
-            icon: Icons.favorite_rounded,
+            icon: Icons.waving_hand_rounded,
             color: const Color(0xFF00E676),
             size: 64,
             iconSize: 32,
@@ -922,8 +922,8 @@ class NoMoreProfilesWidget extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          const Color(0xFFFF2C60).withValues(alpha: 0.15),
-                          const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                          const Color(0xFF5C6BC0).withValues(alpha: 0.15),
+                          const Color(0xFF7986CB).withValues(alpha: 0.1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -933,7 +933,7 @@ class NoMoreProfilesWidget extends StatelessWidget {
                     child: const Icon(
                       Icons.explore_off_rounded,
                       size: 72,
-                      color: Color(0xFFFF2C60),
+                      color: Color(0xFF5C6BC0),
                     ),
                   ),
                 );
@@ -962,12 +962,12 @@ class NoMoreProfilesWidget extends StatelessWidget {
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                  colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                 ),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -1067,9 +1067,9 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFF2C60), // Ana pembe/kırmızı
-              Color(0xFFFF6B9D), // Açık pembe
-              Color(0xFFFF8C42), // Turuncu
+              Color(0xFF5C6BC0), // Ana pembe/kırmızı
+              Color(0xFF7986CB), // Açık pembe
+              Color(0xFFFF7043), // Turuncu
             ],
           ),
         ),

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
+import 'user_profile_screen.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -22,13 +23,55 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final _bioController = TextEditingController();
   final _universityController = TextEditingController();
   final _departmentController = TextEditingController();
+  final _instagramController = TextEditingController();
+  final _linkedinController = TextEditingController();
 
   String _selectedGender = 'Erkek';
   String _lookingFor = 'Kadın';
+  String _selectedGrade = '';
 
   List<String?> _photoUrls = List.filled(6, null);
   List<File?> _localPhotos = List.filled(6, null);
   List<String> _selectedInterests = [];
+  List<String> _selectedClubs = [];
+  List<String> _selectedIntents = [];
+
+  final List<String> _gradeOptions = [
+    'Hazırlık',
+    '1. Sınıf',
+    '2. Sınıf',
+    '3. Sınıf',
+    '4. Sınıf',
+    'Yüksek Lisans',
+    'Doktora',
+    'Mezun',
+  ];
+
+  final List<String> _clubOptions = [
+    'Yazılım Kulübü',
+    'Müzik Kulübü',
+    'Fotoğrafçılık',
+    'Tiyatro',
+    'Münazara',
+    'Dans Topluluğu',
+    'Spor Kulübü',
+    'Girişimcilik',
+    'Robotik',
+    'Sosyal Sorumluluk',
+    'Sinema Kulübü',
+    'Edebiyat',
+  ];
+
+  final List<String> _intentOptions = [
+    'Kahve içmek',
+    'Ders çalışmak',
+    'Spor yapmak',
+    'Proje ortağı bulmak',
+    'Etkinliklere katılmak',
+    'Sohbet etmek',
+    'Yeni arkadaşlar edinmek',
+    'Networking',
+  ];
 
   bool _isLoading = false;
   bool _isSaving = false;
@@ -69,6 +112,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _bioController.dispose();
     _universityController.dispose();
     _departmentController.dispose();
+    _instagramController.dispose();
+    _linkedinController.dispose();
     super.dispose();
   }
 
@@ -101,6 +146,16 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
 
       _selectedInterests = List<String>.from(profile['interests'] ?? []);
+
+      // Zenginleştirilmiş alanlar
+      _selectedGrade = profile['grade'] ?? '';
+      _selectedClubs = List<String>.from(profile['clubs'] ?? []);
+      _selectedIntents = List<String>.from(profile['intent'] ?? []);
+
+      // Sosyal linkler
+      final socialLinks = profile['socialLinks'] as Map<String, dynamic>? ?? {};
+      _instagramController.text = socialLinks['instagram'] ?? '';
+      _linkedinController.text = socialLinks['linkedin'] ?? '';
 
       List<dynamic> photos = profile['photos'] ?? [];
       for (int i = 0; i < photos.length && i < 6; i++) {
@@ -137,10 +192,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.pink.withOpacity(0.1),
+                  color: Colors.indigo.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.camera_alt, color: Colors.pink),
+                child: const Icon(Icons.camera_alt, color: Colors.indigo),
               ),
               title: const Text('Kamera'),
               onTap: () {
@@ -152,10 +207,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.pink.withOpacity(0.1),
+                  color: Colors.indigo.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.photo_library, color: Colors.pink),
+                child: const Icon(Icons.photo_library, color: Colors.indigo),
               ),
               title: const Text('Galeri'),
               onTap: () {
@@ -247,6 +302,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
       }
 
+      // Sosyal linkler
+      Map<String, String> socialLinks = {};
+      if (_instagramController.text.trim().isNotEmpty) {
+        socialLinks['instagram'] = _instagramController.text.trim();
+      }
+      if (_linkedinController.text.trim().isNotEmpty) {
+        socialLinks['linkedin'] = _linkedinController.text.trim();
+      }
+
       // Profili kaydet
       bool success = await _profileService.saveProfile(
         name: _nameController.text.trim(),
@@ -258,6 +322,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         photoUrls: finalPhotoUrls,
         gender: _selectedGender,
         lookingFor: _lookingFor,
+        grade: _selectedGrade,
+        clubs: _selectedClubs,
+        socialLinks: socialLinks,
+        intent: _selectedIntents,
       );
 
       if (success) {
@@ -292,6 +360,37 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     CustomNotification.warning(context, message);
   }
 
+  /// Navigate to UserProfileScreen to preview own profile as others see it
+  /// Uses a fancy Scale + Fade transition animation
+  void _previewProfile() {
+    final currentUserId = _profileService.currentUserId;
+    if (currentUserId == null) {
+      _showWarning('Profil onizlemesi icin giris yapmis olmaniz gerekiyor');
+      return;
+    }
+
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            UserProfileScreen(userId: currentUserId),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          // Scale + Fade transition for a premium feel
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.90, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              ),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 400),
+        reverseTransitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,31 +398,82 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Text(
-          'Profili Düzenle',
-          style: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _saveProfile,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    'Kaydet',
+        leadingWidth: 145,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12, top: 6, bottom: 6),
+          child: GestureDetector(
+            onTap: _previewProfile,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF1A237E), // Koyu Indigo
+                    Color(0xFF7C4DFF), // Canlı Mor/Menekşe (deepPurpleAccent)
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C4DFF).withValues(alpha: 0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.visibility_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Önizle',
                     style: GoogleFonts.poppins(
-                      color: Colors.pink,
-                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        title: const SizedBox.shrink(),
+        actions: [
+          // Kaydet Butonu
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton(
+              onPressed: _isSaving ? null : _saveProfile,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.indigo,
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.indigo,
+                      ),
+                    )
+                  : Text(
+                      'Kaydet',
+                      style: GoogleFonts.poppins(
+                        color: Colors.indigo,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+            ),
           ),
         ],
       ),
@@ -388,8 +538,36 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ]),
                   const SizedBox(height: 24),
+                  _buildSection('Sınıf Seviyesi', [
+                    _buildGradeSelector(),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildSection('Topluluklar / Kulüpler', [
+                    _buildClubsSelector(),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildSection('Ne İçin Buradayım?', [
+                    _buildIntentSelector(),
+                  ]),
+                  const SizedBox(height: 24),
                   _buildSection('İlgi Alanları', [
                     _buildInterestsSelector(),
+                  ]),
+                  const SizedBox(height: 24),
+                  _buildSection('Sosyal Medya', [
+                    _buildTextField(
+                      controller: _instagramController,
+                      label: 'Instagram',
+                      hint: '@kullaniciadi',
+                      icon: Icons.camera_alt_outlined,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildTextField(
+                      controller: _linkedinController,
+                      label: 'LinkedIn',
+                      hint: 'linkedin.com/in/kullaniciadi',
+                      icon: Icons.work_outline,
+                    ),
                   ]),
                   const SizedBox(height: 100),
                 ],
@@ -410,7 +588,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.photo_library, color: Colors.pink),
+              const Icon(Icons.photo_library, color: Colors.indigo),
               const SizedBox(width: 8),
               Text(
                 'Fotoğraflar',
@@ -457,7 +635,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         decoration: BoxDecoration(
           color: Colors.grey[200],
           borderRadius: BorderRadius.circular(12),
-          border: isMainPhoto ? Border.all(color: Colors.pink, width: 2) : null,
+          border: isMainPhoto ? Border.all(color: Colors.indigo, width: 2) : null,
         ),
         child: Stack(
           fit: StackFit.expand,
@@ -502,7 +680,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: hasPhoto ? Colors.white : Colors.pink,
+                  color: hasPhoto ? Colors.white : Colors.indigo,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
@@ -514,7 +692,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 child: Icon(
                   hasPhoto ? Icons.edit : Icons.add,
                   size: 14,
-                  color: hasPhoto ? Colors.pink : Colors.white,
+                  color: hasPhoto ? Colors.indigo : Colors.white,
                 ),
               ),
             ),
@@ -528,7 +706,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.pink,
+                    color: Colors.indigo,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -589,7 +767,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.pink),
+        prefixIcon: Icon(icon, color: Colors.indigo),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
@@ -600,7 +778,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.pink),
+          borderSide: const BorderSide(color: Colors.indigo),
         ),
         filled: true,
         fillColor: Colors.grey[50],
@@ -647,7 +825,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           decoration: InputDecoration(
             labelText: label,
             hintText: hint,
-            prefixIcon: Icon(icon, color: Colors.pink),
+            prefixIcon: Icon(icon, color: Colors.indigo),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: Colors.grey[300]!),
@@ -658,7 +836,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.pink),
+              borderSide: const BorderSide(color: Colors.indigo),
             ),
             filled: true,
             fillColor: Colors.grey[50],
@@ -766,10 +944,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.pink : Colors.grey[100],
+          color: isSelected ? Colors.indigo : Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Colors.pink : Colors.grey[300]!,
+            color: isSelected ? Colors.indigo : Colors.grey[300]!,
           ),
         ),
         child: Column(
@@ -814,10 +992,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? Colors.pink : Colors.grey[100],
+              color: isSelected ? Colors.indigo : Colors.grey[100],
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: isSelected ? Colors.pink : Colors.grey[300]!,
+                color: isSelected ? Colors.indigo : Colors.grey[300]!,
               ),
             ),
             child: Text(
@@ -832,6 +1010,194 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         );
       }).toList(),
     );
+  }
+
+  Widget _buildGradeSelector() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _gradeOptions.map((grade) {
+        bool isSelected = _selectedGrade == grade;
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedGrade = isSelected ? '' : grade;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.indigo : Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected ? Colors.indigo : Colors.grey[300]!,
+              ),
+            ),
+            child: Text(
+              grade,
+              style: GoogleFonts.poppins(
+                color: isSelected ? Colors.white : Colors.grey[700],
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildClubsSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'En fazla 3 topluluk seçebilirsiniz',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _clubOptions.map((club) {
+            bool isSelected = _selectedClubs.contains(club);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedClubs.remove(club);
+                  } else if (_selectedClubs.length < 3) {
+                    _selectedClubs.add(club);
+                  } else {
+                    _showWarning('En fazla 3 topluluk seçebilirsiniz');
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.indigo : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Colors.indigo : Colors.grey[300]!,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.groups_outlined,
+                      size: 16,
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      club,
+                      style: GoogleFonts.poppins(
+                        color: isSelected ? Colors.white : Colors.grey[700],
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildIntentSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Neden burada olduğunu paylaş (en fazla 3)',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _intentOptions.map((intent) {
+            bool isSelected = _selectedIntents.contains(intent);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedIntents.remove(intent);
+                  } else if (_selectedIntents.length < 3) {
+                    _selectedIntents.add(intent);
+                  } else {
+                    _showWarning('En fazla 3 niyet seçebilirsiniz');
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.deepPurple : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? Colors.deepPurple : Colors.grey[300]!,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getIntentIcon(intent),
+                      size: 16,
+                      color: isSelected ? Colors.white : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      intent,
+                      style: GoogleFonts.poppins(
+                        color: isSelected ? Colors.white : Colors.grey[700],
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  IconData _getIntentIcon(String intent) {
+    switch (intent) {
+      case 'Kahve içmek':
+        return Icons.coffee_outlined;
+      case 'Ders çalışmak':
+        return Icons.menu_book_outlined;
+      case 'Spor yapmak':
+        return Icons.fitness_center_outlined;
+      case 'Proje ortağı bulmak':
+        return Icons.handshake_outlined;
+      case 'Etkinliklere katılmak':
+        return Icons.event_outlined;
+      case 'Sohbet etmek':
+        return Icons.chat_bubble_outline;
+      case 'Yeni arkadaşlar edinmek':
+        return Icons.people_outline;
+      case 'Networking':
+        return Icons.hub_outlined;
+      default:
+        return Icons.star_outline;
+    }
   }
 
 }

@@ -63,6 +63,10 @@ class ProfileService {
     required List<String?> photoUrls,
     required String gender,
     required String lookingFor,
+    String grade = '',
+    List<String> clubs = const [],
+    Map<String, String> socialLinks = const {},
+    List<String> intent = const [],
   }) async {
     try {
       if (currentUserId == null) return false;
@@ -77,6 +81,10 @@ class ProfileService {
         'photos': photoUrls.where((url) => url != null).toList(),
         'gender': gender,
         'lookingFor': lookingFor,
+        'grade': grade,
+        'clubs': clubs,
+        'socialLinks': socialLinks,
+        'intent': intent,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));

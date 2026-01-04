@@ -132,7 +132,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             height: 70,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
@@ -276,7 +276,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.15),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.15),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -286,7 +286,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             onPressed: () => _showExitConfirmDialog(),
             icon: const Icon(
               Icons.arrow_back_ios_new,
-              color: Color(0xFFFF2C60),
+              color: Color(0xFF5C6BC0),
               size: 22,
             ),
           ),
@@ -298,7 +298,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             children: [
               ShaderMask(
                 shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                  colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                 ).createShader(bounds),
                 child: Text(
                   'Profilini Oluştur',
@@ -362,7 +362,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2C60),
+              backgroundColor: const Color(0xFF5C6BC0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -390,12 +390,12 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                 shape: BoxShape.circle,
                 color: Colors.grey[200],
                 border: Border.all(
-                  color: const Color(0xFFFF2C60),
+                  color: const Color(0xFF5C6BC0),
                   width: 3,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -422,7 +422,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                 padding: const EdgeInsets.all(10),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                   ),
                   shape: BoxShape.circle,
                 ),
@@ -563,7 +563,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
-          prefixIcon: Icon(icon, color: const Color(0xFFFF2C60)),
+          prefixIcon: Icon(icon, color: const Color(0xFF5C6BC0)),
           labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
           hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
           border: OutlineInputBorder(
@@ -576,7 +576,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(color: Color(0xFFFF2C60), width: 2),
+            borderSide: const BorderSide(color: Color(0xFF5C6BC0), width: 2),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -651,7 +651,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             decoration: InputDecoration(
               labelText: label,
               hintText: hint,
-              prefixIcon: Icon(icon, color: const Color(0xFFFF2C60)),
+              prefixIcon: Icon(icon, color: const Color(0xFF5C6BC0)),
               suffixIcon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
               labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
               hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
@@ -666,7 +666,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide:
-                    const BorderSide(color: Color(0xFFFF2C60), width: 2),
+                    const BorderSide(color: Color(0xFF5C6BC0), width: 2),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -745,7 +745,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                   decoration: BoxDecoration(
                     gradient: isSelected
                         ? const LinearGradient(
-                            colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                            colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                           )
                         : null,
                     color: isSelected ? null : Colors.white,
@@ -753,7 +753,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                     boxShadow: [
                       BoxShadow(
                         color: isSelected
-                            ? const Color(0xFFFF2C60).withValues(alpha: 0.3)
+                            ? const Color(0xFF5C6BC0).withValues(alpha: 0.3)
                             : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
@@ -805,7 +805,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                   decoration: BoxDecoration(
                     gradient: isSelected
                         ? const LinearGradient(
-                            colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+                            colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                           )
                         : null,
                     color: isSelected ? null : Colors.white,
@@ -813,7 +813,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                     boxShadow: [
                       BoxShadow(
                         color: isSelected
-                            ? const Color(0xFFFF2C60).withValues(alpha: 0.3)
+                            ? const Color(0xFF5C6BC0).withValues(alpha: 0.3)
                             : Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
@@ -843,12 +843,12 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       height: 56,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF2C60), Color(0xFFFF6B9D)],
+          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFFF2C60).withValues(alpha: 0.4),
+            color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),

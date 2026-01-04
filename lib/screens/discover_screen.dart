@@ -166,7 +166,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               color: Colors.grey[200],
               child: const Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFFFF2C60),
+                  color: Color(0xFF5C6BC0),
                 ),
               ),
             ),
@@ -298,12 +298,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+            color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             icon,
-            color: const Color(0xFFFF2C60),
+            color: const Color(0xFF5C6BC0),
             size: 22,
           ),
         ),
@@ -359,7 +359,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               color: Colors.grey[200],
               child: const Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFFFF2C60),
+                  color: Color(0xFF5C6BC0),
                 ),
               ),
             ),
@@ -397,7 +397,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 width: 4,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF2C60),
+                  color: const Color(0xFF5C6BC0),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -425,20 +425,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFFFF2C60).withValues(alpha: 0.1),
-                      const Color(0xFFFF6B9D).withValues(alpha: 0.1),
+                      const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                      const Color(0xFF7986CB).withValues(alpha: 0.1),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
-                    color: const Color(0xFFFF2C60).withValues(alpha: 0.3),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
                   interest,
                   style: GoogleFonts.poppins(
                     fontSize: 14,
-                    color: const Color(0xFFFF2C60),
+                    color: const Color(0xFF5C6BC0),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -474,7 +474,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 width: 4,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF2C60),
+                  color: const Color(0xFF5C6BC0),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -542,7 +542,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             ),
             // Like button
             _buildActionButton(
-              icon: Icons.favorite_rounded,
+              icon: Icons.waving_hand_rounded,
               color: const Color(0xFF00E676),
               size: 64,
               iconSize: 32,
@@ -610,13 +610,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF2C60).withValues(alpha: 0.2),
+                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
                   blurRadius: 20,
                 ),
               ],
             ),
             child: const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
               strokeWidth: 3,
             ),
           ),
@@ -679,7 +679,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF2C60),
+                backgroundColor: const Color(0xFF5C6BC0),
                 foregroundColor: Colors.white,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -704,13 +704,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF2C60).withValues(alpha: 0.1),
+                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.explore_off_rounded,
                 size: 64,
-                color: Color(0xFFFF2C60),
+                color: Color(0xFF5C6BC0),
               ),
             ),
             const SizedBox(height: 24),
@@ -743,7 +743,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF2C60),
+                    backgroundColor: const Color(0xFF5C6BC0),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 12),
@@ -793,7 +793,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF2C60)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
               ),
               const SizedBox(height: 16),
               Text(
@@ -819,7 +819,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           context,
           'Test Profilleri Eklendi',
           subtitle: likeCount > 0
-              ? '$likeCount kisi seni begendi!'
+              ? '$likeCount kisi seninle tanismak istiyor!'
               : 'Yeni profiller kesfetmeye hazir',
         );
         ref.read(swipeProvider.notifier).refresh();
