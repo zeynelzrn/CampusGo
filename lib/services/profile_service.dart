@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfileService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -11,48 +12,143 @@ class ProfileService {
   // Mevcut kullanıcı ID'si
   String? get currentUserId => _auth.currentUser?.uid;
 
-  // Fotoğraf yükle
-  Future<String?> uploadPhoto(File imageFile, int photoIndex) async {
+  // ==================== FOTO YONETIMI ====================
+
+  /// Fotoğraf yükle - Yeni klasör yapısı: user_photos/{userId}/{timestamp}.jpg
+  ///
+  /// [imageFile] - Yüklenecek dosya
+  /// [slotIndex] - Hangi slot'a yüklendiği (metadata için, dosya adında kullanılmıyor)
+  ///
+  /// Returns: Download URL veya null
+  /// Throws: Exception with detailed message for UI handling
+  Future<String?> uploadPhoto(File imageFile, int slotIndex) async {
     try {
-      if (currentUserId == null) return null;
+      if (currentUserId == null) {
+        debugPrint('ProfileService: Kullanici girisi yapilmamis');
+        throw Exception('Oturum açılmamış. Lütfen tekrar giriş yapın.');
+      }
 
-      String fileName = 'photo_$photoIndex.jpg';
-      Reference ref =
-          _storage.ref().child('users/$currentUserId/photos/$fileName');
+      // Dosya var mı kontrol et
+      if (!await imageFile.exists()) {
+        debugPrint('ProfileService: Dosya bulunamadi: ${imageFile.path}');
+        throw Exception('Fotoğraf dosyası bulunamadı.');
+      }
 
-      UploadTask uploadTask = ref.putFile(
+      // Benzersiz dosya adı: timestamp + random suffix
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${timestamp}_$slotIndex.jpg';
+
+      // Yeni klasör yapısı: user_photos/{userId}/{fileName}
+      final ref = _storage.ref().child('user_photos/$currentUserId/$fileName');
+
+      debugPrint('ProfileService: Foto yukleniyor -> $fileName');
+      debugPrint('ProfileService: Storage path -> user_photos/$currentUserId/$fileName');
+
+      // Metadata ile yükle
+      final uploadTask = ref.putFile(
         imageFile,
-        SettableMetadata(contentType: 'image/jpeg'),
+        SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {
+            'slotIndex': slotIndex.toString(),
+            'uploadedAt': DateTime.now().toIso8601String(),
+          },
+        ),
       );
 
-      TaskSnapshot snapshot = await uploadTask;
-      String downloadUrl = await snapshot.ref.getDownloadURL();
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
 
+      debugPrint('ProfileService: Foto yuklendi -> $fileName');
       return downloadUrl;
+    } on FirebaseException catch (e) {
+      // Firebase-specific error handling
+      debugPrint('ProfileService: Firebase hatasi: ${e.code} - ${e.message}');
+
+      switch (e.code) {
+        case 'unauthorized':
+        case 'permission-denied':
+          throw Exception(
+            'Storage izni yok. Firebase Console\'da Storage Rules\'u kontrol edin.\n'
+            'Gerekli kural: user_photos/{userId}/* için read/write izni.',
+          );
+        case 'object-not-found':
+          throw Exception('Dosya bulunamadı.');
+        case 'bucket-not-found':
+          throw Exception('Storage bucket bulunamadı. Firebase yapılandırmasını kontrol edin.');
+        case 'quota-exceeded':
+          throw Exception('Storage kotası aşıldı.');
+        case 'unauthenticated':
+          throw Exception('Oturum süresi dolmuş. Lütfen tekrar giriş yapın.');
+        case 'retry-limit-exceeded':
+          throw Exception('Bağlantı hatası. İnternet bağlantınızı kontrol edin.');
+        case 'canceled':
+          throw Exception('Yükleme iptal edildi.');
+        default:
+          throw Exception('Firebase hatası: ${e.message}');
+      }
     } catch (e) {
-      print('Fotoğraf yükleme hatası: $e');
-      return null;
+      debugPrint('ProfileService: Foto yukleme hatasi: $e');
+      // Re-throw if it's already our custom exception
+      if (e is Exception) rethrow;
+      throw Exception('Fotoğraf yüklenemedi: $e');
     }
   }
 
-  // Fotoğraf sil
+  /// URL'den fotoğraf sil (Storage'dan)
+  ///
+  /// [photoUrl] - Silinecek fotoğrafın Firebase Storage URL'i
+  ///
+  /// Returns: Başarılı mı?
+  Future<bool> deletePhotoByUrl(String photoUrl) async {
+    try {
+      if (currentUserId == null) return false;
+      if (photoUrl.isEmpty) return false;
+
+      // URL'den Reference oluştur
+      final ref = _storage.refFromURL(photoUrl);
+
+      // Silmeden önce dosyanın bu kullanıcıya ait olduğunu doğrula
+      // (Güvenlik için - başkasının fotoğrafını silmeyi engelle)
+      final fullPath = ref.fullPath;
+      if (!fullPath.contains(currentUserId!)) {
+        debugPrint('ProfileService: Guvenlik hatasi - bu foto size ait degil');
+        return false;
+      }
+
+      await ref.delete();
+      debugPrint('ProfileService: Foto silindi -> $fullPath');
+      return true;
+    } catch (e) {
+      // Dosya zaten silinmiş olabilir - hata değil
+      debugPrint('ProfileService: Foto silme hatasi (muhtemelen zaten silinmis): $e');
+      return true; // Dosya yoksa da başarılı say
+    }
+  }
+
+  /// Eski index-based silme (geriye uyumluluk için - kullanımdan kaldırılacak)
+  @Deprecated('Use deletePhotoByUrl instead')
   Future<bool> deletePhoto(int photoIndex) async {
     try {
       if (currentUserId == null) return false;
 
       String fileName = 'photo_$photoIndex.jpg';
-      Reference ref =
-          _storage.ref().child('users/$currentUserId/photos/$fileName');
+      Reference ref = _storage.ref().child('users/$currentUserId/photos/$fileName');
 
       await ref.delete();
       return true;
     } catch (e) {
-      print('Fotoğraf silme hatası: $e');
+      debugPrint('ProfileService: Eski foto silme hatasi: $e');
       return false;
     }
   }
 
-  // Profili kaydet
+  // ==================== PROFIL YONETIMI ====================
+
+  /// Profili kaydet
+  ///
+  /// [photoUrls] - 6 elemanlı liste, null olan slotlar boş demek
+  /// Firestore'a kaydederken null'ları KORUYORUZ (indeks pozisyonları için)
   Future<bool> saveProfile({
     required String name,
     required int age,
@@ -71,6 +167,21 @@ class ProfileService {
     try {
       if (currentUserId == null) return false;
 
+      // Photos array'ini hazırla - NULL DEĞERLERİ KALDIRARAK kaydet
+      // Ama sırayı korumak için önce compaction yapalım
+      final List<String> cleanedPhotos = [];
+      for (int i = 0; i < photoUrls.length; i++) {
+        if (photoUrls[i] != null && photoUrls[i]!.isNotEmpty) {
+          cleanedPhotos.add(photoUrls[i]!);
+        }
+      }
+
+      // En az 1 fotoğraf olmalı
+      if (cleanedPhotos.isEmpty) {
+        debugPrint('ProfileService: En az 1 fotograf gerekli');
+        return false;
+      }
+
       await _firestore.collection('users').doc(currentUserId).set({
         'name': name,
         'age': age,
@@ -78,25 +189,61 @@ class ProfileService {
         'university': university,
         'department': department,
         'interests': interests,
-        'photos': photoUrls.where((url) => url != null).toList(),
+        'photos': cleanedPhotos, // Temizlenmiş array
         'gender': gender,
         'lookingFor': lookingFor,
         'grade': grade,
         'clubs': clubs,
         'socialLinks': socialLinks,
         'intent': intent,
-        'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // createdAt sadece ilk kayıtta set edilsin
+      final doc = await _firestore.collection('users').doc(currentUserId).get();
+      if (doc.exists && doc.data()?['createdAt'] == null) {
+        await _firestore.collection('users').doc(currentUserId).update({
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      debugPrint('ProfileService: Profil kaydedildi (${cleanedPhotos.length} foto)');
       return true;
     } catch (e) {
-      print('Profil kaydetme hatası: $e');
+      debugPrint('ProfileService: Profil kaydetme hatasi: $e');
       return false;
     }
   }
 
-  // Profili getir
+  /// Sadece fotoğrafları güncelle (hızlı güncelleme için)
+  Future<bool> updatePhotos(List<String?> photoUrls) async {
+    try {
+      if (currentUserId == null) return false;
+
+      final List<String> cleanedPhotos = photoUrls
+          .where((url) => url != null && url.isNotEmpty)
+          .cast<String>()
+          .toList();
+
+      if (cleanedPhotos.isEmpty) {
+        debugPrint('ProfileService: En az 1 fotograf gerekli');
+        return false;
+      }
+
+      await _firestore.collection('users').doc(currentUserId).update({
+        'photos': cleanedPhotos,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('ProfileService: Fotolar guncellendi (${cleanedPhotos.length} foto)');
+      return true;
+    } catch (e) {
+      debugPrint('ProfileService: Foto guncelleme hatasi: $e');
+      return false;
+    }
+  }
+
+  /// Profili getir
   Future<Map<String, dynamic>?> getProfile() async {
     try {
       if (currentUserId == null) return null;
@@ -109,12 +256,14 @@ class ProfileService {
       }
       return null;
     } catch (e) {
-      print('Profil getirme hatası: $e');
+      debugPrint('ProfileService: Profil getirme hatasi: $e');
       return null;
     }
   }
 
-  // Tüm profilleri getir (match için)
+  // ==================== DIGER METODLAR ====================
+
+  /// Tüm profilleri getir (match için)
   Future<List<Map<String, dynamic>>> getAllProfiles() async {
     try {
       if (currentUserId == null) return [];
@@ -131,12 +280,12 @@ class ProfileService {
         return data;
       }).toList();
     } catch (e) {
-      print('Profilleri getirme hatası: $e');
+      debugPrint('ProfileService: Profilleri getirme hatasi: $e');
       return [];
     }
   }
 
-  // Like/Dislike kaydet
+  /// Like/Dislike kaydet
   Future<bool> swipeProfile(String targetUserId, bool isLike) async {
     try {
       if (currentUserId == null) return false;
@@ -170,12 +319,12 @@ class ProfileService {
 
       return false;
     } catch (e) {
-      print('Swipe hatası: $e');
+      debugPrint('ProfileService: Swipe hatasi: $e');
       return false;
     }
   }
 
-  // Match oluştur
+  /// Match oluştur
   Future<void> _createMatch(String otherUserId) async {
     try {
       if (currentUserId == null) return;
@@ -204,7 +353,7 @@ class ProfileService {
           .doc(currentUserId)
           .set({'timestamp': FieldValue.serverTimestamp()});
     } catch (e) {
-      print('Match oluşturma hatası: $e');
+      debugPrint('ProfileService: Match olusturma hatasi: $e');
     }
   }
 }

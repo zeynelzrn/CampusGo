@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/notification_service.dart';
+import '../services/auth_service.dart';
 import 'discover_screen.dart';
 import 'likes_screen.dart';
 import 'chat_list_screen.dart';
 import 'profile_edit_screen.dart';
 import 'settings_screen.dart';
+import 'welcome_screen.dart';
 
 // Custom scroll behavior for better swipe detection
 class _CustomPageScrollBehavior extends ScrollBehavior {
@@ -132,6 +136,10 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
   late PageController _pageController;
+  final AuthService _authService = AuthService();
+
+  // Ban durumu stream subscription
+  Stream<DocumentSnapshot>? _userStream;
 
   final List<Widget> _screens = [
     const ProfileEditScreen(),
@@ -155,6 +163,112 @@ class _MainScreenState extends State<MainScreen> {
 
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
+
+    // Ban durumu kontrolü başlat
+    _startBanCheck();
+  }
+
+  /// Kullanıcının ban durumunu gerçek zamanlı dinle
+  void _startBanCheck() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _userStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots();
+
+    _userStream!.listen((snapshot) {
+      if (!mounted) return;
+
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>?;
+        final isBanned = data?['isBanned'] as bool? ?? false;
+
+        if (isBanned) {
+          _handleBannedUser();
+        }
+      }
+    });
+  }
+
+  /// Banlı kullanıcıyı çıkış yaptır ve uyarı göster
+  Future<void> _handleBannedUser() async {
+    // Önce çıkış yap
+    await _authService.signOut();
+
+    if (!mounted) return;
+
+    // Uyarı dialog göster
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.block_rounded,
+                color: Colors.red,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hesap Askıya Alındı',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Hesabınız topluluk kurallarını ihlal ettiği için askıya alınmıştır.\n\n'
+          'Bu kararın hatalı olduğunu düşünüyorsanız destek ekibimizle iletişime geçebilirsiniz.',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: Colors.grey[700],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Login ekranına yönlendir
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => WelcomeScreen()),
+                (route) => false,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Tamam',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _navigateToTab(int index) {

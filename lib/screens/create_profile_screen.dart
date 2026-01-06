@@ -8,6 +8,7 @@ import '../providers/profile_provider.dart';
 import '../repositories/profile_repository.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
+import '../utils/image_helper.dart';
 import 'main_screen.dart';
 import 'welcome_screen.dart';
 
@@ -48,17 +49,15 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     Navigator.pop(context); // Close bottom sheet
 
     try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
+      // ImageHelper ile izin kontrolu + resim secme + sikistirma (hepsi bir arada)
+      final File? compressedFile = await ImageHelper.pickAndCompressImage(
+        context,
+        source,
       );
 
-      if (pickedFile != null) {
+      if (compressedFile != null) {
         setState(() {
-          _selectedImage = File(pickedFile.path);
+          _selectedImage = compressedFile;
         });
       }
     } catch (e) {
@@ -219,10 +218,16 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
+          // Welcome ekranı ile uyumlu soft mavi gradient
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFDF6F0), Color(0xFFF8EDE3)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF5F8FF), // Soft buz mavisi
+              Color(0xFFE8F0FE), // Açık indigo tonu
+              Color(0xFFF0F4FF), // Ferah mavi-beyaz
+            ],
+            stops: [0.0, 0.5, 1.0],
           ),
         ),
         child: SafeArea(

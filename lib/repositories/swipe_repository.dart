@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
@@ -44,8 +43,6 @@ class SwipeRepository {
     if (userId == null) return {};
 
     try {
-      debugPrint('========== FETCHING EXCLUSION LIST ==========');
-
       // Fetch actions and blacklist in parallel
       final userService = UserService();
       final results = await Future.wait([
@@ -56,18 +53,13 @@ class SwipeRepository {
       final actionsSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
       final restrictedIds = results[1] as Set<String>;
 
-      debugPrint('SwipeRepository: Found ${actionsSnapshot.docs.length} actions for user $userId');
-      debugPrint('SwipeRepository: Found ${restrictedIds.length} restricted (blocked) users');
-
       // Extract target user IDs from actions
       final actionIds = <String>{};
       for (final doc in actionsSnapshot.docs) {
         final data = doc.data();
         final toUserId = data['toUserId'] as String?;
-        final actionType = data['type'] as String?;
         if (toUserId != null) {
           actionIds.add(toUserId);
-          debugPrint('  - Excluding $toUserId (action: $actionType)');
         }
       }
 
@@ -75,72 +67,54 @@ class SwipeRepository {
       actionIds.add(userId);
 
       // COMBINE: actions + blacklist
-      final allExcludedIds = <String>{
+      return <String>{
         ...actionIds,
         ...restrictedIds,
       };
-
-      // Log restricted users
-      for (final id in restrictedIds) {
-        debugPrint('  - Excluding $id (BLOCKED/BLACKLIST)');
-      }
-
-      debugPrint('Total swiped: ${actionIds.length - 1}'); // -1 for self
-      debugPrint('Total blocked: ${restrictedIds.length}');
-      debugPrint('SwipeRepository: Total excluded IDs: ${allExcludedIds.length}');
-      debugPrint('==============================================');
-
-      return allExcludedIds;
     } catch (e) {
-      debugPrint('Error fetching action IDs: $e');
       return {userId}; // At minimum, exclude self
     }
   }
 
   /// Refresh exclusion list (call after blocking someone)
   Future<Set<String>> refreshExclusionList() async {
-    debugPrint('SwipeRepository: Refreshing exclusion list after block action');
     return await fetchAllActionIds();
   }
 
   /// Fetch a batch of users with pagination
-  /// Returns raw users - filtering should be done by the provider
+  /// Returns profiles and lastDocument for pagination
   /// If gender filter returns no results, falls back to showing all users
-  Future<List<UserProfile>> fetchUserBatch({
+  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})> fetchUserBatch({
     DocumentSnapshot? lastDocument,
     String? genderFilter,
   }) async {
     final userId = currentUserId;
-    if (userId == null) return [];
+    if (userId == null) return (profiles: <UserProfile>[], lastDoc: null);
 
     try {
       // First, try with gender filter
-      List<UserProfile> results = await _fetchUsersWithFilter(
+      var result = await _fetchUsersWithFilter(
         lastDocument: lastDocument,
         genderFilter: genderFilter,
       );
 
-      debugPrint('SwipeRepository: Fetched ${results.length} users with filter: $genderFilter');
-
       // FALLBACK: If no results with filter and we have a filter, try without it
-      if (results.isEmpty && genderFilter != null && genderFilter != 'Herkes' && genderFilter.isNotEmpty) {
-        debugPrint('SwipeRepository: No users with gender filter "$genderFilter", trying without filter...');
-        results = await _fetchUsersWithFilter(
+      if (result.profiles.isEmpty && genderFilter != null && genderFilter != 'Herkes' && genderFilter.isNotEmpty) {
+        result = await _fetchUsersWithFilter(
           lastDocument: lastDocument,
           genderFilter: null, // No filter - show everyone
         );
-        debugPrint('SwipeRepository: Fetched ${results.length} users without filter (fallback)');
       }
 
-      return results;
+      return result;
     } catch (e) {
-      debugPrint('Error fetching user batch: $e');
-      return [];
+      return (profiles: <UserProfile>[], lastDoc: null);
     }
   }
 
   /// Internal helper to fetch users with optional filter
-  Future<List<UserProfile>> _fetchUsersWithFilter({
+  /// Returns a record with profiles and the last document for pagination
+  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})> _fetchUsersWithFilter({
     DocumentSnapshot? lastDocument,
     String? genderFilter,
   }) async {
@@ -162,10 +136,15 @@ class SwipeRepository {
 
     final snapshot = await query.get();
 
-    return snapshot.docs
+    // Get last document for pagination
+    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+    final profiles = snapshot.docs
         .map((doc) => UserProfile.fromFirestore(doc))
         .where((profile) => profile.isComplete) // Only show complete profiles
         .toList();
+
+    return (profiles: profiles, lastDoc: lastDoc);
   }
 
   /// Record a swipe action
@@ -200,7 +179,6 @@ class SwipeRepository {
 
       return {'success': true, 'isMatch': isMatch};
     } catch (e) {
-      debugPrint('Error recording swipe action: $e');
       return {'success': false, 'isMatch': false};
     }
   }
@@ -224,18 +202,13 @@ class SwipeRepository {
         // Only create match if it's a mutual like/superlike
         if (type == SwipeActionType.like.name ||
             type == SwipeActionType.superlike.name) {
-          debugPrint('MUTUAL MATCH! $userId <-> $targetUserId');
           await _createMatchAndChat(userId, targetUserId);
           return true; // IT'S A MATCH!
         }
       }
 
-      // No mutual like - target hasn't liked us yet
-      // The like is recorded but no match created
-      debugPrint('Like recorded, waiting for mutual: $userId -> $targetUserId');
       return false;
     } catch (e) {
-      debugPrint('Error checking for match: $e');
       return false;
     }
   }
@@ -250,12 +223,7 @@ class SwipeRepository {
     try {
       // Check if match already exists
       final existingMatch = await _matchesCollection.doc(matchId).get();
-      if (existingMatch.exists) {
-        debugPrint('Match already exists: $matchId');
-        return;
-      }
-
-      debugPrint('Creating new match: $matchId');
+      if (existingMatch.exists) return;
 
       // Create match document
       await _matchesCollection.doc(matchId).set({
@@ -278,13 +246,11 @@ class SwipeRepository {
 
       await batch.commit();
 
-      // === CRITICAL: Create chat room for the match ===
-      debugPrint('Creating chat room for match: $matchId');
+      // Create chat room for the match
       final chatService = ChatService();
-      final chatId = await chatService.createMatchChat(userId1, userId2);
-      debugPrint('Chat room created: $chatId');
+      await chatService.createMatchChat(userId1, userId2);
     } catch (e) {
-      debugPrint('Error creating match and chat: $e');
+      // Silent fail - match creation is not critical
     }
   }
 
@@ -299,7 +265,6 @@ class SwipeRepository {
 
       return UserProfile.fromFirestore(doc);
     } catch (e) {
-      debugPrint('Error fetching current user profile: $e');
       return null;
     }
   }
@@ -331,7 +296,6 @@ class SwipeRepository {
 
       return UserProfile.fromFirestore(doc);
     } catch (e) {
-      debugPrint('Error fetching user profile: $e');
       return null;
     }
   }
@@ -346,7 +310,6 @@ class SwipeRepository {
       await _actionsCollection.doc(actionId).delete();
       return true;
     } catch (e) {
-      debugPrint('Error undoing swipe: $e');
       return false;
     }
   }

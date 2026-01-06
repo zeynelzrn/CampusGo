@@ -1,17 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 /// Service for user-related operations like blocking and reporting
 class UserService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final FirebaseStorage _storage;
 
   UserService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
+    FirebaseStorage? storage,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+        _auth = auth ?? FirebaseAuth.instance,
+        _storage = storage ?? FirebaseStorage.instance;
 
   /// Get current user ID
   String? get currentUserId => _auth.currentUser?.uid;
@@ -442,6 +446,441 @@ class UserService {
     }
   }
 
+  // ==================== ACCOUNT DELETION (HARD DELETE) ====================
+
+  /// Kullanıcının TÜM verilerini siler (Deep Clean / Hard Delete)
+  ///
+  /// SIRALAMA KRİTİK: Auth yetkisi kaybolmadan önce tüm veriler temizlenmeli!
+  ///
+  /// Adım 1: Storage Temizliği (user_photos/{userId}/)
+  /// Adım 2: Firestore İlişkisel Veri Temizliği:
+  ///   - matches (users array contains userId)
+  ///   - chats + messages subcollection
+  ///   - actions (fromUserId veya toUserId)
+  ///   - reports (reporterId veya reportedId)
+  ///   - user profile + subcollections
+  ///
+  /// NOT: Bu fonksiyon Firebase Auth hesabını SİLMEZ.
+  /// Auth silme işlemi AuthService.deleteAccountWithData() içinde yapılır.
+  Future<Map<String, dynamic>> deleteUserEntireData(String userId) async {
+    debugPrint('');
+    debugPrint('╔══════════════════════════════════════════════════════════╗');
+    debugPrint('║           HARD DELETE - DEEP CLEAN START                 ║');
+    debugPrint('╠══════════════════════════════════════════════════════════╣');
+    debugPrint('║  User ID: $userId');
+    debugPrint('╚══════════════════════════════════════════════════════════╝');
+
+    // Silme istatistikleri
+    final stats = _DeleteStats();
+
+    // ════════════════════════════════════════════════════════════
+    // ADIM 1: STORAGE TEMİZLİĞİ (ÖNCELİKLİ)
+    // ════════════════════════════════════════════════════════════
+    debugPrint('\n┌─ ADIM 1: Storage Temizliği');
+    await _cleanupStorage(userId, stats);
+
+    // ════════════════════════════════════════════════════════════
+    // ADIM 2: FİRESTORE İLİŞKİSEL VERİ TEMİZLİĞİ
+    // ════════════════════════════════════════════════════════════
+    debugPrint('\n┌─ ADIM 2: Firestore İlişkisel Veri Temizliği');
+
+    // Paralel silme için Future listesi
+    await Future.wait([
+      _cleanupMatches(userId, stats),
+      _cleanupActions(userId, stats),
+      _cleanupReports(userId, stats),
+    ]);
+
+    // Chats ayrı çünkü subcollection (messages) silmesi gerekiyor
+    await _cleanupChatsWithMessages(userId, stats);
+
+    // ════════════════════════════════════════════════════════════
+    // ADIM 3: KULLANICI PROFİLİ VE ALT KOLEKSİYONLAR
+    // ════════════════════════════════════════════════════════════
+    debugPrint('\n┌─ ADIM 3: Kullanıcı Profili Temizliği');
+    await _cleanupUserProfile(userId, stats);
+
+    // ════════════════════════════════════════════════════════════
+    // SONUÇ RAPORU
+    // ════════════════════════════════════════════════════════════
+    debugPrint('\n╔══════════════════════════════════════════════════════════╗');
+    debugPrint('║           HARD DELETE - SONUÇ RAPORU                     ║');
+    debugPrint('╠══════════════════════════════════════════════════════════╣');
+    debugPrint('║  📸 Fotoğraflar:     ${stats.photos.toString().padLeft(5)}                            ║');
+    debugPrint('║  💕 Eşleşmeler:      ${stats.matches.toString().padLeft(5)}                            ║');
+    debugPrint('║  💬 Sohbetler:       ${stats.chats.toString().padLeft(5)}                            ║');
+    debugPrint('║  📝 Mesajlar:        ${stats.messages.toString().padLeft(5)}                            ║');
+    debugPrint('║  👆 Aksiyonlar:      ${stats.actions.toString().padLeft(5)}                            ║');
+    debugPrint('║  🚨 Raporlar:        ${stats.reports.toString().padLeft(5)}                            ║');
+    debugPrint('║  👤 Alt Koleksiyon:  ${stats.subcollections.toString().padLeft(5)}                            ║');
+    debugPrint('║  ✅ Profil Silindi:  ${stats.userDocDeleted ? 'EVET ' : 'HAYIR'}                            ║');
+    debugPrint('║  ⚠️  Hatalar:        ${stats.errors.toString().padLeft(5)}                            ║');
+    debugPrint('╚══════════════════════════════════════════════════════════╝');
+    debugPrint('');
+
+    return {
+      'success': stats.errors == 0,
+      'deletedPhotos': stats.photos,
+      'deletedMatches': stats.matches,
+      'deletedChats': stats.chats,
+      'deletedMessages': stats.messages,
+      'deletedActions': stats.actions,
+      'deletedReports': stats.reports,
+      'deletedSubcollections': stats.subcollections,
+      'userDocDeleted': stats.userDocDeleted,
+      'errors': stats.errors,
+    };
+  }
+
+  /// Storage temizliği - TÜM OLASI KLASÖRLER
+  /// FAIL-SAFE: Hem yeni hem eski klasör yapısını kontrol eder
+  ///
+  /// Kontrol Edilen Yollar:
+  /// - user_photos/{userId}/     (Yeni yapı)
+  /// - profile_images/{userId}/  (Eski yapı - Geriye dönük uyumluluk)
+  Future<void> _cleanupStorage(String userId, _DeleteStats stats) async {
+    debugPrint('│');
+    debugPrint('│  ┌─────────────────────────────────────────────');
+    debugPrint('│  │ STORAGE TEMİZLİĞİ BAŞLIYOR');
+    debugPrint('│  │ User ID: $userId');
+    debugPrint('│  │ Kontrol edilecek klasörler:');
+    debugPrint('│  │   1. user_photos/$userId (YENİ)');
+    debugPrint('│  │   2. profile_images/$userId (ESKİ)');
+    debugPrint('│  └─────────────────────────────────────────────');
+
+    // Kontrol edilecek tüm olası yollar
+    final storagePaths = [
+      'user_photos/$userId',      // Yeni yapı
+      'profile_images/$userId',   // Eski yapı
+    ];
+
+    int pathIndex = 0;
+    for (final path in storagePaths) {
+      pathIndex++;
+      debugPrint('│');
+      debugPrint('│  ┌─ [$pathIndex/${storagePaths.length}] Klasör: $path');
+
+      try {
+        // 1. Referans oluştur
+        final storageRef = _storage.ref().child(path);
+        debugPrint('│  │  ├─ Referans oluşturuldu');
+
+        // 2. Dosyaları listele
+        debugPrint('│  │  ├─ Dosyalar listeleniyor...');
+        final ListResult listResult;
+        try {
+          listResult = await storageRef.listAll();
+        } catch (e) {
+          // Klasör yoksa veya erişim hatası varsa devam et
+          debugPrint('│  │  ├─ ⚠ Klasör bulunamadı veya boş: $e');
+          debugPrint('│  │  └─ Atlanıyor, sonraki klasöre geçiliyor...');
+          continue;
+        }
+
+        // 3. Dosya sayısını kontrol et
+        final itemCount = listResult.items.length;
+        final prefixCount = listResult.prefixes.length;
+
+        debugPrint('│  │  ├─ Bulunan: $itemCount dosya, $prefixCount alt klasör');
+
+        if (itemCount == 0 && prefixCount == 0) {
+          debugPrint('│  │  └─ Klasör boş, atlanıyor');
+          continue;
+        }
+
+        // 4. Dosyaları listele ve sil
+        if (itemCount > 0) {
+          debugPrint('│  │  ├─ Dosyalar:');
+          for (int i = 0; i < listResult.items.length; i++) {
+            final item = listResult.items[i];
+            debugPrint('│  │  │    ${i + 1}. ${item.name}');
+          }
+
+          debugPrint('│  │  ├─ Silme işlemi başlıyor...');
+          for (final item in listResult.items) {
+            try {
+              await item.delete();
+              stats.photos++;
+              debugPrint('│  │  │    ✓ SİLİNDİ: ${item.name}');
+            } catch (e) {
+              debugPrint('│  │  │    ✗ HATA: ${item.name} - $e');
+              stats.errors++;
+            }
+          }
+        }
+
+        // 5. Alt klasörleri recursive sil
+        if (prefixCount > 0) {
+          debugPrint('│  │  ├─ Alt klasörler siliniyor...');
+          for (final prefix in listResult.prefixes) {
+            await _deleteStorageFolder(prefix, stats);
+          }
+        }
+
+        debugPrint('│  │  └─ ✓ Klasör temizliği tamamlandı');
+
+      } catch (e) {
+        debugPrint('│  │  └─ ⚠ Beklenmeyen hata: $e (devam ediliyor)');
+        stats.errors++;
+      }
+    }
+
+    // Özet
+    debugPrint('│');
+    debugPrint('│  ┌─────────────────────────────────────────────');
+    debugPrint('│  │ STORAGE TEMİZLİĞİ TAMAMLANDI');
+    debugPrint('│  │ Toplam silinen dosya: ${stats.photos}');
+    debugPrint('│  │ Hata sayısı: ${stats.errors}');
+    debugPrint('│  └─────────────────────────────────────────────');
+  }
+
+  /// Alt klasörleri recursive sil
+  Future<void> _deleteStorageFolder(Reference folderRef, _DeleteStats stats) async {
+    try {
+      debugPrint('│  │      → Alt klasör: ${folderRef.fullPath}');
+      final listResult = await folderRef.listAll();
+
+      // Dosyaları sil
+      for (final item in listResult.items) {
+        try {
+          await item.delete();
+          stats.photos++;
+          debugPrint('│  │        ✓ Silindi: ${item.name}');
+        } catch (e) {
+          debugPrint('│  │        ✗ Hata: ${item.name} - $e');
+          stats.errors++;
+        }
+      }
+
+      // Alt klasörleri recursive sil
+      for (final prefix in listResult.prefixes) {
+        await _deleteStorageFolder(prefix, stats);
+      }
+    } catch (e) {
+      debugPrint('│  │        ✗ Alt klasör hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Matches koleksiyonu temizliği
+  Future<void> _cleanupMatches(String userId, _DeleteStats stats) async {
+    debugPrint('│  ├─ Matches temizleniyor...');
+    try {
+      final snapshot = await _firestore
+          .collection('matches')
+          .where('users', arrayContains: userId)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('│  │  └─ Eşleşme bulunamadı');
+        return;
+      }
+
+      // Batch delete (500 limit)
+      final batches = _createBatches(snapshot.docs);
+      for (final batch in batches) {
+        for (final doc in batch) {
+          _firestore.batch().delete(doc.reference);
+        }
+      }
+
+      // Paralel silme
+      await Future.wait(
+        snapshot.docs.map((doc) => doc.reference.delete()),
+      );
+
+      stats.matches = snapshot.docs.length;
+      debugPrint('│  │  └─ ✓ ${stats.matches} eşleşme silindi');
+    } catch (e) {
+      debugPrint('│  │  └─ ✗ Matches hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Chats ve Messages temizliği (subcollection dikkatli silinmeli)
+  Future<void> _cleanupChatsWithMessages(String userId, _DeleteStats stats) async {
+    debugPrint('│  ├─ Chats ve Messages temizleniyor...');
+    try {
+      final chatsSnapshot = await _firestore
+          .collection('chats')
+          .where('users', arrayContains: userId)
+          .get();
+
+      if (chatsSnapshot.docs.isEmpty) {
+        debugPrint('│  │  └─ Sohbet bulunamadı');
+        return;
+      }
+
+      for (final chatDoc in chatsSnapshot.docs) {
+        // Önce messages subcollection'ı sil
+        try {
+          final messagesSnapshot = await chatDoc.reference
+              .collection('messages')
+              .get();
+
+          if (messagesSnapshot.docs.isNotEmpty) {
+            // Paralel mesaj silme
+            await Future.wait(
+              messagesSnapshot.docs.map((msg) => msg.reference.delete()),
+            );
+            stats.messages += messagesSnapshot.docs.length;
+          }
+        } catch (e) {
+          debugPrint('│  │  ├─ ⚠ Messages hatası (${chatDoc.id}): $e');
+          stats.errors++;
+        }
+
+        // Sonra chat dokümanını sil
+        try {
+          await chatDoc.reference.delete();
+          stats.chats++;
+        } catch (e) {
+          debugPrint('│  │  ├─ ✗ Chat silme hatası (${chatDoc.id}): $e');
+          stats.errors++;
+        }
+      }
+
+      debugPrint('│  │  └─ ✓ ${stats.chats} sohbet, ${stats.messages} mesaj silindi');
+    } catch (e) {
+      debugPrint('│  │  └─ ✗ Chats hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Actions koleksiyonu temizliği (fromUserId ve toUserId)
+  Future<void> _cleanupActions(String userId, _DeleteStats stats) async {
+    debugPrint('│  ├─ Actions temizleniyor...');
+    try {
+      // fromUserId ve toUserId için paralel sorgu
+      final results = await Future.wait([
+        _firestore
+            .collection('actions')
+            .where('fromUserId', isEqualTo: userId)
+            .get(),
+        _firestore
+            .collection('actions')
+            .where('toUserId', isEqualTo: userId)
+            .get(),
+      ]);
+
+      final allDocs = <DocumentSnapshot>{};
+      for (final result in results) {
+        allDocs.addAll(result.docs);
+      }
+
+      if (allDocs.isEmpty) {
+        debugPrint('│  │  └─ Aksiyon bulunamadı');
+        return;
+      }
+
+      // Paralel silme
+      await Future.wait(
+        allDocs.map((doc) => doc.reference.delete()),
+      );
+
+      stats.actions = allDocs.length;
+      debugPrint('│  │  └─ ✓ ${stats.actions} aksiyon silindi');
+    } catch (e) {
+      debugPrint('│  │  └─ ✗ Actions hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Reports koleksiyonu temizliği (reporterId ve reportedId)
+  Future<void> _cleanupReports(String userId, _DeleteStats stats) async {
+    debugPrint('│  ├─ Reports temizleniyor...');
+    try {
+      // reporterId ve reportedId için paralel sorgu
+      final results = await Future.wait([
+        _firestore
+            .collection('reports')
+            .where('reporterId', isEqualTo: userId)
+            .get(),
+        _firestore
+            .collection('reports')
+            .where('reportedId', isEqualTo: userId)
+            .get(),
+      ]);
+
+      final allDocs = <DocumentSnapshot>{};
+      for (final result in results) {
+        allDocs.addAll(result.docs);
+      }
+
+      if (allDocs.isEmpty) {
+        debugPrint('│  │  └─ Rapor bulunamadı');
+        return;
+      }
+
+      // Paralel silme
+      await Future.wait(
+        allDocs.map((doc) => doc.reference.delete()),
+      );
+
+      stats.reports = allDocs.length;
+      debugPrint('│  │  └─ ✓ ${stats.reports} rapor silindi');
+    } catch (e) {
+      debugPrint('│  │  └─ ✗ Reports hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Kullanıcı profili ve alt koleksiyonları temizliği
+  Future<void> _cleanupUserProfile(String userId, _DeleteStats stats) async {
+    try {
+      final userDocRef = _firestore.collection('users').doc(userId);
+
+      // Alt koleksiyonlar listesi
+      const subcollections = [
+        'blocked_users',
+        'blocked_by',
+        'matches',
+        'likes',
+        'dislikes',
+        'notifications',
+      ];
+
+      // Alt koleksiyonları paralel sil
+      await Future.wait(
+        subcollections.map((subcollection) async {
+          try {
+            final subSnapshot = await userDocRef.collection(subcollection).get();
+            if (subSnapshot.docs.isNotEmpty) {
+              await Future.wait(
+                subSnapshot.docs.map((doc) => doc.reference.delete()),
+              );
+              stats.subcollections += subSnapshot.docs.length;
+              debugPrint('│  ├─ ✓ $subcollection: ${subSnapshot.docs.length} döküman');
+            }
+          } catch (e) {
+            debugPrint('│  ├─ ⚠ $subcollection hatası: $e');
+          }
+        }),
+      );
+
+      // Ana kullanıcı dokümanını sil
+      await userDocRef.delete();
+      stats.userDocDeleted = true;
+      debugPrint('│  └─ ✓ Kullanıcı profili silindi');
+    } catch (e) {
+      debugPrint('│  └─ ✗ Profil silme hatası: $e');
+      stats.errors++;
+    }
+  }
+
+  /// Batch işlemleri için dökümanları 500'lük gruplara böl
+  List<List<DocumentSnapshot>> _createBatches(List<DocumentSnapshot> docs) {
+    const batchSize = 500;
+    final batches = <List<DocumentSnapshot>>[];
+    for (var i = 0; i < docs.length; i += batchSize) {
+      batches.add(docs.sublist(
+        i,
+        i + batchSize > docs.length ? docs.length : i + batchSize,
+      ));
+    }
+    return batches;
+  }
+
   // ==================== HELPER METHODS ====================
 
   /// Generate consistent chat ID from two user IDs
@@ -462,4 +901,17 @@ class ReportReason {
     required this.label,
     required this.icon,
   });
+}
+
+/// Silme istatistikleri için yardımcı sınıf
+class _DeleteStats {
+  int photos = 0;
+  int matches = 0;
+  int chats = 0;
+  int messages = 0;
+  int actions = 0;
+  int reports = 0;
+  int subcollections = 0;
+  int errors = 0;
+  bool userDocDeleted = false;
 }

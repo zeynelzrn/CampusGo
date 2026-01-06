@@ -21,6 +21,10 @@ class UserProfile {
   final Map<String, String> socialLinks; // Sosyal medya linkleri (instagram, linkedin, vb.)
   final List<String> intent; // Niyet (Kahve içmek, Ders çalışmak, Spor yapmak, vb.)
 
+  // Admin ve Ban Durumu
+  final bool isAdmin; // Admin yetkisi (Firebase Console'dan manuel verilir)
+  final bool isBanned; // Banlı kullanıcı (Adminler tarafından verilir)
+
   const UserProfile({
     required this.id,
     required this.name,
@@ -38,6 +42,8 @@ class UserProfile {
     this.clubs = const [],
     this.socialLinks = const {},
     this.intent = const [],
+    this.isAdmin = false,
+    this.isBanned = false,
   });
 
   /// Create from Firestore document
@@ -61,6 +67,9 @@ class UserProfile {
       clubs: List<String>.from(data['clubs'] ?? []),
       socialLinks: Map<String, String>.from(data['socialLinks'] ?? {}),
       intent: List<String>.from(data['intent'] ?? []),
+      // Admin ve Ban durumu - varsayılan olarak false (güvenlik için kritik)
+      isAdmin: data['isAdmin'] as bool? ?? false,
+      isBanned: data['isBanned'] as bool? ?? false,
     );
   }
 

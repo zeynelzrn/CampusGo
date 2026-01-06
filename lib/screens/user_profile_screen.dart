@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/chat_service.dart';
@@ -79,10 +80,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _loadProfileAndBlockStatus() async {
     try {
-      debugPrint('Loading profile for user: ${widget.userId}');
-      debugPrint('Is own profile (Preview Mode): $_isOwnProfile');
-      debugPrint('Has previewProfile: ${widget.previewProfile != null}');
-
       // If previewProfile is provided, use it directly (real-time preview mode)
       if (widget.previewProfile != null) {
         if (mounted) {
@@ -112,17 +109,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       // Load profile and BOTH block statuses in parallel
       final results = await Future.wait([
         _chatService.getUserProfile(widget.userId),
-        _userService.isUserBlocked(widget.userId),    // Did I block them?
-        _userService.isBlockedByUser(widget.userId),  // Did they block me?
+        _userService.isUserBlocked(widget.userId),
+        _userService.isBlockedByUser(widget.userId),
       ]);
 
       final profile = results[0] as UserProfile?;
       final isBlocked = results[1] as bool;
       final isBlockedByTarget = results[2] as bool;
-
-      debugPrint('Profile loaded: ${profile?.name}');
-      debugPrint('I blocked them: $isBlocked');
-      debugPrint('They blocked me: $isBlockedByTarget');
 
       if (mounted) {
         setState(() {
@@ -131,17 +124,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           _isBlockedByTarget = isBlockedByTarget;
           _isLoading = false;
 
-          // If profile is null OR they blocked me, show appropriate error
           if (profile == null) {
             _error = 'Profil bulunamadi';
           } else if (isBlockedByTarget) {
-            // They blocked me - show access denied
             _error = 'Bu profile erisim yok';
           }
         });
       }
     } catch (e) {
-      debugPrint('Error loading profile: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -191,22 +181,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Immersive mode for preview
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    ));
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      extendBodyBehindAppBar: true,
       body: _isLoading
           ? _buildLoadingState()
           : _isBlockedByTarget
-              ? _buildAccessDeniedState() // They blocked me - can't see their profile
+              ? _buildAccessDeniedState()
               : _error != null
                   ? _buildErrorState()
                   : _isBlocked
-                      ? _buildBlockedState() // I blocked them - show unblock option
+                      ? _buildBlockedState()
                       : _buildProfileContent(),
     );
   }
 
-  /// Build Access Denied state when the TARGET user has blocked US
-  /// This ensures mutual invisibility - they can't see us, we can't see them
   Widget _buildAccessDeniedState() {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -232,7 +228,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Access denied icon
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
@@ -265,7 +260,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              // Back button
               ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -343,7 +337,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Blocked icon
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
@@ -376,7 +369,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              // Unblock button
               ElevatedButton.icon(
                 onPressed: _showUnblockDialog,
                 icon: const Icon(Icons.lock_open, color: Colors.white),
@@ -398,7 +390,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Back button
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
@@ -524,340 +515,87 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  /// Build profile content - Kesfet ekrani ile birebir ayni arayuz
   Widget _buildProfileContent() {
     final profile = _profile!;
 
-    return CustomScrollView(
-      slivers: [
-        // App Bar with Photo
-        SliverAppBar(
-          expandedHeight: 400,
-          pinned: true,
-          backgroundColor: const Color(0xFF5C6BC0),
-          leading: IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(8),
+    return Stack(
+      children: [
+        CustomScrollView(
+          slivers: [
+            // Ana fotoğraf section
+            SliverToBoxAdapter(
+              child: _buildMainPhotoSection(profile),
+            ),
+            // Preview Mode Banner (when viewing own profile)
+            if (_isOwnProfile)
+              SliverToBoxAdapter(
+                child: _buildPreviewBanner(),
+              ),
+            // Bilgi section
+            SliverToBoxAdapter(
+              child: _buildInfoSection(profile),
+            ),
+            // İkinci fotoğraf (varsa)
+            if (profile.photos.length > 1)
+              SliverToBoxAdapter(
+                child: _buildPhotoCard(profile.photos[1]),
+              ),
+            // Sınıf ve Kulüpler section
+            if (profile.grade.isNotEmpty || profile.clubs.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildGradeAndClubsSection(profile),
+              ),
+            // İlgi alanları section
+            if (profile.interests.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildInterestsSection(profile),
+              ),
+            // Üçüncü fotoğraf (varsa)
+            if (profile.photos.length > 2)
+              SliverToBoxAdapter(
+                child: _buildPhotoCard(profile.photos[2]),
+              ),
+            // Niyet section
+            if (profile.intent.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildIntentSection(profile),
+              ),
+            // Bio section
+            if (profile.bio.isNotEmpty)
+              SliverToBoxAdapter(
+                child: _buildBioSection(profile),
+              ),
+            // Kalan fotoğraflar
+            if (profile.photos.length > 3)
+              ...profile.photos.skip(3).map(
+                    (photo) => SliverToBoxAdapter(
+                      child: _buildPhotoCard(photo),
+                    ),
+                  ),
+            // Alt boşluk
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 100),
+            ),
+          ],
+        ),
+        // Geri butonu
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 10,
+          left: 16,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withValues(alpha: 0.4),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          flexibleSpace: FlexibleSpaceBar(
-            background: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Profile Photo (supports both local files and network URLs)
-                if (profile.photos.isNotEmpty)
-                  _buildPhotoWidget(profile.photos.first)
-                else
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    child: const Icon(Icons.person, size: 100, color: Colors.white),
-                  ),
-
-                // Gradient overlay
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Name and Age
-                Positioned(
-                  bottom: 16,
-                  left: 16,
-                  right: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            '${profile.name}, ${profile.age}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Aktif',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (profile.university.isNotEmpty)
-                        Row(
-                          children: [
-                            const Icon(Icons.school, color: Colors.white70, size: 16),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                profile.university,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: Colors.white70,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Profile Content
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Preview Mode Banner (when viewing own profile)
-                if (_isOwnProfile) ...[
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                          const Color(0xFF7986CB).withValues(alpha: 0.1),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.visibility_rounded,
-                            color: Color(0xFF5C6BC0),
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Onizleme Modu',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF5C6BC0),
-                                ),
-                              ),
-                              Text(
-                                'Profiliniz baskalarinin gozunden boyle gorunuyor',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Bio Section
-                if (profile.bio.isNotEmpty) ...[
-                  _buildSectionTitle('Hakkinda'),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      profile.bio,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        color: Colors.grey[800],
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Education Section
-                if (profile.university.isNotEmpty || profile.department.isNotEmpty) ...[
-                  _buildSectionTitle('Egitim'),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        if (profile.university.isNotEmpty)
-                          _buildInfoRow(Icons.school, 'Universite', profile.university),
-                        if (profile.department.isNotEmpty) ...[
-                          const Divider(height: 24),
-                          _buildInfoRow(Icons.book, 'Bolum', profile.department),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Interests Section
-                if (profile.interests.isNotEmpty) ...[
-                  _buildSectionTitle('Ilgi Alanlari'),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: profile.interests.map((interest) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            interest,
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // More Photos Section
-                if (profile.photos.length > 1) ...[
-                  _buildSectionTitle('Fotograflar'),
-                  const SizedBox(height: 8),
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: profile.photos.length,
-                    itemBuilder: (context, index) {
-                      final photoPath = profile.photos[index];
-                      return GestureDetector(
-                        onTap: () => _showFullScreenPhoto(photoPath),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _buildPhotoWidget(photoPath),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-
-                const SizedBox(height: 100),
-              ],
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
           ),
         ),
@@ -865,13 +603,189 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.poppins(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.grey[800],
+  Widget _buildMainPhotoSection(UserProfile profile) {
+    return Stack(
+      children: [
+        // Ana fotoğraf
+        AspectRatio(
+          aspectRatio: 0.75,
+          child: profile.photos.isNotEmpty
+              ? _buildPhotoWidget(profile.photos.first)
+              : Container(
+                  color: const Color(0xFF5C6BC0),
+                  child: const Icon(Icons.person, size: 100, color: Colors.white),
+                ),
+        ),
+        // Gradient overlay
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 200,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.7),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // İsim ve temel bilgiler
+        Positioned(
+          left: 20,
+          right: 20,
+          bottom: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${profile.name}, ${profile.age}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (profile.university.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.school_rounded,
+                      color: Colors.white70,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        profile.university,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          color: Colors.white70,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreviewBanner() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+            const Color(0xFF7986CB).withValues(alpha: 0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.visibility_rounded,
+              color: Color(0xFF5C6BC0),
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Onizleme Modu',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF5C6BC0),
+                  ),
+                ),
+                Text(
+                  'Profiliniz baskalarinin gozunden boyle gorunuyor',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(UserProfile profile) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (profile.department.isNotEmpty) ...[
+            _buildInfoRow(
+              Icons.auto_stories_rounded,
+              'Bolum',
+              profile.department,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (profile.university.isNotEmpty)
+            _buildInfoRow(
+              Icons.location_city_rounded,
+              'Universite',
+              profile.university,
+            ),
+        ],
       ),
     );
   }
@@ -883,11 +797,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: const Color(0xFF5C6BC0), size: 20),
+          child: Icon(
+            icon,
+            color: const Color(0xFF5C6BC0),
+            size: 22,
+          ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -897,6 +815,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 style: GoogleFonts.poppins(
                   fontSize: 12,
                   color: Colors.grey[500],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
@@ -911,6 +830,418 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGradeAndClubsSection(UserProfile profile) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sınıf Seviyesi
+          if (profile.grade.isNotEmpty) ...[
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C6BC0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Sinif Seviyesi',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                    const Color(0xFF7986CB).withValues(alpha: 0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(
+                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.school_outlined,
+                    size: 18,
+                    color: Color(0xFF5C6BC0),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    profile.grade,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: const Color(0xFF5C6BC0),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          // Kulüpler
+          if (profile.clubs.isNotEmpty) ...[
+            if (profile.grade.isNotEmpty) const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C6BC0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Topluluklar',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: profile.clubs.map((club) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                        const Color(0xFF7986CB).withValues(alpha: 0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(25),
+                    border: Border.all(
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.groups_outlined,
+                        size: 16,
+                        color: Color(0xFF5C6BC0),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        club,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: const Color(0xFF5C6BC0),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntentSection(UserProfile profile) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Ne Icin Buradayim',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: profile.intent.map((intent) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: Colors.deepPurple.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getIntentIcon(intent),
+                      size: 16,
+                      color: Colors.deepPurple,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      intent,
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.deepPurple,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIntentIcon(String intent) {
+    switch (intent) {
+      case 'Kahve içmek':
+      case 'Kahve icmek':
+        return Icons.coffee_outlined;
+      case 'Ders çalışmak':
+      case 'Ders calismak':
+        return Icons.menu_book_outlined;
+      case 'Spor yapmak':
+        return Icons.fitness_center_outlined;
+      case 'Proje ortağı bulmak':
+      case 'Proje ortagi bulmak':
+        return Icons.handshake_outlined;
+      case 'Etkinliklere katılmak':
+      case 'Etkinliklere katilmak':
+        return Icons.event_outlined;
+      case 'Sohbet etmek':
+        return Icons.chat_bubble_outline;
+      case 'Yeni arkadaşlar edinmek':
+      case 'Yeni arkadaslar edinmek':
+        return Icons.people_outline;
+      case 'Networking':
+        return Icons.hub_outlined;
+      default:
+        return Icons.star_outline;
+    }
+  }
+
+  Widget _buildInterestsSection(UserProfile profile) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5C6BC0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Ilgi Alanlari',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: profile.interests.map((interest) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                      const Color(0xFF7986CB).withValues(alpha: 0.1),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                  border: Border.all(
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Text(
+                  interest,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: const Color(0xFF5C6BC0),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBioSection(UserProfile profile) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5C6BC0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Hakkinda',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            profile.bio,
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              color: Colors.grey[700],
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoCard(String photoPath) {
+    return GestureDetector(
+      onTap: () => _showFullScreenPhoto(photoPath),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: AspectRatio(
+            aspectRatio: 0.85,
+            child: _buildPhotoWidget(photoPath),
+          ),
+        ),
+      ),
     );
   }
 

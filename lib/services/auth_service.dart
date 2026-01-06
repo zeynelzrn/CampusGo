@@ -1,9 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'notification_service.dart';
+import 'user_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final NotificationService _notificationService = NotificationService();
+  final UserService _userService = UserService();
 
   // Mevcut kullanıcıyı al
   User? get currentUser => _auth.currentUser;
@@ -161,38 +164,176 @@ class AuthService {
     }
   }
 
-  // Hesabı sil
-  Future<void> deleteAccount(String password) async {
+  // Hesabı sil (HARD DELETE - Tüm veriler dahil)
+  //
+  // SIRALAMA KRİTİK - Race Condition Önleme:
+  // 1. Şifre ile yeniden kimlik doğrulama
+  // 2. userId'yi kaydet (Auth silinmeden önce)
+  // 3. Storage temizliği (ÖNCE - Auth yetkisi gerekli)
+  // 4. Firestore temizliği
+  // 5. FCM token temizliği
+  // 6. Firebase Auth hesabını sil (EN SON)
+  Future<Map<String, dynamic>> deleteAccountWithData(String password) async {
+    debugPrint('');
+    debugPrint('╔══════════════════════════════════════════════════════════════╗');
+    debugPrint('║         HESAP SİLME İŞLEMİ BAŞLIYOR                          ║');
+    debugPrint('║         (HARD DELETE - TÜM VERİLER)                          ║');
+    debugPrint('╚══════════════════════════════════════════════════════════════╝');
+
     try {
+      // ════════════════════════════════════════════════════════════
+      // ADIM 0: KULLANICI KONTROLÜ
+      // ════════════════════════════════════════════════════════════
+      debugPrint('\n┌─ ADIM 0: Kullanıcı Kontrolü');
       final user = _auth.currentUser;
       if (user == null) {
-        throw Exception('Kullanıcı bulunamadı');
+        debugPrint('│  ✗ HATA: Oturum açmış kullanıcı bulunamadı');
+        return {'success': false, 'error': 'Kullanıcı bulunamadı'};
       }
 
-      // Önce yeniden kimlik doğrulama yap
-      final credential = EmailAuthProvider.credential(
-        email: user.email!,
-        password: password,
-      );
-      await user.reauthenticateWithCredential(credential);
+      // KRİTİK: userId'yi şimdi kaydet, Auth silinmeden önce kullanacağız
+      final String userId = user.uid;
+      final String? userEmail = user.email;
 
-      // Hesabı sil
-      await user.delete();
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'wrong-password':
-          errorMessage = 'Yanlış şifre';
-          break;
-        case 'requires-recent-login':
-          errorMessage = 'Lütfen tekrar giriş yapın';
-          break;
-        default:
-          errorMessage = 'Bir hata oluştu: ${e.message}';
+      debugPrint('│  ✓ Kullanıcı bulundu');
+      debugPrint('│    User ID: $userId');
+      debugPrint('│    Email: $userEmail');
+      debugPrint('└─────────────────────────────────────────────');
+
+      // ════════════════════════════════════════════════════════════
+      // ADIM 1: ŞİFRE İLE YENİDEN KİMLİK DOĞRULAMA
+      // ════════════════════════════════════════════════════════════
+      debugPrint('\n┌─ ADIM 1: Kimlik Doğrulama (Re-Authentication)');
+      debugPrint('│  → Şifre ile doğrulanıyor...');
+
+      try {
+        final credential = EmailAuthProvider.credential(
+          email: userEmail!,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+        debugPrint('│  ✓ Kimlik doğrulama BAŞARILI');
+        debugPrint('└─────────────────────────────────────────────');
+      } on FirebaseAuthException catch (e) {
+        debugPrint('│  ✗ Kimlik doğrulama HATASI: ${e.code}');
+        debugPrint('└─────────────────────────────────────────────');
+
+        String errorMessage;
+        switch (e.code) {
+          case 'wrong-password':
+          case 'invalid-credential':
+            errorMessage = 'Yanlış şifre';
+            break;
+          case 'requires-recent-login':
+            errorMessage = 'Güvenlik nedeniyle tekrar giriş yapmanız gerekiyor';
+            break;
+          case 'too-many-requests':
+            errorMessage = 'Çok fazla deneme. Lütfen bekleyin';
+            break;
+          default:
+            errorMessage = 'Kimlik doğrulama hatası: ${e.code}';
+        }
+        return {'success': false, 'error': errorMessage};
       }
-      throw Exception(errorMessage);
-    } catch (e) {
-      throw Exception('Hesap silinemedi: $e');
+
+      // ════════════════════════════════════════════════════════════
+      // ADIM 2: TÜM VERİLERİ SİL (Storage + Firestore)
+      // ════════════════════════════════════════════════════════════
+      debugPrint('\n┌─ ADIM 2: Veri Temizliği (Storage + Firestore)');
+      debugPrint('│  → UserService.deleteUserEntireData çağrılıyor...');
+      debugPrint('│  → User ID: $userId');
+      debugPrint('│');
+
+      // KRİTİK: Bu işlem TAMAMEN bitmeden devam etme!
+      Map<String, dynamic> deleteResult = {};
+      try {
+        deleteResult = await _userService.deleteUserEntireData(userId);
+
+        debugPrint('│');
+        debugPrint('│  ✓ Veri temizliği tamamlandı');
+        debugPrint('│    Sonuç: ${deleteResult['success'] == true ? 'BAŞARILI' : 'HATALI'}');
+        debugPrint('│    Silinen fotoğraf: ${deleteResult['deletedPhotos']}');
+        debugPrint('│    Silinen eşleşme: ${deleteResult['deletedMatches']}');
+        debugPrint('│    Silinen sohbet: ${deleteResult['deletedChats']}');
+        debugPrint('│    Silinen mesaj: ${deleteResult['deletedMessages']}');
+        debugPrint('│    Hatalar: ${deleteResult['errors']}');
+        debugPrint('└─────────────────────────────────────────────');
+      } catch (e) {
+        debugPrint('│  ⚠ Veri temizliği sırasında hata (devam ediliyor): $e');
+        debugPrint('└─────────────────────────────────────────────');
+        deleteResult = {'success': false, 'error': e.toString()};
+      }
+
+      // ════════════════════════════════════════════════════════════
+      // ADIM 3: FCM TOKEN SİL
+      // ════════════════════════════════════════════════════════════
+      debugPrint('\n┌─ ADIM 3: FCM Token Temizliği');
+      try {
+        await _notificationService.deleteTokenFromFirestore(userId);
+        debugPrint('│  ✓ FCM token silindi');
+      } catch (e) {
+        debugPrint('│  ⚠ FCM token silinemedi (kritik değil): $e');
+      }
+      debugPrint('└─────────────────────────────────────────────');
+
+      // ════════════════════════════════════════════════════════════
+      // ADIM 4: FİREBASE AUTH HESABINI SİL (EN SON!)
+      // ════════════════════════════════════════════════════════════
+      debugPrint('\n┌─ ADIM 4: Firebase Auth Hesabını Sil');
+      debugPrint('│  → Auth hesabı siliniyor...');
+
+      try {
+        // KRİTİK: Bu noktada tüm veriler silinmiş olmalı
+        await user.delete();
+        debugPrint('│  ✓ Firebase Auth hesabı SİLİNDİ');
+        debugPrint('└─────────────────────────────────────────────');
+      } on FirebaseAuthException catch (e) {
+        debugPrint('│  ✗ Auth silme HATASI: ${e.code}');
+        debugPrint('└─────────────────────────────────────────────');
+
+        if (e.code == 'requires-recent-login') {
+          return {
+            'success': false,
+            'error': 'Güvenlik nedeniyle tekrar giriş yapmanız gerekiyor',
+            'requiresReauth': true,
+          };
+        }
+        return {'success': false, 'error': 'Hesap silinemedi: ${e.code}'};
+      }
+
+      // ════════════════════════════════════════════════════════════
+      // BAŞARILI SONUÇ
+      // ════════════════════════════════════════════════════════════
+      debugPrint('');
+      debugPrint('╔══════════════════════════════════════════════════════════════╗');
+      debugPrint('║         ✅ HESAP BAŞARIYLA SİLİNDİ                           ║');
+      debugPrint('╚══════════════════════════════════════════════════════════════╝');
+      debugPrint('');
+
+      return {
+        'success': true,
+        'deletedData': deleteResult,
+      };
+
+    } catch (e, stackTrace) {
+      debugPrint('');
+      debugPrint('╔══════════════════════════════════════════════════════════════╗');
+      debugPrint('║         ❌ HESAP SİLME HATASI                                ║');
+      debugPrint('╠══════════════════════════════════════════════════════════════╣');
+      debugPrint('║  Error: $e');
+      debugPrint('║  Stack: $stackTrace');
+      debugPrint('╚══════════════════════════════════════════════════════════════╝');
+
+      return {'success': false, 'error': 'Hesap silinemedi: $e'};
+    }
+  }
+
+  // Eski metod (geriye uyumluluk için korunuyor)
+  @Deprecated('Use deleteAccountWithData instead for complete data cleanup')
+  Future<void> deleteAccount(String password) async {
+    final result = await deleteAccountWithData(password);
+    if (result['success'] != true) {
+      throw Exception(result['error'] ?? 'Hesap silinemedi');
     }
   }
 }

@@ -1,32 +1,33 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' show setEquals;
+import 'package:flutter/foundation.dart' show setEquals, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:image_picker/image_picker.dart'; // ImageSource enum icin gerekli
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/custom_notification.dart';
+import '../providers/swipe_provider.dart';
+import '../utils/image_helper.dart';
 import 'user_profile_screen.dart';
 
-class ProfileEditScreen extends StatefulWidget {
+class ProfileEditScreen extends ConsumerStatefulWidget {
   const ProfileEditScreen({super.key});
 
   @override
-  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+  ConsumerState<ProfileEditScreen> createState() => _ProfileEditScreenState();
 }
 
-class _ProfileEditScreenState extends State<ProfileEditScreen> {
+class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final ProfileService _profileService = ProfileService();
-  final ImagePicker _picker = ImagePicker();
 
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _bioController = TextEditingController();
   final _universityController = TextEditingController();
   final _departmentController = TextEditingController();
-  final _instagramController = TextEditingController();
-  final _linkedinController = TextEditingController();
+  final _clubsController = TextEditingController(); // Kullanıcı kendi topluluk/kulüplerini yazar
 
   String _selectedGender = 'Erkek';
   String _lookingFor = 'Kadın';
@@ -35,7 +36,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   List<String?> _photoUrls = List.filled(6, null);
   List<File?> _localPhotos = List.filled(6, null);
   List<String> _selectedInterests = [];
-  List<String> _selectedClubs = [];
   List<String> _selectedIntents = [];
 
   final List<String> _gradeOptions = [
@@ -47,21 +47,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     'Yüksek Lisans',
     'Doktora',
     'Mezun',
-  ];
-
-  final List<String> _clubOptions = [
-    'Yazılım Kulübü',
-    'Müzik Kulübü',
-    'Fotoğrafçılık',
-    'Tiyatro',
-    'Münazara',
-    'Dans Topluluğu',
-    'Spor Kulübü',
-    'Girişimcilik',
-    'Robotik',
-    'Sosyal Sorumluluk',
-    'Sinema Kulübü',
-    'Edebiyat',
   ];
 
   final List<String> _intentOptions = [
@@ -88,10 +73,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   String _initialGender = 'Erkek';
   String _initialLookingFor = 'Kadın';
   String _initialGrade = '';
-  String _initialInstagram = '';
-  String _initialLinkedin = '';
+  String _initialClubs = '';
   List<String> _initialInterests = [];
-  List<String> _initialClubs = [];
   List<String> _initialIntents = [];
   List<String?> _initialPhotoUrls = List.filled(6, null);
 
@@ -131,8 +114,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _bioController.addListener(_checkForChanges);
     _universityController.addListener(_checkForChanges);
     _departmentController.addListener(_checkForChanges);
-    _instagramController.addListener(_checkForChanges);
-    _linkedinController.addListener(_checkForChanges);
+    _clubsController.addListener(_checkForChanges);
   }
 
   void _checkForChanges() {
@@ -146,14 +128,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         _bioController.text.trim() != _initialBio.trim() ||
         _universityController.text.trim() != _initialUniversity.trim() ||
         _departmentController.text.trim() != _initialDepartment.trim() ||
-        _instagramController.text.trim() != _initialInstagram.trim() ||
-        _linkedinController.text.trim() != _initialLinkedin.trim() ||
+        _clubsController.text.trim() != _initialClubs.trim() ||
         _selectedGender != _initialGender ||
         _lookingFor != _initialLookingFor ||
         _selectedGrade != _initialGrade ||
         // Set-based deep comparison for lists (order doesn't matter)
         !_setEquals(_selectedInterests, _initialInterests) ||
-        !_setEquals(_selectedClubs, _initialClubs) ||
         !_setEquals(_selectedIntents, _initialIntents) ||
         !_photoListEquals(_photoUrls, _localPhotos, _initialPhotoUrls);
 
@@ -184,15 +164,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _bioController.removeListener(_checkForChanges);
     _universityController.removeListener(_checkForChanges);
     _departmentController.removeListener(_checkForChanges);
-    _instagramController.removeListener(_checkForChanges);
-    _linkedinController.removeListener(_checkForChanges);
+    _clubsController.removeListener(_checkForChanges);
     _nameController.dispose();
     _ageController.dispose();
     _bioController.dispose();
     _universityController.dispose();
     _departmentController.dispose();
-    _instagramController.dispose();
-    _linkedinController.dispose();
+    _clubsController.dispose();
     super.dispose();
   }
 
@@ -228,13 +206,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
       // Zenginleştirilmiş alanlar
       _selectedGrade = profile['grade'] ?? '';
-      _selectedClubs = List<String>.from(profile['clubs'] ?? []);
+      // Kulüpleri virgülle ayrılmış string olarak yükle
+      final clubsList = List<String>.from(profile['clubs'] ?? []);
+      _clubsController.text = clubsList.join(', ');
       _selectedIntents = List<String>.from(profile['intent'] ?? []);
-
-      // Sosyal linkler
-      final socialLinks = profile['socialLinks'] as Map<String, dynamic>? ?? {};
-      _instagramController.text = socialLinks['instagram'] ?? '';
-      _linkedinController.text = socialLinks['linkedin'] ?? '';
 
       List<dynamic> photos = profile['photos'] ?? [];
       for (int i = 0; i < photos.length && i < 6; i++) {
@@ -261,19 +236,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     _initialGender = _selectedGender;
     _initialLookingFor = _lookingFor;
     _initialGrade = _selectedGrade;
-    _initialInstagram = _instagramController.text;
-    _initialLinkedin = _linkedinController.text;
+    _initialClubs = _clubsController.text;
     _initialInterests = List<String>.from(_selectedInterests);
-    _initialClubs = List<String>.from(_selectedClubs);
     _initialIntents = List<String>.from(_selectedIntents);
     _initialPhotoUrls = List<String?>.from(_photoUrls);
   }
 
+  // Silinecek fotoğraf URL'leri (Kaydet'e basınca Storage'dan silinecek)
+  final List<String> _urlsToDelete = [];
+
   Future<void> _pickImage(int index) async {
+    final bool hasPhoto = _photoUrls[index] != null || _localPhotos[index] != null;
+    final bool isMainPhoto = index == 0;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (ctx) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -291,56 +270,80 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // Başlık
+            Text(
+              isMainPhoto ? 'Ana Fotoğraf' : 'Fotoğraf ${index + 1}',
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (isMainPhoto)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Ana fotoğraf silinemez, sadece değiştirilebilir',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
+
+            // Kamera seçeneği
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.withOpacity(0.1),
+                  color: Colors.indigo.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.camera_alt, color: Colors.indigo),
               ),
-              title: const Text('Kamera'),
+              title: Text(hasPhoto ? 'Kamera ile Değiştir' : 'Kamera'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 _getImage(ImageSource.camera, index);
               },
             ),
+
+            // Galeri seçeneği
             ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.withOpacity(0.1),
+                  color: Colors.indigo.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.photo_library, color: Colors.indigo),
               ),
-              title: const Text('Galeri'),
+              title: Text(hasPhoto ? 'Galeriden Değiştir' : 'Galeri'),
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(ctx);
                 _getImage(ImageSource.gallery, index);
               },
             ),
-            if (_photoUrls[index] != null || _localPhotos[index] != null)
+
+            // Silme seçeneği - SADECE index > 0 için göster
+            if (hasPhoto && !isMainPhoto)
               ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.delete, color: Colors.red),
                 ),
                 title: const Text('Fotoğrafı Sil'),
                 onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _photoUrls[index] = null;
-                    _localPhotos[index] = null;
-                  });
-                  _checkForChanges();
+                  Navigator.pop(ctx);
+                  _deletePhoto(index);
                 },
               ),
+
             const SizedBox(height: 20),
           ],
         ),
@@ -348,24 +351,52 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     );
   }
 
+  /// Fotoğrafı sil (Storage'dan silme işlemi Kaydet'e basınca yapılır)
+  void _deletePhoto(int index) {
+    // Ana fotoğraf silinemez
+    if (index == 0) {
+      _showError('Ana fotoğraf silinemez, sadece değiştirilebilir');
+      return;
+    }
+
+    // Eğer URL varsa, silme listesine ekle (Kaydet'e basınca Storage'dan silinecek)
+    final urlToDelete = _photoUrls[index];
+    if (urlToDelete != null && urlToDelete.isNotEmpty) {
+      _urlsToDelete.add(urlToDelete);
+      debugPrint('ProfileEdit: Silinecek URL eklendi: $urlToDelete');
+    }
+
+    setState(() {
+      _photoUrls[index] = null;
+      _localPhotos[index] = null;
+    });
+    _checkForChanges();
+  }
+
   Future<void> _getImage(ImageSource source, int index) async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+      // ImageHelper ile izin kontrolu + resim secme + sikistirma (hepsi bir arada)
+      final File? compressedFile = await ImageHelper.pickAndCompressImage(
+        context,
+        source,
       );
 
-      if (image != null) {
+      if (compressedFile != null) {
+        // Eğer bu slotta eski bir URL varsa, silme listesine ekle
+        final oldUrl = _photoUrls[index];
+        if (oldUrl != null && oldUrl.isNotEmpty) {
+          _urlsToDelete.add(oldUrl);
+          debugPrint('ProfileEdit: Degistirilecek foto silme listesine eklendi: $oldUrl');
+        }
+
         setState(() {
-          _localPhotos[index] = File(image.path);
+          _localPhotos[index] = compressedFile;
           _photoUrls[index] = null;
         });
         _checkForChanges();
       }
     } catch (e) {
-      _showError('Fotoğraf seçilemedi');
+      _showError('Fotoğraf seçilemedi: $e');
     }
   }
 
@@ -386,15 +417,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       return;
     }
 
-    if (_photoUrls[0] == null && _localPhotos[0] == null) {
-      _showError('En az bir fotoğraf eklemelisiniz');
+    // Ana fotoğraf kontrolü - en az 1 fotoğraf olmalı
+    final bool hasMainPhoto = _photoUrls[0] != null || _localPhotos[0] != null;
+    if (!hasMainPhoto) {
+      _showError('Ana fotoğraf (ilk slot) zorunludur');
       return;
     }
 
     setState(() => _isSaving = true);
 
     try {
-      // Önce yeni fotoğrafları yükle
+      // 1. Önce silme listesindeki eski fotoğrafları Storage'dan sil
+      if (_urlsToDelete.isNotEmpty) {
+        debugPrint('ProfileEdit: ${_urlsToDelete.length} foto Storage\'dan siliniyor...');
+        for (final url in _urlsToDelete) {
+          await _profileService.deletePhotoByUrl(url);
+        }
+        _urlsToDelete.clear(); // Silme listesini temizle
+      }
+
+      // 2. Yeni fotoğrafları yükle
       List<String?> finalPhotoUrls = List.from(_photoUrls);
 
       for (int i = 0; i < 6; i++) {
@@ -407,16 +449,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         }
       }
 
-      // Sosyal linkler
-      Map<String, String> socialLinks = {};
-      if (_instagramController.text.trim().isNotEmpty) {
-        socialLinks['instagram'] = _instagramController.text.trim();
-      }
-      if (_linkedinController.text.trim().isNotEmpty) {
-        socialLinks['linkedin'] = _linkedinController.text.trim();
-      }
+      // Kulüpleri virgülle ayrılmış string'den list'e çevir
+      final clubsList = _clubsController.text.trim().isEmpty
+          ? <String>[]
+          : _clubsController.text.split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
 
-      // Profili kaydet
+      // 3. Profili kaydet
       bool success = await _profileService.saveProfile(
         name: _nameController.text.trim(),
         age: age,
@@ -428,8 +466,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         gender: _selectedGender,
         lookingFor: _lookingFor,
         grade: _selectedGrade,
-        clubs: _selectedClubs,
-        socialLinks: socialLinks,
+        clubs: clubsList,
+        socialLinks: {},
         intent: _selectedIntents,
       );
 
@@ -443,6 +481,14 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
             _localPhotos[i] = null;
           }
 
+          // IMPORTANT: Check if lookingFor changed BEFORE saving initial values!
+          final lookingForChanged = _lookingFor != _initialLookingFor;
+          final newLookingFor = _lookingFor;
+
+          if (lookingForChanged) {
+            debugPrint('ProfileEdit: lookingFor changed from $_initialLookingFor to $newLookingFor');
+          }
+
           // Save new initial values (current state becomes the new baseline)
           _saveInitialValues();
 
@@ -452,18 +498,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           // Close keyboard
           FocusScope.of(context).unfocus();
 
-          // Show success SnackBar
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Değişiklikler başarıyla kaydedildi ✅'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          // Update gender filter if lookingFor changed
+          if (lookingForChanged) {
+            debugPrint('ProfileEdit: Updating gender filter to $newLookingFor');
+            await ref.read(swipeProvider.notifier).updateGenderFilter(newLookingFor);
+            debugPrint('ProfileEdit: Gender filter updated successfully');
+          }
+
+          // Show beautiful success notification (check mounted after async)
+          if (mounted) {
+            CustomNotification.success(
+              context,
+              'Profil Güncellendi',
+              subtitle: 'Değişiklikler başarıyla kaydedildi',
+            );
+          }
         }
       } else {
         _showError('Profil kaydedilemedi');
@@ -507,6 +556,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       }
     }
 
+    // Kulüpleri virgülle ayrılmış string'den list'e çevir
+    final previewClubs = _clubsController.text.trim().isEmpty
+        ? <String>[]
+        : _clubsController.text.split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
+
     // Create temporary UserProfile from current form state
     final previewProfile = UserProfile(
       id: currentUserId,
@@ -522,13 +576,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       gender: _selectedGender,
       lookingFor: _lookingFor,
       grade: _selectedGrade,
-      clubs: List<String>.from(_selectedClubs),
-      socialLinks: {
-        if (_instagramController.text.trim().isNotEmpty)
-          'instagram': _instagramController.text.trim(),
-        if (_linkedinController.text.trim().isNotEmpty)
-          'linkedin': _linkedinController.text.trim(),
-      },
+      clubs: previewClubs,
+      socialLinks: {},
       intent: List<String>.from(_selectedIntents),
     );
 
@@ -573,8 +622,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFF1A237E), // Koyu Indigo
-                    Color(0xFF7C4DFF), // Canlı Mor/Menekşe (deepPurpleAccent)
+                    Color(0xFF5C6BC0), // Indigo (navigation bar ile uyumlu)
+                    Color(0xFF7986CB), // Açık indigo
+                    Color(0xFF9FA8DA), // Lavender
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -582,7 +632,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7C4DFF).withValues(alpha: 0.4),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -773,22 +823,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   _buildSection('İlgi Alanları', [
                     _buildInterestsSelector(),
                   ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Sosyal Medya', [
-                    _buildTextField(
-                      controller: _instagramController,
-                      label: 'Instagram',
-                      hint: '@kullaniciadi',
-                      icon: Icons.camera_alt_outlined,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _linkedinController,
-                      label: 'LinkedIn',
-                      hint: 'linkedin.com/in/kullaniciadi',
-                      icon: Icons.work_outline,
-                    ),
-                  ]),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -904,7 +938,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 4,
                     ),
                   ],
@@ -1289,62 +1323,40 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'En fazla 3 topluluk seçebilirsiniz',
+          'Üye olduğunuz topluluk veya kulüpleri virgülle ayırarak yazın',
           style: GoogleFonts.poppins(
             fontSize: 12,
             color: Colors.grey[600],
           ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _clubOptions.map((club) {
-            bool isSelected = _selectedClubs.contains(club);
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedClubs.remove(club);
-                  } else if (_selectedClubs.length < 3) {
-                    _selectedClubs.add(club);
-                  } else {
-                    _showWarning('En fazla 3 topluluk seçebilirsiniz');
-                  }
-                });
-                _checkForChanges();
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.indigo : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected ? Colors.indigo : Colors.grey[300]!,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.groups_outlined,
-                      size: 16,
-                      color: isSelected ? Colors.white : Colors.grey[600],
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      club,
-                      style: GoogleFonts.poppins(
-                        color: isSelected ? Colors.white : Colors.grey[700],
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: TextField(
+            controller: _clubsController,
+            maxLines: 2,
+            style: GoogleFonts.poppins(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Örn: Yazılım Kulübü, Münazara, Dans Topluluğu',
+              hintStyle: GoogleFonts.poppins(
+                color: Colors.grey[400],
+                fontSize: 14,
               ),
-            );
-          }).toList(),
+              prefixIcon: Icon(
+                Icons.groups_outlined,
+                color: Colors.grey[400],
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
         ),
       ],
     );

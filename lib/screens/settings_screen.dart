@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/debug_service.dart';
 import '../providers/swipe_provider.dart';
@@ -9,6 +11,7 @@ import '../widgets/custom_notification.dart';
 import 'welcome_screen.dart';
 import 'splash_screen.dart';
 import 'blocked_users_screen.dart';
+import 'admin_dashboard_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -26,8 +29,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // ignore: unused_field - Used in debug functions for loading state
   bool _isDebugLoading = false;
 
+  // Admin durumu (Firestore'dan yüklenir)
+  bool _isAdmin = false;
+
   // Admin password for Debug Panel access
   static const String _adminPassword = 'campus2025';
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  /// Kullanıcının admin olup olmadığını kontrol et
+  Future<void> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _isAdmin = data?['isAdmin'] as bool? ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('SettingsScreen: Admin durumu kontrol hatasi: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,9 +185,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ]),
                     const SizedBox(height: 32),
-                    // ==================== DEBUG PANEL ====================
-                    _buildDebugPanel(),
-                    const SizedBox(height: 32),
+                    // ==================== ADMIN PANEL (Sadece adminler için) ====================
+                    if (_isAdmin) ...[
+                      _buildAdminPanelSection(),
+                      const SizedBox(height: 24),
+                      // ==================== DEBUG PANEL (Sadece adminler için) ====================
+                      _buildDebugPanel(),
+                      const SizedBox(height: 32),
+                    ],
                     Center(
                       child: Text(
                         'Version 1.0.0',
@@ -564,19 +603,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
         title: Row(
           children: [
-            const Icon(Icons.warning_rounded, color: Colors.red),
-            const SizedBox(width: 8),
-            Text(
-              'Hesabi Sil',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.warning_rounded, color: Colors.red, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hesabi Kalici Olarak Sil',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                  fontSize: 18,
+                ),
               ),
             ),
           ],
@@ -585,11 +634,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Bu islem geri alinamaz! Tum verileriniz silinecektir.',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'BU ISLEM GERI ALINAMAZ!',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Silinecek veriler:',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildDeleteListItem('Profil bilgileriniz'),
+                  _buildDeleteListItem('Tum fotograflariniz'),
+                  _buildDeleteListItem('Eslesmeleriniz'),
+                  _buildDeleteListItem('Sohbetleriniz ve mesajlariniz'),
+                  _buildDeleteListItem('Begeni gecmisiniz'),
+                ],
               ),
             ),
             const SizedBox(height: 16),
@@ -612,39 +690,106 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
+                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
+              'Vazgec',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
             ),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (passwordController.text.isNotEmpty) {
-                Navigator.pop(context);
-                try {
-                  await _authService.deleteAccount(passwordController.text);
-                  if (mounted) {
-                    Navigator.pushAndRemoveUntil(
+              if (passwordController.text.isEmpty) {
+                CustomNotification.error(
+                  dialogContext,
+                  'Hata',
+                  subtitle: 'Lutfen sifrenizi girin',
+                );
+                return;
+              }
+
+              // Dialog'u kapat
+              Navigator.pop(dialogContext);
+
+              // Loading göster
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingContext) => PopScope(
+                  canPop: false,
+                  child: AlertDialog(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(color: Colors.red),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Hesabiniz siliniyor...',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Tum verileriniz temizleniyor.\nBu islem biraz zaman alabilir.',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+
+              // Hesabı sil (HARD DELETE)
+              final result = await _authService.deleteAccountWithData(
+                passwordController.text,
+              );
+
+              // Loading'i kapat
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+
+              if (result['success'] == true) {
+                // Başarılı - Welcome ekranına yönlendir
+                if (mounted) {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                    (route) => false,
+                  );
+
+                  // Başarı mesajı göster (bir sonraki frame'de)
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    CustomNotification.success(
                       context,
-                      MaterialPageRoute(builder: (context) => WelcomeScreen()),
-                      (route) => false,
+                      'Hesap Silindi',
+                      subtitle: 'Hesabiniz ve tum verileriniz basariyla silindi.',
                     );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    CustomNotification.error(
-                      context,
-                      'Hata',
-                      subtitle: e.toString(),
-                    );
-                  }
+                  });
+                }
+              } else {
+                // Hata mesajı göster
+                if (mounted) {
+                  CustomNotification.error(
+                    context,
+                    'Hesap Silinemedi',
+                    subtitle: result['error'] ?? 'Bilinmeyen hata',
+                  );
                 }
               }
             },
@@ -656,11 +801,141 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             child: Text(
               'Hesabi Sil',
-              style: GoogleFonts.poppins(color: Colors.white),
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  /// Delete listesi için yardımcı widget
+  Widget _buildDeleteListItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, top: 2),
+      child: Row(
+        children: [
+          Icon(Icons.remove, size: 12, color: Colors.red[400]),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== ADMIN PANEL (Şikayet Yönetimi) ====================
+
+  Widget _buildAdminPanelSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section title
+        Row(
+          children: [
+            const Icon(
+              Icons.shield_rounded,
+              color: Colors.red,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Admin Paneli',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Admin Dashboard Button
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: Colors.red.withValues(alpha: 0.2),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.red.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ListTile(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdminDashboardScreen(),
+                ),
+              );
+            },
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.red.shade400,
+                    Colors.red.shade600,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.admin_panel_settings_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            title: Text(
+              'Sikayet Yonetimi',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            subtitle: Text(
+              'Bekleyen sikayetleri incele',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.red[400],
+                size: 18,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1364,28 +1639,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             style: GoogleFonts.poppins(
               fontSize: 12,
               color: Colors.green[700],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDeleteListItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.remove, color: Colors.red[400], size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: Colors.grey[700],
-              ),
             ),
           ),
         ],

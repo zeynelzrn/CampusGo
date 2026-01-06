@@ -18,6 +18,12 @@ dependencies:
   cloud_firestore: ^5.5.1
   firebase_storage: ^12.3.7
   image_picker: ^1.0.7
+  # Permission Handling
+  permission_handler: ^11.3.1
+  # Image Compression
+  flutter_image_compress: ^2.3.0
+  path_provider: ^2.1.2
+  path: ^1.9.0
   shared_preferences: ^2.2.2
   # State Management
   flutter_riverpod: ^2.4.9

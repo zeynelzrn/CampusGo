@@ -268,17 +268,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                               // Form alanları
                               _buildModernTextField(
                                 controller: _emailController,
-                                label: 'Üniversite E-postası',
-                                hint: 'ornek@universite.edu.tr',
+                                label: 'E-posta',
+                                hint: 'ornek@mail.com',
                                 icon: Icons.alternate_email,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'E-posta adresi gerekli';
                                   }
-                                  if (!value.endsWith('.edu.tr')) {
-                                    return 'Sadece .edu.tr uzantılı e-postalar kabul edilir';
-                                  }
+                                  // TODO: Yayın öncesi .edu.tr kontrolünü geri aç
+                                  // if (!value.endsWith('.edu.tr')) {
+                                  //   return 'Sadece .edu.tr uzantılı e-postalar kabul edilir';
+                                  // }
                                   if (!RegExp(
                                           r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                       .hasMatch(value)) {

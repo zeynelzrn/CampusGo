@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
 
@@ -114,28 +113,34 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
     try {
       int attempts = 0;
-      const maxAttempts = 5; // Prevent infinite loops
+      const maxAttempts = 3; // Reduced - proper pagination means fewer attempts needed
       List<UserProfile> filteredProfiles = [];
+      DocumentSnapshot? currentLastDoc = state.lastDocument;
 
       // Keep fetching until we have enough profiles or no more data
       while (
           filteredProfiles.length < minCardsInStack && attempts < maxAttempts) {
         final batch = await _repository.fetchUserBatch(
-          lastDocument: state.lastDocument,
+          lastDocument: currentLastDoc,
           genderFilter: state.genderFilter,
         );
 
-        if (batch.isEmpty) {
-          // No more data available
+        // No more data available
+        if (batch.profiles.isEmpty) {
           state = state.copyWith(
+            profiles: [...state.profiles, ...filteredProfiles],
+            lastDocument: currentLastDoc,
             hasMore: false,
             isLoading: false,
           );
-          break;
+          return;
         }
 
+        // CRITICAL: Update cursor for next iteration
+        currentLastDoc = batch.lastDoc;
+
         // Apply client-side filtering
-        final newProfiles = batch
+        final newProfiles = batch.profiles
             .where((profile) =>
                 !state.excludedIds.contains(profile.id) &&
                 !state.profiles.any((p) => p.id == profile.id) &&
@@ -143,15 +148,13 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
             .toList();
 
         filteredProfiles.addAll(newProfiles);
-
-        // Update last document for pagination
-        // Note: We need to track the actual Firestore document for pagination
         attempts++;
       }
 
-      // Add filtered profiles to state
+      // Add filtered profiles to state with updated pagination cursor
       state = state.copyWith(
         profiles: [...state.profiles, ...filteredProfiles],
+        lastDocument: currentLastDoc,
         isLoading: false,
         hasMore: filteredProfiles.isNotEmpty,
       );
@@ -210,11 +213,9 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
           (actionType == SwipeActionType.like ||
               actionType == SwipeActionType.superlike)) {
         state = state.copyWith(isMatch: true);
-        debugPrint('SwipeProvider: IT\'S A MATCH! Showing match animation.');
       }
     } catch (e) {
       // Silent fail for background operation
-      debugPrint('SwipeProvider: Error recording swipe: $e');
     }
   }
 
@@ -257,7 +258,6 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
       return true;
     } catch (e) {
-      print('Error undoing swipe: $e');
       return false;
     }
   }
@@ -281,6 +281,7 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
       hasMore: true,
       clearLastDocument: true,
     );
+
     await _fetchNextBatch();
   }
 }

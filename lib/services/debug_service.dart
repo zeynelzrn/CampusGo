@@ -178,8 +178,9 @@ class DebugService {
   /// PROTECTED UIDs: Only these 2 accounts will NEVER be deleted
   /// Everything else gets deleted - no email checks, no domain checks
   static const List<String> _protectedUids = [
-    'BA1pWoPOIDf1ReVB3wyXQnIOG7L2', // PC Hesabi (Zeynel - Gmail)
-    'KhpezrxgStV67YYYo6fHWGkwlxm1', // Telefon Hesabi (Okul Maili)
+    'KJcDoC0XTZZRAKP6QNu6ahOugCA3', // zeynel gmail.    
+    'GEE22M3nqpNR890Fz4igFIzFQoj1', // zeyneltcr gmail
+    'KhpezrxgStV67YYYo6fHWGkwlxm1', // (Okul Maili)
   ];
 
   /// Delete all users EXCEPT the 2 protected UIDs
