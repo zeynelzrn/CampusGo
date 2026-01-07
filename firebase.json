@@ -1,18 +1,1 @@
-{
-  "firestore": {
-    "indexes": "firestore.indexes.json"
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
-    }
-  ]
-}
+{"firestore":{"indexes":"firestore.indexes.json"},"functions":[{"source":"functions","codebase":"default","ignore":["node_modules",".git","firebase-debug.log","firebase-debug.*.log","*.local"]}],"flutter":{"platforms":{"android":{"default":{"projectId":"campusgo-zrn","appId":"1:871846711176:android:b8df99658a7366d8b5b43d","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"campusgo-zrn","configurations":{"ios":"1:871846711176:ios:2c148f7378a38d43b5b43d"}}},"ios":{"default":{"projectId":"campusgo-zrn","appId":"1:871846711176:ios:2c148f7378a38d43b5b43d","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}}}}}
