@@ -194,7 +194,7 @@ class DebugService {
     try {
       debugPrint('');
       debugPrint('╔═══════════════════════════════════════════════════════╗');
-      debugPrint('║         SIMPLE UID WHITELIST - 2 HESAP KORUMALI       ║');
+      debugPrint('║         SIMPLE UID WHITELIST - 2fl HESAP KORUMALI       ║');
       debugPrint('╠═══════════════════════════════════════════════════════╣');
       debugPrint('║  Korunan UID\'ler:');
       for (final uid in _protectedUids) {
