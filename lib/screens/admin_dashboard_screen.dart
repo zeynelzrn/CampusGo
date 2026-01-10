@@ -100,7 +100,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       stream: _firestore
           .collection('reports')
           .where('status', isEqualTo: status)
-          .orderBy('createdAt', descending: true)
+          .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -207,9 +207,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   Widget _buildReportCard(String reportId, Map<String, dynamic> data, String status) {
     final reason = data['reason'] as String? ?? 'Belirtilmemis';
     final description = data['description'] as String? ?? '';
-    final reportedUserId = data['reportedUserId'] as String? ?? '';
+    final reportedUserId = data['reportedId'] as String? ?? '';
     final reporterId = data['reporterId'] as String? ?? '';
-    final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+    final createdAt = (data['timestamp'] as Timestamp?)?.toDate();
     final isPending = status == 'pending';
 
     return Container(

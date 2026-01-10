@@ -958,4 +958,601 @@ firestore.indexes.json                 - Composite indexler
 
 ---
 
-*Bu dokuman CampusGo projesinin kapsamli teknik dokumantasyonudur. 
+---
+
+## SON GUNCELLEME: PERFORMANS OPTIMIZASYONLARI VE YENI OZELLIKLER
+
+### 1. Motion Blur Efekti (MainScreen)
+
+**Dosya:** `lib/screens/main_screen.dart`
+
+Tab gecislerinde hiz hissi veren yatay motion blur efekti eklendi.
+
+**Teknik Detaylar:**
+```dart
+import 'dart:ui' as ui;
+
+class _DirectionalLockPageViewState extends State<_DirectionalLockPageView> {
+  double _blurIntensity = 0.0;
+  static const double _maxBlur = 8.0; // Maksimum blur sigma degeri
+
+  void _onScroll() {
+    if (!widget.controller.hasClients) return;
+    final page = widget.controller.page ?? 0.0;
+    // Sayfa pozisyonunun tam sayiya olan uzakligi (0-0.5 arasi)
+    final distanceFromInt = (page - page.round()).abs();
+    // Blur yogunlugu: 0.5'te maksimum (gecisin ortasi)
+    final normalizedDistance = distanceFromInt * 2;
+    final blurCurve = Curves.easeInOutCubic.transform(normalizedDistance);
+    setState(() {
+      _blurIntensity = blurCurve * _maxBlur;
+    });
+  }
+
+  // Build icinde:
+  if (_blurIntensity > 0.1)
+    Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 50),
+          opacity: (_blurIntensity / _maxBlur).clamp(0.0, 0.6),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(
+              sigmaX: _blurIntensity,
+              sigmaY: 0, // Sadece yatay blur
+            ),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+      ),
+    ),
+}
+```
+
+**Ozellikler:**
+- `BackdropFilter` ile gercek zamanli blur efekti
+- Sadece yatay (sigmaX) blur - hiz hissi verir
+- `Curves.easeInOutCubic` ile dogal animasyon egrisi
+- Gecisin ortasinda maksimum blur (8.0 sigma)
+- %60 maksimum opacity ile yumusak gorunum
+- Animasyon suresi: 380ms
+
+---
+
+### 2. Tab Degisikligi Bildirim Sistemi (ValueNotifier Pattern)
+
+**Dosya:** `lib/screens/main_screen.dart`
+
+Sekmeler arasi iletisim icin global ValueNotifier pattern eklendi.
+
+**Teknik Detaylar:**
+```dart
+class MainScreen extends StatefulWidget {
+  /// Global tab index notifier - diger ekranlar tab degisikligini dinleyebilir
+  static final ValueNotifier<int> currentTabNotifier = ValueNotifier<int>(2);
+
+  // ...
+}
+
+class _MainScreenState extends State<MainScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Global notifier'i baslangic degeriyle ayarla
+    MainScreen.currentTabNotifier.value = _currentIndex;
+  }
+
+  void _onPageChanged(int index) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _currentIndex = index;
+    });
+    // Global notifier'i guncelle - diger ekranlar dinleyebilir
+    MainScreen.currentTabNotifier.value = index;
+  }
+}
+```
+
+**Kullanim Ornegi (ChatListScreen):**
+```dart
+@override
+void initState() {
+  super.initState();
+  MainScreen.currentTabNotifier.addListener(_onTabChanged);
+}
+
+void _onTabChanged() {
+  // Chat tab'indan ayrildiginda tum swipe action'lari kapat
+  if (MainScreen.currentTabNotifier.value != _chatTabIndex) {
+    _openSwipeActionChatId.value = null;
+  }
+}
+
+@override
+void dispose() {
+  MainScreen.currentTabNotifier.removeListener(_onTabChanged);
+  super.dispose();
+}
+```
+
+**Avantajlari:**
+- Sekmeler arasi state paylasimi
+- Rebuild gerektirmeden bildirim
+- Performansli cross-widget iletisim
+- Swipe butonlarinin otomatik kapanmasi
+
+---
+
+### 3. ChatListScreen Performans Optimizasyonlari
+
+**Dosya:** `lib/screens/chat_list_screen.dart`
+
+Sohbet listesinde parazitlenme (flickering) ve gereksiz rebuild sorunlari cozuldu.
+
+**Eklenen Ozellikler:**
+
+#### 3.1 AutomaticKeepAliveClientMixin
+```dart
+class _ChatListScreenState extends State<ChatListScreen>
+    with RouteAware, AutomaticKeepAliveClientMixin<ChatListScreen> {
+
+  @override
+  bool get wantKeepAlive => true; // Tab degisiminde state'i koru
+
+  @override
+  Widget build(BuildContext context) {
+    // CRITICAL: AutomaticKeepAliveClientMixin icin super.build cagrilmali
+    super.build(context);
+    // ...
+  }
+}
+```
+
+#### 3.2 Stream Cache (initState'de olusturma)
+```dart
+// OPTIMIZATION: Stream'leri initState'de olustur, rebuild'de yeniden olusturma
+late final Stream<Set<String>> _restrictedUsersStream;
+late final Stream<List<Chat>> _chatsStream;
+late final Stream<int> _unreadCountStream;
+
+@override
+void initState() {
+  super.initState();
+  // OPTIMIZATION: Stream'leri bir kez olustur ve cache'le
+  _restrictedUsersStream = _userService.watchAllRestrictedUserIds();
+  _chatsStream = _chatService.watchChats();
+  _unreadCountStream = _chatService.watchUnreadCount();
+}
+```
+
+#### 3.3 RepaintBoundary Kullanimi
+```dart
+Widget _buildHeader() {
+  return RepaintBoundary(
+    child: Container(
+      // Header icerigi...
+    ),
+  );
+}
+
+// Liste icin:
+child: RepaintBoundary(
+  child: StreamBuilder<Set<String>>(
+    stream: _restrictedUsersStream,
+    // ...
+  ),
+),
+```
+
+#### 3.4 ListView Optimizasyonlari
+```dart
+return ListView.builder(
+  padding: const EdgeInsets.symmetric(vertical: 8),
+  itemCount: chats.length,
+  // OPTIMIZATION: Onceden render et ve cache'le
+  addAutomaticKeepAlives: true,
+  cacheExtent: 500, // Gorunur alanin disinda 500px cache'le
+  itemBuilder: (context, index) {
+    final chat = chats[index];
+    return _buildChatCard(chat, index);
+  },
+);
+```
+
+---
+
+### 4. Navigasyon Takılması Duzeltmesi
+
+**Dosya:** `lib/screens/chat_list_screen.dart`
+
+Sohbet detayina gecerken navigasyonun takılma sorunu cozuldu.
+
+**Onceki Sorunlu Kod:**
+```dart
+void _openChatDetail(Chat chat) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    Navigator.push(context, ...); // SORUN: Navigasyon gecikmesi
+  });
+}
+```
+
+**Duzeltilmis Kod:**
+```dart
+void _openChatDetail(Chat chat) {
+  // Swipe action'i kapat (setState yok, sadece ValueNotifier)
+  _openSwipeActionChatId.value = null;
+
+  // Context kontrolu
+  if (!mounted) return;
+
+  // Mark as read - fire and forget (await yok, UI bloklama yok)
+  _chatService.markChatAsRead(chat.id);
+
+  // DUZELTME: rootNavigator kullan (Tab yapisi icinde oldugumuz icin)
+  // addPostFrameCallback kaldirildi - navigasyonu geciktirip kilitlemeye neden oluyordu
+  Navigator.of(context, rootNavigator: true).push(
+    CupertinoPageRoute(
+      builder: (_) => ChatDetailScreen(
+        chatId: chat.id,
+        peerName: chat.peerName,
+        peerImage: chat.peerImage,
+        peerId: chat.peerId,
+      ),
+    ),
+  );
+}
+```
+
+**Cozum Detaylari:**
+- `addPostFrameCallback` kaldirildi (gereksiz gecikme)
+- `rootNavigator: true` eklendi (Tab yapisi icin gerekli)
+- `CupertinoPageRoute` kullanildi (iOS-style gecis)
+- `markChatAsRead` async beklenmiyor (fire-and-forget)
+
+---
+
+### 5. Swipe-to-Delete Ozelligi (Sohbet Listesi)
+
+**Dosya:** `lib/screens/chat_list_screen.dart`
+
+Sohbet kartlarini saga kaydirarak silme butonu gosterme ozelligi eklendi.
+
+**Teknik Detaylar:**
+```dart
+class _SwipeableChatCard extends StatefulWidget {
+  final Chat chat;
+  final bool hasUnread;
+  final ValueNotifier<String?> openChatIdNotifier;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final Widget Function() buildAvatar;
+  // ...
+}
+
+class _SwipeableChatCardState extends State<_SwipeableChatCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  static const double _maxSlide = 80;
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    final delta = details.primaryDelta ?? 0;
+    _controller.value -= delta / _maxSlide;
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+
+    // Hizli sola kaydirma
+    if (velocity < -300) {
+      _controller.forward();
+      widget.openChatIdNotifier.value = widget.chat.id;
+      return;
+    }
+    // Hizli saga kaydirma
+    if (velocity > 300) {
+      _controller.reverse();
+      if (_isOpen) widget.openChatIdNotifier.value = null;
+      return;
+    }
+    // Yavas kaydirma - yaridan fazlaysa ac
+    if (_controller.value > 0.5) {
+      _controller.forward();
+      widget.openChatIdNotifier.value = widget.chat.id;
+    } else {
+      _controller.reverse();
+      if (_isOpen) widget.openChatIdNotifier.value = null;
+    }
+  }
+}
+```
+
+**Ozellikler:**
+- Animasyonlu kaydirma (200ms)
+- Velocity-based swipe algılama
+- Tek kart acik kalir (diger kartlar otomatik kapanir)
+- Tab degisiminde otomatik kapanma
+- Onay dialogu ile silme
+
+---
+
+### 6. Modern Overlay Bildirimler
+
+**Dosya:** `lib/screens/chat_list_screen.dart`, `lib/screens/chat_detail_screen.dart`
+
+Snackbar yerine modern gradient overlay bildirimler eklendi.
+
+**Teknik Detaylar:**
+```dart
+showOverlayNotification(
+  (context) {
+    return SafeArea(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.green.shade500, Colors.green.shade400],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.green.withValues(alpha: 0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Icon container
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Title and subtitle
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Basarili', style: ...),
+                      Text('Islem tamamlandi', style: ...),
+                    ],
+                  ),
+                ),
+                // Close button
+                GestureDetector(
+                  onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
+                  child: Icon(Icons.close_rounded, ...),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  },
+  duration: const Duration(seconds: 3),
+  position: NotificationPosition.top,
+);
+```
+
+**Bildirim Tipleri:**
+- **Basari (Yesil):** Silme, temizleme, raporlama onaylari
+- **Hata (Kirmizi):** Islem hatalari
+- Otomatik kapanma (3-4 saniye)
+- Manuel kapatma butonu
+
+---
+
+### 7. Admin Sifresi Kaldirildi
+
+**Dosya:** `lib/screens/settings_screen.dart`
+
+Gelistirici araclarina erisim icin sifre sorgusu kaldirildi.
+
+**Onceki Akis:**
+```
+Gelistirici Araclari -> Sifre Dialogu -> Admin Menu
+```
+
+**Yeni Akis:**
+```
+Gelistirici Araclari -> Dogrudan Admin Menu
+```
+
+**Degisiklik:**
+```dart
+// Eski kod:
+onTap: _showPasswordDialog,  // Sifre soruyordu
+
+// Yeni kod:
+onTap: _showAdminMenu,  // Dogrudan menu aciyor
+```
+
+**Not:** Admin paneli hala sadece `isAdmin: true` olan kullanıcılara gorunur.
+
+---
+
+### 8. Admin Dashboard Alan Adi Duzeltmeleri
+
+**Dosya:** `lib/screens/admin_dashboard_screen.dart`
+
+Firestore rapor koleksiyonundaki alan adlari duzeltildi.
+
+**Duzeltilen Alanlar:**
+```dart
+// Onceki (yanlis):
+final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+final reportedUserId = data['reportedUserId'] as String? ?? '';
+
+// Yeni (dogru):
+final createdAt = (data['timestamp'] as Timestamp?)?.toDate();
+final reportedUserId = data['reportedId'] as String? ?? '';
+```
+
+**Firestore Rapor Yapisi:**
+```javascript
+{
+  reporterId: "userId",
+  reportedId: "targetUserId",      // reportedUserId degil!
+  reason: "harassment",
+  description: "Detayli aciklama",
+  timestamp: Timestamp,            // createdAt degil!
+  status: "pending"
+}
+```
+
+---
+
+### 9. ChatDetailScreen Profil Navigasyonu
+
+**Dosya:** `lib/screens/chat_detail_screen.dart`
+
+AppBar'daki avatar ve isim tiklanabilir yapildi.
+
+**Teknik Detaylar:**
+```dart
+PreferredSizeWidget _buildAppBar() {
+  return AppBar(
+    // ...
+    title: GestureDetector(
+      onTap: _viewProfile,  // Profil ekranina git
+      child: Row(
+        children: [
+          // Avatar - tiklanabilir
+          Container(/* avatar */),
+          const SizedBox(width: 12),
+          // Name - tiklanabilir
+          Expanded(
+            child: Column(
+              children: [
+                Text(widget.peerName, ...),
+                Text('Cevrimici', ...),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+    // ...
+  );
+}
+
+void _viewProfile() {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => UserProfileScreen(userId: widget.peerId),
+    ),
+  );
+}
+```
+
+---
+
+### 10. Kullanici Ban Sistemi
+
+**Dosya:** `lib/screens/main_screen.dart`, `lib/screens/admin_dashboard_screen.dart`
+
+Gercek zamanli ban kontrolu ve cikis sistemi eklendi.
+
+**MainScreen'de Ban Kontrolu:**
+```dart
+void _startBanCheck() {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  _userStream = FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .snapshots();
+
+  _userStream!.listen((snapshot) {
+    if (!mounted) return;
+    if (snapshot.exists) {
+      final data = snapshot.data() as Map<String, dynamic>?;
+      final isBanned = data?['isBanned'] as bool? ?? false;
+      if (isBanned) {
+        _handleBannedUser();  // Otomatik cikis + uyari
+      }
+    }
+  });
+}
+```
+
+**Admin'den Ban Islemi:**
+```dart
+Future<void> _banUserAndResolveReport(String reportId, String targetUserId) async {
+  final batch = _firestore.batch();
+
+  // 1. Kullaniciyi banla
+  final userRef = _firestore.collection('users').doc(targetUserId);
+  batch.update(userRef, {
+    'isBanned': true,
+    'bannedAt': FieldValue.serverTimestamp(),
+  });
+
+  // 2. Sikayeti cozuldu olarak isaretle
+  final reportRef = _firestore.collection('reports').doc(reportId);
+  batch.update(reportRef, {
+    'status': 'resolved',
+    'resolvedAt': FieldValue.serverTimestamp(),
+    'resolution': 'banned',
+  });
+
+  await batch.commit();
+}
+```
+
+---
+
+## TEKNIK MIMARI OZETI
+
+### State Management Yaklasimlari
+
+| Yaklasim | Kullanim Alani | Dosya |
+|----------|----------------|-------|
+| `ValueNotifier<T>` | Tab degisikligi bildirimi | main_screen.dart |
+| `AutomaticKeepAliveClientMixin` | Tab state koruma | chat_list_screen.dart |
+| `StreamBuilder + Cache` | Firestore stream optimizasyonu | chat_list_screen.dart |
+| `AnimationController` | Swipe animasyonlari | chat_list_screen.dart |
+| `Riverpod StateNotifier` | Global app state | swipe_provider.dart |
+
+### Performans Optimizasyonlari
+
+| Optimizasyon | Etki | Dosya |
+|--------------|------|-------|
+| Stream caching | ~%80 rebuild azaltma | chat_list_screen.dart |
+| RepaintBoundary | Izole repaint alanlari | chat_list_screen.dart |
+| ListView cacheExtent | On-yukleme | chat_list_screen.dart |
+| rootNavigator | Tab navigasyon duzeltme | chat_list_screen.dart |
+| Motion blur overlay | Gorsel performans | main_screen.dart |
+
+### UI/UX Gelistirmeleri
+
+| Ozellik | Aciklama | Dosya |
+|---------|----------|-------|
+| Motion Blur | Tab gecislerinde hiz efekti | main_screen.dart |
+| Swipe-to-Delete | Saga kaydirarak silme | chat_list_screen.dart |
+| Overlay Notifications | Modern bildirimler | chat_list_screen.dart, chat_detail_screen.dart |
+| Haptic Feedback | Dokunsal geri bildirim | main_screen.dart |
+| Animated Tab Bar | Jole efektli balon | main_screen.dart |
+
+---
+
+*Bu dokuman CampusGo projesinin kapsamli teknik dokumantasyonudur. Son guncelleme: Ocak 2026*

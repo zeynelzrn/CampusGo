@@ -3,10 +3,12 @@ import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:overlay_support/overlay_support.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import 'chat_detail_screen.dart';
+import 'main_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -15,12 +17,82 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen>
+    with RouteAware, AutomaticKeepAliveClientMixin<ChatListScreen> {
   final ChatService _chatService = ChatService();
   final UserService _userService = UserService();
 
+  // Swipe action için açık olan chat id'si - ValueNotifier ile rebuild önlenir
+  final ValueNotifier<String?> _openSwipeActionChatId = ValueNotifier(null);
+
+  // Animasyon sadece ilk yüklemede çalışsın
+  bool _initialLoadComplete = false;
+
+  // Chat tab index'i (MainScreen'deki sıralama)
+  static const int _chatTabIndex = 3;
+
+  // OPTIMIZATION: Stream'leri initState'de oluştur, rebuild'de yeniden oluşturma
+  late final Stream<Set<String>> _restrictedUsersStream;
+  late final Stream<List<Chat>> _chatsStream;
+  late final Stream<int> _unreadCountStream;
+
+  @override
+  bool get wantKeepAlive => true; // Tab değişiminde state'i koru
+
+  @override
+  void initState() {
+    super.initState();
+
+    // OPTIMIZATION: Stream'leri bir kez oluştur ve cache'le
+    _restrictedUsersStream = _userService.watchAllRestrictedUserIds();
+    _chatsStream = _chatService.watchChats();
+    _unreadCountStream = _chatService.watchUnreadCount();
+
+    // Tab değişikliğini dinle - başka tab'a geçildiğinde swipe'ı kapat
+    MainScreen.currentTabNotifier.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    // Chat tab'ından ayrıldığında tüm swipe action'ları kapat
+    if (MainScreen.currentTabNotifier.value != _chatTabIndex) {
+      _openSwipeActionChatId.value = null;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Route observer'a kayıt ol
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      RouteObserver<PageRoute>? observer;
+      try {
+        observer = Navigator.of(context).widget.observers
+            .whereType<RouteObserver<PageRoute>>()
+            .firstOrNull;
+        observer?.subscribe(this, route);
+      } catch (_) {}
+    }
+  }
+
+  @override
+  void didPopNext() {
+    // Başka sayfadan geri dönüldüğünde sil butonunu kapat
+    _openSwipeActionChatId.value = null;
+  }
+
+  @override
+  void dispose() {
+    MainScreen.currentTabNotifier.removeListener(_onTabChanged);
+    _openSwipeActionChatId.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // CRITICAL: AutomaticKeepAliveClientMixin için super.build çağrılmalı
+    super.build(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
@@ -28,65 +100,71 @@ class _ChatListScreenState extends State<ChatListScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: StreamBuilder<Set<String>>(
-                // Get ALL restricted user IDs (BLACKLIST: blocked_users + blocked_by)
-                // This ensures MUTUAL INVISIBILITY - if either user blocked the other,
-                // the chat is hidden for both
-                stream: _userService.watchAllRestrictedUserIds(),
-                builder: (context, restrictedSnapshot) {
-                  final restrictedIds = restrictedSnapshot.data ?? <String>{};
+              // OPTIMIZATION: RepaintBoundary ile liste güncellemelerini izole et
+              child: RepaintBoundary(
+                child: StreamBuilder<Set<String>>(
+                  // OPTIMIZATION: Cached stream kullan - her build'de yeniden oluşturma
+                  stream: _restrictedUsersStream,
+                  builder: (context, restrictedSnapshot) {
+                    final restrictedIds = restrictedSnapshot.data ?? <String>{};
 
-                  return StreamBuilder<List<Chat>>(
-                    stream: _chatService.watchChats(),
-                    builder: (context, chatSnapshot) {
-                      if (chatSnapshot.connectionState == ConnectionState.waiting) {
-                        return _buildLoadingState();
-                      }
-
-                      if (chatSnapshot.hasError) {
-                        // Detayli hata loglama
-                        final error = chatSnapshot.error;
-                        debugPrint('========== CHAT ERROR ==========');
-                        debugPrint('Error Type: ${error.runtimeType}');
-                        debugPrint('Error Message: $error');
-                        debugPrint('Stack Trace: ${chatSnapshot.stackTrace}');
-                        debugPrint('=================================');
-
-                        // Index hatasi kontrolu
-                        final errorStr = error.toString();
-                        if (errorStr.contains('index') || errorStr.contains('Index')) {
-                          debugPrint('>>> COMPOSITE INDEX GEREKIYOR! <<<');
-                          debugPrint('Firebase Console\'da index olusturun veya asagidaki linke tiklayin.');
-                        }
-                        if (errorStr.contains('permission') || errorStr.contains('Permission')) {
-                          debugPrint('>>> PERMISSION DENIED! Firestore Rules kontrol edin. <<<');
+                    return StreamBuilder<List<Chat>>(
+                      // OPTIMIZATION: Cached stream kullan
+                      stream: _chatsStream,
+                      builder: (context, chatSnapshot) {
+                        if (chatSnapshot.connectionState == ConnectionState.waiting &&
+                            !chatSnapshot.hasData) {
+                          return _buildLoadingState();
                         }
 
-                        return _buildErrorState(errorStr);
-                      }
+                        if (chatSnapshot.hasError) {
+                          final error = chatSnapshot.error;
+                          debugPrint('========== CHAT ERROR ==========');
+                          debugPrint('Error Type: ${error.runtimeType}');
+                          debugPrint('Error Message: $error');
+                          debugPrint('Stack Trace: ${chatSnapshot.stackTrace}');
+                          debugPrint('=================================');
 
-                      final allChats = chatSnapshot.data ?? [];
+                          final errorStr = error.toString();
+                          if (errorStr.contains('index') || errorStr.contains('Index')) {
+                            debugPrint('>>> COMPOSITE INDEX GEREKIYOR! <<<');
+                            debugPrint('Firebase Console\'da index olusturun veya asagidaki linke tiklayin.');
+                          }
+                          if (errorStr.contains('permission') || errorStr.contains('Permission')) {
+                            debugPrint('>>> PERMISSION DENIED! Firestore Rules kontrol edin. <<<');
+                          }
 
-                      // Filter out ALL restricted users (BLACKLIST)
-                      // This includes:
-                      // 1. Users I blocked (blocked_users)
-                      // 2. Users who blocked me (blocked_by)
-                      final chats = allChats.where((chat) {
-                        final isRestricted = restrictedIds.contains(chat.peerId);
-                        if (isRestricted) {
-                          debugPrint('Filtering out RESTRICTED user: ${chat.peerName} (${chat.peerId})');
+                          return _buildErrorState(errorStr);
                         }
-                        return !isRestricted;
-                      }).toList();
 
-                      if (chats.isEmpty) {
-                        return _buildEmptyState();
-                      }
+                        final allChats = chatSnapshot.data ?? [];
 
-                      return _buildChatList(chats);
-                    },
-                  );
-                },
+                        // Filter out ALL restricted users (BLACKLIST)
+                        final chats = allChats.where((chat) {
+                          final isRestricted = restrictedIds.contains(chat.peerId);
+                          return !isRestricted;
+                        }).toList();
+
+                        if (chats.isEmpty) {
+                          return _buildEmptyState();
+                        }
+
+                        // İlk yükleme tamamlandı
+                        if (!_initialLoadComplete) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              setState(() {
+                                _initialLoadComplete = true;
+                              });
+                            }
+                          });
+                        }
+
+                        return _buildChatList(chats);
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -96,70 +174,73 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+    return RepaintBoundary(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-              borderRadius: BorderRadius.circular(12),
+              child: const Icon(
+                Icons.chat_bubble_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
             ),
-            child: const Icon(
-              Icons.chat_bubble_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sohbetler',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[800],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sohbetler',
+                    style: GoogleFonts.poppins(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
                   ),
-                ),
-                StreamBuilder<int>(
-                  stream: _chatService.watchUnreadCount(),
-                  builder: (context, snapshot) {
-                    final unreadCount = snapshot.data ?? 0;
-                    return Text(
-                      unreadCount > 0
-                          ? '$unreadCount okunmamis mesaj'
-                          : 'Tum mesajlar okundu',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: unreadCount > 0
-                            ? const Color(0xFF5C6BC0)
-                            : Colors.grey[600],
-                        fontWeight:
-                            unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                    );
-                  },
-                ),
-              ],
+                  StreamBuilder<int>(
+                    // OPTIMIZATION: Cached stream kullan
+                    stream: _unreadCountStream,
+                    builder: (context, snapshot) {
+                      final unreadCount = snapshot.data ?? 0;
+                      return Text(
+                        unreadCount > 0
+                            ? '$unreadCount okunmamis mesaj'
+                            : 'Tum mesajlar okundu',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          color: unreadCount > 0
+                              ? const Color(0xFF5C6BC0)
+                              : Colors.grey[600],
+                          fontWeight:
+                              unreadCount > 0 ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -382,6 +463,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: chats.length,
+      // OPTIMIZATION: Önceden render et ve cache'le
+      addAutomaticKeepAlives: true,
+      cacheExtent: 500, // Görünür alanın dışında 500px cache'le
       itemBuilder: (context, index) {
         final chat = chats[index];
         return _buildChatCard(chat, index);
@@ -392,6 +476,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget _buildChatCard(Chat chat, int index) {
     final currentUserId = _chatService.currentUserId ?? '';
     final hasUnread = chat.hasUnreadFor(currentUserId);
+
+    final cardWidget = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: _SwipeableChatCard(
+        chat: chat,
+        hasUnread: hasUnread,
+        openChatIdNotifier: _openSwipeActionChatId,
+        onTap: () => _openChatDetail(chat),
+        onDelete: () => _showDeleteConfirmDialog(chat),
+        buildAvatar: () => _buildAvatar(chat),
+      ),
+    );
+
+    // Animasyon sadece ilk yüklemede çalışsın
+    if (_initialLoadComplete) {
+      return cardWidget;
+    }
 
     return TweenAnimationBuilder<double>(
       duration: Duration(milliseconds: 300 + (index * 50)),
@@ -405,116 +506,281 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         );
       },
-      child: GestureDetector(
-        onTap: () => _openChatDetail(chat),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: hasUnread ? const Color(0xFFFFF0F3) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: hasUnread
-                ? Border.all(
-                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
-                    width: 1,
-                  )
-                : null,
-            boxShadow: [
-              BoxShadow(
-                color: hasUnread
-                    ? const Color(0xFF5C6BC0).withValues(alpha: 0.1)
-                    : Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Profile photo with online indicator
-              _buildAvatar(chat),
-              const SizedBox(width: 12),
+      child: cardWidget,
+    );
+  }
 
-              // Name and last message
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            chat.peerName,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight:
-                                  hasUnread ? FontWeight.bold : FontWeight.w600,
-                              color: Colors.grey[800],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (hasUnread)
-                          Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                              ),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      chat.lastMessage ?? 'Yeni esleme! Merhaba de!',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: hasUnread ? Colors.grey[800] : Colors.grey[500],
-                        fontWeight:
-                            hasUnread ? FontWeight.w500 : FontWeight.normal,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+  void _showDeleteConfirmDialog(Chat chat) {
+    // Önce swipe action'ı kapat
+    _openSwipeActionChatId.value = null;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.shade300.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red.shade400,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Sohbeti Sil',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
                 ),
               ),
-
-              // Time and arrow
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${chat.peerName} ile olan sohbeti silmek istediginize emin misiniz?',
+              style: GoogleFonts.poppins(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Row(
                 children: [
-                  Text(
-                    chat.formattedTime,
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: hasUnread
-                          ? const Color(0xFF5C6BC0)
-                          : Colors.grey[400],
-                      fontWeight:
-                          hasUnread ? FontWeight.w600 : FontWeight.normal,
+                  const Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bu kisi size tekrar mesaj atarsa yeni bir sohbet olusacaktir.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.orange[800],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: hasUnread
-                        ? const Color(0xFF5C6BC0)
-                        : Colors.grey[400],
-                    size: 24,
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Iptal',
+              style: GoogleFonts.poppins(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await _deleteChat(chat);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade400,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: Text(
+              'Sil',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _deleteChat(Chat chat) async {
+    final success = await _chatService.deleteChat(chat.id);
+
+    if (success) {
+      // Show modern green overlay notification
+      showOverlayNotification(
+        (context) {
+          return SafeArea(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade500, Colors.green.shade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.delete_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Sohbet Silindi',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '${chat.peerName} ile sohbet kaldirildi',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        duration: const Duration(seconds: 3),
+        position: NotificationPosition.top,
+      );
+    } else {
+      // Show error notification
+      showOverlayNotification(
+        (context) {
+          return SafeArea(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.red.shade500, Colors.red.shade400],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.4),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Hata Olustu',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Sohbet silinemedi. Lutfen tekrar deneyin.',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white.withValues(alpha: 0.7),
+                          size: 22,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        duration: const Duration(seconds: 4),
+        position: NotificationPosition.top,
+      );
+    }
   }
 
   Widget _buildAvatar(Chat chat) {
@@ -577,17 +843,310 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   void _openChatDetail(Chat chat) {
-    // Mark as read when opening
+    // Swipe action'ı kapat (setState yok, sadece ValueNotifier)
+    _openSwipeActionChatId.value = null;
+
+    // Context kontrolü
+    if (!mounted) return;
+
+    // Mark as read - fire and forget (await yok, UI bloklama yok)
     _chatService.markChatAsRead(chat.id);
 
-    Navigator.push(
-      context,
+    // DÜZELTME: rootNavigator kullan (Tab yapısı içinde olduğumuz için)
+    // addPostFrameCallback kaldırıldı - navigasyonu geciktirip kilitlemeye neden oluyordu
+    Navigator.of(context, rootNavigator: true).push(
       CupertinoPageRoute(
-        builder: (context) => ChatDetailScreen(
+        builder: (_) => ChatDetailScreen(
           chatId: chat.id,
           peerName: chat.peerName,
           peerImage: chat.peerImage,
           peerId: chat.peerId,
+        ),
+      ),
+    );
+  }
+}
+
+/// Swipeable Chat Card - Kendi animasyon state'ini yöneten widget
+class _SwipeableChatCard extends StatefulWidget {
+  final Chat chat;
+  final bool hasUnread;
+  final ValueNotifier<String?> openChatIdNotifier;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final Widget Function() buildAvatar;
+
+  const _SwipeableChatCard({
+    required this.chat,
+    required this.hasUnread,
+    required this.openChatIdNotifier,
+    required this.onTap,
+    required this.onDelete,
+    required this.buildAvatar,
+  });
+
+  @override
+  State<_SwipeableChatCard> createState() => _SwipeableChatCardState();
+}
+
+class _SwipeableChatCardState extends State<_SwipeableChatCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  static const double _maxSlide = 80;
+
+  bool get _isOpen => widget.openChatIdNotifier.value == widget.chat.id;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+
+    // Başlangıçta açık mı kontrol et
+    if (_isOpen) {
+      _controller.value = 1.0;
+    }
+
+    // ValueNotifier'ı dinle
+    widget.openChatIdNotifier.addListener(_onOpenChatIdChanged);
+  }
+
+  void _onOpenChatIdChanged() {
+    if (_isOpen && _controller.value < 1.0) {
+      _controller.forward();
+    } else if (!_isOpen && _controller.value > 0.0) {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.openChatIdNotifier.removeListener(_onOpenChatIdChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+
+    // Hızlı sola kaydırma
+    if (velocity < -300) {
+      _controller.forward();
+      widget.openChatIdNotifier.value = widget.chat.id;
+      return;
+    }
+
+    // Hızlı sağa kaydırma
+    if (velocity > 300) {
+      _controller.reverse();
+      if (_isOpen) widget.openChatIdNotifier.value = null;
+      return;
+    }
+
+    // Yavaş kaydırma - yarıdan fazlaysa aç
+    if (_controller.value > 0.5) {
+      _controller.forward();
+      widget.openChatIdNotifier.value = widget.chat.id;
+    } else {
+      _controller.reverse();
+      if (_isOpen) widget.openChatIdNotifier.value = null;
+    }
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    final delta = details.primaryDelta ?? 0;
+    _controller.value -= delta / _maxSlide;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        height: 84,
+        child: Stack(
+          children: [
+            // Delete button (arkada, sabit)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: _maxSlide,
+              child: GestureDetector(
+                onTap: widget.onDelete,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade300,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Sil',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Chat card (önde, kaydırılabilir)
+            RepaintBoundary(
+              child: ListenableBuilder(
+                listenable: _controller,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(-_maxSlide * _controller.value, 0),
+                    child: child,
+                  );
+                },
+                child: GestureDetector(
+                  onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                  onHorizontalDragEnd: _onHorizontalDragEnd,
+                  onTap: () {
+                    if (_controller.value > 0) {
+                      _controller.reverse();
+                      widget.openChatIdNotifier.value = null;
+                    } else {
+                      widget.onTap();
+                    }
+                  },
+                  child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: widget.hasUnread
+                        ? const Color(0xFFFFF0F3)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: widget.hasUnread
+                        ? Border.all(
+                            color:
+                                const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                            width: 1,
+                          )
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.hasUnread
+                            ? const Color(0xFF5C6BC0).withValues(alpha: 0.1)
+                            : Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // Profile photo
+                      widget.buildAvatar(),
+                      const SizedBox(width: 12),
+
+                      // Name and last message
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    widget.chat.peerName,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      fontWeight: widget.hasUnread
+                                          ? FontWeight.bold
+                                          : FontWeight.w600,
+                                      color: Colors.grey[800],
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (widget.hasUnread)
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 8),
+                                    width: 10,
+                                    height: 10,
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Color(0xFF5C6BC0),
+                                          Color(0xFF7986CB)
+                                        ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.chat.lastMessage ??
+                                  'Yeni esleme! Merhaba de!',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                color: widget.hasUnread
+                                    ? Colors.grey[800]
+                                    : Colors.grey[500],
+                                fontWeight: widget.hasUnread
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Time and arrow
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            widget.chat.formattedTime,
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: widget.hasUnread
+                                  ? const Color(0xFF5C6BC0)
+                                  : Colors.grey[400],
+                              fontWeight: widget.hasUnread
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: widget.hasUnread
+                                ? const Color(0xFF5C6BC0)
+                                : Colors.grey[400],
+                            size: 24,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            ),
+          ],
         ),
       ),
     );

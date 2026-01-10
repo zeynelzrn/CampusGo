@@ -32,8 +32,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // Admin durumu (Firestore'dan yüklenir)
   bool _isAdmin = false;
 
-  // Admin password for Debug Panel access
-  static const String _adminPassword = 'campus2025';
 
   @override
   void initState() {
@@ -941,128 +939,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // ==================== DEBUG PANEL ====================
 
-  /// Shows admin login dialog with password protection.
-  /// Calls [onSuccess] callback only if correct password is entered.
-  void _showAdminLoginDialog({required VoidCallback onSuccess}) {
-    final passwordController = TextEditingController();
-    String? errorText;
-
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.lock_rounded,
-                  color: Colors.deepPurple,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Gelistirici Erisimi',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bu bolume erisim icin admin sifresi gereklidir.',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Admin sifresi',
-                  filled: true,
-                  fillColor: Colors.grey[100],
-                  prefixIcon: const Icon(Icons.key_rounded, color: Colors.deepPurple),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  errorText: errorText,
-                  errorStyle: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Colors.red,
-                  ),
-                ),
-                onSubmitted: (_) {
-                  if (passwordController.text == _adminPassword) {
-                    Navigator.pop(dialogContext);
-                    onSuccess();
-                  } else {
-                    setDialogState(() {
-                      errorText = 'Yanlis sifre!';
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: Text(
-                'Iptal',
-                style: GoogleFonts.poppins(color: Colors.grey[600]),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (passwordController.text == _adminPassword) {
-                  Navigator.pop(dialogContext);
-                  onSuccess();
-                } else {
-                  setDialogState(() {
-                    errorText = 'Yanlis sifre!';
-                  });
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(
-                'Giris',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildDebugPanel() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1104,9 +980,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
           ),
           child: ListTile(
-            onTap: () => _showAdminLoginDialog(
-              onSuccess: _showAdminMenu,
-            ),
+            onTap: _showAdminMenu,
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -1125,7 +999,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             title: Text(
-              'Gelistirici Erisimi',
+              'Gelistirici Araclari',
               style: GoogleFonts.poppins(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -1133,23 +1007,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             subtitle: Text(
-              'Debug araclarina erisin',
+              'Debug ve test araclari',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 color: Colors.grey[600],
               ),
             ),
-            trailing: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.lock_rounded,
-                color: Colors.deepPurple[400],
-                size: 18,
-              ),
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.deepPurple[400],
+              size: 24,
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             shape: RoundedRectangleBorder(
@@ -1161,7 +1028,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  /// Shows Admin Menu bottom sheet after successful password entry
+  /// Shows Admin Menu bottom sheet for admin users
   void _showAdminMenu() {
     showModalBottomSheet(
       context: context,
