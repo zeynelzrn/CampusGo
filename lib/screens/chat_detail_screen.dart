@@ -6,6 +6,7 @@ import 'package:overlay_support/overlay_support.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
+import '../widgets/modern_animated_dialog.dart';
 import 'user_profile_screen.dart';
 
 class ChatDetailScreen extends StatefulWidget {
@@ -700,7 +701,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UserProfileScreen(userId: widget.peerId),
+        builder: (context) => UserProfileScreen(
+          userId: widget.peerId,
+          onUserBlocked: (blockedUserId) {
+            // Kullanıcı engellendiğinde hem profil hem chat ekranını kapat
+            // ChatListScreen'e kadar tüm ekranları kapat
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        ),
       ),
     );
   }
@@ -725,43 +733,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
 
   void _showClearChatDialog() {
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Sohbeti Temizle?',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Bu sohbet gecmisi kalici olarak silinecek. Bu islem geri alinamaz.',
-          style: GoogleFonts.poppins(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _clearChat();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Temizle',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.cleaning_services_rounded,
+        title: 'Sohbeti Temizle',
+        subtitle: 'Bu sohbet geçmişi kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+        cancelText: 'İptal',
+        confirmText: 'Temizle',
+        confirmButtonColor: Colors.orange,
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _clearChat();
+        },
       ),
     );
   }
@@ -978,107 +964,39 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
 
   void _showBlockDialog() {
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.block_rounded, color: Colors.red, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Kullaniciyi Engelle',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.block_rounded,
+        title: 'Kullanıcıyı Engelle',
+        subtitle: '${widget.peerName} adlı kullanıcıyı engellemek istediğinize emin misiniz?',
+        content: const DialogInfoBox(
+          icon: Icons.warning_amber_rounded,
+          text: 'Bu kişi size mesaj atamaz ve profilinizi göremez.',
+          color: Colors.orange,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${widget.peerName} adli kullaniciyi engellemek istediginize emin misiniz?',
-              style: GoogleFonts.poppins(fontSize: 15),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bu kisi size mesaj atamaz ve profilinizi goremez.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.orange[800],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _blockUser();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: Text(
-              'Engelle',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        cancelText: 'İptal',
+        confirmText: 'Engelle',
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _blockUser();
+        },
       ),
     );
   }
 
   Future<void> _blockUser() async {
     // Show loading indicator
-    showDialog(
+    showModernDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Engelleniyor...',
+          color: Colors.red,
         ),
       ),
     );
@@ -1090,50 +1008,112 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       Navigator.pop(context);
 
       if (success) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${widget.peerName} engellendi',
-                    style: GoogleFonts.poppins(),
+        // Show success notification
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade500, Colors.green.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.block_rounded, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Kullanıcı Engellendi',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${widget.peerName} artık size ulaşamaz',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 2),
-          ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
         );
 
-        // Navigate back to chat list (user shouldn't stay in blocked person's chat)
+        // Navigate back to chat list
         Navigator.pop(context);
       } else {
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Engelleme basarisiz oldu. Lutfen tekrar deneyin.',
-                    style: GoogleFonts.poppins(),
+        // Show error notification
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.red.shade500, Colors.red.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Engelleme başarısız oldu. Lütfen tekrar deneyin.',
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
         );
       }
     }

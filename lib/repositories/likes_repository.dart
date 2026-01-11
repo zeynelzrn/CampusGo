@@ -12,6 +12,7 @@ class LikesRepository {
 
   /// Watch received likes in real-time
   /// Returns a Stream of UserProfiles who have liked the current user
+  /// Sorted by timestamp (newest first)
   Stream<List<UserProfile>> watchReceivedLikes() {
     final userId = currentUserId;
     if (userId == null) {
@@ -25,7 +26,7 @@ class LikesRepository {
         .snapshots()
         .asyncMap((actionsSnapshot) async {
       // Step 1: Filter only likes and superLikes
-      final likeActions = actionsSnapshot.docs.where((doc) {
+      var likeActions = actionsSnapshot.docs.where((doc) {
         final type = doc.data()['type'] as String?;
         return type == 'like' || type == 'superlike';
       }).toList();
@@ -34,7 +35,17 @@ class LikesRepository {
         return <UserProfile>[];
       }
 
-      // Collect fromUserIds
+      // Sort by timestamp (newest first) - client-side sorting
+      likeActions.sort((a, b) {
+        final aTimestamp = a.data()['timestamp'] as Timestamp?;
+        final bTimestamp = b.data()['timestamp'] as Timestamp?;
+        if (aTimestamp == null && bTimestamp == null) return 0;
+        if (aTimestamp == null) return 1;
+        if (bTimestamp == null) return -1;
+        return bTimestamp.compareTo(aTimestamp); // Descending (newest first)
+      });
+
+      // Collect fromUserIds (now in sorted order)
       final likedByUserIds =
           likeActions.map((doc) => doc.data()['fromUserId'] as String).toList();
 
@@ -214,6 +225,7 @@ class LikesRepository {
   }
 
   /// Dismiss a user from the likes list (after disliking, remove from view)
+  /// Uses set instead of update to create the document if it doesn't exist
   Future<Map<String, dynamic>> dismissUser(String targetUserId) async {
     final userId = currentUserId;
     if (userId == null) {
@@ -223,8 +235,12 @@ class LikesRepository {
     try {
       final actionId = '${userId}_$targetUserId';
 
-      await _firestore.collection('actions').doc(actionId).update({
+      // set kullanarak doküman yoksa oluştur, varsa güncelle
+      await _firestore.collection('actions').doc(actionId).set({
+        'fromUserId': userId,
+        'toUserId': targetUserId,
         'type': 'dismissed',
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       return {'success': true};

@@ -140,6 +140,7 @@ class UserService {
   }
 
   /// Unblock a user
+  /// Also updates the action timestamp so the user appears as "new" in likes list
   Future<bool> unblockUser(String targetUserId) async {
     final currentUid = currentUserId;
     if (currentUid == null) return false;
@@ -162,11 +163,40 @@ class UserService {
       batch.delete(reverseBlockRef);
 
       await batch.commit();
+
+      // Update the action timestamp so user appears as "new" in likes list
+      // This makes the unblocked user appear at the top/bottom based on sort order
+      await _updateActionTimestamp(targetUserId, currentUid);
+
       debugPrint('UserService: Successfully unblocked user $targetUserId');
       return true;
     } catch (e) {
       debugPrint('UserService: Error unblocking user: $e');
       return false;
+    }
+  }
+
+  /// Update the timestamp of an action document to make it appear as "new"
+  Future<void> _updateActionTimestamp(String fromUserId, String toUserId) async {
+    try {
+      final actionId = '${fromUserId}_$toUserId';
+      final actionDoc = await _firestore.collection('actions').doc(actionId).get();
+
+      if (actionDoc.exists) {
+        final data = actionDoc.data();
+        final type = data?['type'] as String?;
+
+        // Only update if it's a like or superlike (not dismissed/dislike)
+        if (type == 'like' || type == 'superlike') {
+          await _firestore.collection('actions').doc(actionId).update({
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+          debugPrint('UserService: Updated action timestamp for $actionId');
+        }
+      }
+    } catch (e) {
+      debugPrint('UserService: Error updating action timestamp: $e');
+      // Don't throw - this is a non-critical operation
     }
   }
 

@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
@@ -25,13 +24,11 @@ class _CustomPageScrollBehavior extends ScrollBehavior {
       };
 }
 
-/// Motion Blur efektli sayfa geçiş widget'ı
+/// Dikey scroll kilitleme özellikli PageView
 ///
 /// Özellikler:
-/// 1. Dikey scroll sırasında yatay sayfa geçişini engeller
-/// 2. Sayfa geçişlerinde yatay motion blur efekti uygular
-/// 3. Blur yoğunluğu geçişin ortasında maksimum olur
-/// 4. Yön duyarlı: soldan sağa veya sağdan sola blur
+/// - Dikey scroll sırasında yatay sayfa geçişini engeller
+/// - Standart sade kaydırma davranışı
 class _DirectionalLockPageView extends StatefulWidget {
   final PageController controller;
   final ValueChanged<int> onPageChanged;
@@ -53,42 +50,9 @@ class _DirectionalLockPageViewState extends State<_DirectionalLockPageView> {
   bool _directionDetermined = false;
   bool _isVerticalScroll = false;
 
-  // Motion blur için
-  double _blurIntensity = 0.0;
-  static const double _maxBlur = 8.0; // Maksimum blur sigma değeri
-
   // Eşik değerleri
   static const double _directionThreshold = 12.0;
   static const double _verticalRatio = 1.3;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onScroll);
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!widget.controller.hasClients) return;
-
-    final page = widget.controller.page ?? 0.0;
-    // Sayfa pozisyonunun tam sayıya olan uzaklığı (0-0.5 arası)
-    final distanceFromInt = (page - page.round()).abs();
-
-    // Blur yoğunluğu: 0.5'te maksimum (geçişin ortası)
-    // Sinüsoidal eğri ile daha doğal his
-    final normalizedDistance = distanceFromInt * 2; // 0-1 arası normalize
-    final blurCurve = Curves.easeInOutCubic.transform(normalizedDistance);
-
-    setState(() {
-      _blurIntensity = blurCurve * _maxBlur;
-    });
-  }
 
   void _onPointerDown(PointerDownEvent event) {
     _initialPosition = event.position;
@@ -141,38 +105,14 @@ class _DirectionalLockPageViewState extends State<_DirectionalLockPageView> {
       onPointerCancel: _onPointerCancel,
       child: ScrollConfiguration(
         behavior: _CustomPageScrollBehavior(),
-        child: Stack(
-          children: [
-            // Ana PageView
-            PageView(
-              controller: widget.controller,
-              onPageChanged: widget.onPageChanged,
-              physics: _isVerticalScroll
-                  ? const NeverScrollableScrollPhysics()
-                  : const PageScrollPhysics(),
-              allowImplicitScrolling: true,
-              children: widget.children,
-            ),
-            // Motion Blur Overlay - Güçlendirilmiş hız efekti
-            if (_blurIntensity > 0.1)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 50),
-                    opacity: (_blurIntensity / _maxBlur).clamp(0.0, 0.6),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(
-                        sigmaX: _blurIntensity,
-                        sigmaY: 0, // Sadece yatay blur
-                      ),
-                      child: Container(
-                        color: Colors.transparent,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+        child: PageView(
+          controller: widget.controller,
+          onPageChanged: widget.onPageChanged,
+          physics: _isVerticalScroll
+              ? const NeverScrollableScrollPhysics()
+              : const PageScrollPhysics(),
+          allowImplicitScrolling: true,
+          children: widget.children,
         ),
       ),
     );

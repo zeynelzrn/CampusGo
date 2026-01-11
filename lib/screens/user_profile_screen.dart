@@ -1,30 +1,48 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:overlay_support/overlay_support.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../models/user_profile.dart';
+import '../widgets/modern_animated_dialog.dart';
+import '../providers/likes_provider.dart';
 
-class UserProfileScreen extends StatefulWidget {
+class UserProfileScreen extends ConsumerStatefulWidget {
   final String userId;
 
   /// Optional preview profile - if provided, skip Firestore fetch
   /// Used for real-time preview in ProfileEditScreen
   final UserProfile? previewProfile;
 
+  /// Callback when user is blocked - used to update parent screen's state
+  final void Function(String blockedUserId)? onUserBlocked;
+
+  /// Optional like callback - if provided, shows like/dislike buttons
+  /// Used when coming from Likes screen
+  final VoidCallback? onLike;
+
+  /// Optional dislike callback - if provided, shows like/dislike buttons
+  /// Used when coming from Likes screen
+  final VoidCallback? onDislike;
+
   const UserProfileScreen({
     super.key,
     required this.userId,
     this.previewProfile,
+    this.onUserBlocked,
+    this.onLike,
+    this.onDislike,
   });
 
   @override
-  State<UserProfileScreen> createState() => _UserProfileScreenState();
+  ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
+class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   final ChatService _chatService = ChatService();
   final UserService _userService = UserService();
   UserProfile? _profile;
@@ -35,6 +53,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   /// Check if viewing own profile (Preview Mode)
   bool get _isOwnProfile => _userService.currentUserId == widget.userId;
+
+  /// Check if like/dislike buttons should be shown
+  bool get _showLikeDislikeButtons => widget.onLike != null || widget.onDislike != null;
 
   /// Check if a photo path is a local file (not a network URL)
   bool _isLocalFile(String path) {
@@ -153,6 +174,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           _isBlocked = false;
         }
       });
+
+      if (success) {
+        // Kullanıcıyı local state'den temizle (filtreye takılmasın)
+        ref.read(likesUIProvider.notifier).restoreUser(widget.userId);
+
+        // Provider'ları invalidate et - likes listesi yenilensin
+        ref.invalidate(receivedLikesProvider);
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -408,66 +437,190 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _showUnblockDialog() {
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.lock_open, color: Colors.green, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Engeli Kaldir',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Bu kullanicinin engelini kaldirmak istediginize emin misiniz?\n\nEngel kaldirildiktan sonra bu kisi size mesaj atabilir ve profilinizi gorebilir.',
-          style: GoogleFonts.poppins(fontSize: 15),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _unblockUser();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Engeli Kaldir',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.success,
+        icon: Icons.lock_open_rounded,
+        title: 'Engeli Kaldır',
+        subtitle: 'Bu kullanıcının engelini kaldırmak istediğinize emin misiniz?\n\nEngel kaldırıldıktan sonra bu kişi size mesaj atabilir ve profilinizi görebilir.',
+        cancelText: 'İptal',
+        confirmText: 'Engeli Kaldır',
+        confirmButtonColor: Colors.green,
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _unblockUser();
+        },
       ),
     );
+  }
+
+  /// Kullanıcıyı engelleme dialogu göster
+  void _showBlockUserDialog() {
+    HapticFeedback.mediumImpact();
+
+    final userName = _profile?.name ?? 'Bu kullanıcı';
+
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.block_rounded,
+        title: 'Kullanıcıyı Engelle',
+        subtitle: '$userName adlı kullanıcıyı engellemek istediğine emin misin?',
+        content: const DialogInfoBox(
+          icon: Icons.warning_amber_rounded,
+          text: 'Birbirinizi bir daha göremeyecek ve mesajlaşamayacaksınız.',
+          color: Colors.orange,
+        ),
+        cancelText: 'İptal',
+        confirmText: 'Engelle',
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _blockUserFromProfile();
+        },
+      ),
+    );
+  }
+
+  /// Kullanıcıyı engelle ve profil ekranını kapat
+  Future<void> _blockUserFromProfile() async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Engelleniyor...',
+          color: Colors.red,
+        ),
+      ),
+    );
+
+    final success = await _userService.blockUser(widget.userId);
+
+    if (mounted) {
+      // Loading'i kapat
+      Navigator.pop(context);
+
+      if (success) {
+        // Callback varsa, navigasyonu callback'e bırak (ChatDetailScreen popUntil yapacak)
+        // Callback yoksa sadece profil ekranını kapat
+        if (widget.onUserBlocked != null) {
+          widget.onUserBlocked!(widget.userId);
+        } else {
+          Navigator.pop(context);
+        }
+
+        // Başarı bildirimi göster
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade500, Colors.green.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.block_rounded, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Kullanıcı Engellendi',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${_profile?.name ?? 'Kullanıcı'} artık seni göremez',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
+        );
+      } else {
+        // Hata bildirimi göster
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.red.shade500, Colors.red.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Engelleme başarısız oldu. Lütfen tekrar deneyin.',
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
+        );
+      }
+    }
   }
 
   Widget _buildLoadingState() {
@@ -573,9 +726,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       child: _buildPhotoCard(photo),
                     ),
                   ),
-            // Alt boşluk
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 100),
+            // Alt boşluk (like/dislike butonları varsa daha fazla boşluk)
+            SliverToBoxAdapter(
+              child: SizedBox(height: _showLikeDislikeButtons ? 180 : 100),
             ),
           ],
         ),
@@ -599,7 +752,138 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ),
         ),
+        // Engelleme butonu (sadece başka birinin profiline bakılıyorsa) - Premium haptic
+        if (!_isOwnProfile)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 10,
+            right: 16,
+            child: _PremiumHapticButton(
+              onTap: _showBlockUserDialog,
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.block_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+        // Like/Dislike butonları (Likes ekranından gelindiyse)
+        if (_showLikeDislikeButtons)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildLikeDislikeButtons(),
+          ),
       ],
+    );
+  }
+
+  /// Like/Dislike butonları widget'ı
+  Widget _buildLikeDislikeButtons() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        32,
+        16,
+        32,
+        MediaQuery.of(context).padding.bottom + 16,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Dislike butonu
+          if (widget.onDislike != null)
+            _buildActionButton(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                Navigator.pop(context);
+                widget.onDislike?.call();
+              },
+              icon: Icons.close_rounded,
+              size: 60,
+              iconSize: 28,
+              colors: [Colors.grey[100]!, Colors.grey[200]!],
+              iconColor: Colors.grey[600]!,
+              shadowColor: Colors.grey.withValues(alpha: 0.3),
+            ),
+          // Like butonu (büyük)
+          if (widget.onLike != null)
+            _buildActionButton(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                Navigator.pop(context);
+                widget.onLike?.call();
+              },
+              icon: Icons.waving_hand_rounded,
+              size: 72,
+              iconSize: 34,
+              colors: const [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+              iconColor: Colors.white,
+              shadowColor: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
+              isGradient: true,
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Action button widget
+  Widget _buildActionButton({
+    required VoidCallback onTap,
+    required IconData icon,
+    required double size,
+    required double iconSize,
+    required List<Color> colors,
+    required Color iconColor,
+    required Color shadowColor,
+    bool isGradient = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: isGradient
+              ? LinearGradient(
+                  colors: colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isGradient ? null : colors.first,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor,
+              blurRadius: 16,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          color: iconColor,
+          size: iconSize,
+        ),
+      ),
     );
   }
 
@@ -1279,6 +1563,54 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Premium Haptic Button - Görsel ve fiziksel geri bildirim veren buton
+/// Tıklandığında küçülme animasyonu ve haptic feedback sağlar
+class _PremiumHapticButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _PremiumHapticButton({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_PremiumHapticButton> createState() => _PremiumHapticButtonState();
+}
+
+class _PremiumHapticButtonState extends State<_PremiumHapticButton> {
+  bool _isPressed = false;
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _isPressed = true);
+    HapticFeedback.heavyImpact();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isPressed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.85 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+        child: widget.child,
       ),
     );
   }

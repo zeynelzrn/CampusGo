@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +9,7 @@ import '../services/auth_service.dart';
 import '../services/debug_service.dart';
 import '../providers/swipe_provider.dart';
 import '../widgets/custom_notification.dart';
+import '../widgets/modern_animated_dialog.dart';
 import 'welcome_screen.dart';
 import 'splash_screen.dart';
 import 'blocked_users_screen.dart';
@@ -335,7 +337,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           Switch(
             value: value,
-            onChanged: onChanged,
+            onChanged: (newValue) {
+              HapticFeedback.lightImpact();
+              onChanged(newValue);
+            },
             activeTrackColor: const Color(0xFF5C6BC0).withValues(alpha: 0.5),
             activeThumbColor: const Color(0xFF5C6BC0),
           ),
@@ -353,7 +358,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -455,143 +463,97 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _changePassword() async {
     final emailController = TextEditingController();
 
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Text(
-          'Sifre Sifirlama',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-        ),
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.info,
+        icon: Icons.lock_reset_rounded,
+        title: 'Şifre Sıfırlama',
+        subtitle: 'Şifre sıfırlama bağlantısı için e-posta adresinizi girin.',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Sifre sifirlama baglantisi icin e-posta adresinizi girin.',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
-                hintText: 'E-posta',
+                hintText: 'E-posta adresiniz',
+                hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
+                prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[500]),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
+              style: GoogleFonts.poppins(fontSize: 15),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (emailController.text.isNotEmpty) {
-                Navigator.pop(context);
-                final result = await _authService.resetPassword(
-                  email: emailController.text.trim(),
+        cancelText: 'İptal',
+        confirmText: 'Gönder',
+        onConfirm: () async {
+          if (emailController.text.isNotEmpty) {
+            Navigator.pop(dialogContext);
+            final result = await _authService.resetPassword(
+              email: emailController.text.trim(),
+            );
+            if (mounted) {
+              if (result['success'] == true) {
+                CustomNotification.success(
+                  context,
+                  'Başarılı',
+                  subtitle: 'Şifre sıfırlama bağlantısı gönderildi',
                 );
-                if (mounted) {
-                  if (result['success'] == true) {
-                    CustomNotification.success(
-                      context,
-                      'Basarili',
-                      subtitle: 'Sifre sifirlama baglantisi gonderildi',
-                    );
-                  } else {
-                    CustomNotification.error(
-                      context,
-                      'Hata',
-                      subtitle: result['error'] ?? 'Bilinmeyen hata',
-                    );
-                  }
-                }
+              } else {
+                CustomNotification.error(
+                  context,
+                  'Hata',
+                  subtitle: result['error'] ?? 'Bilinmeyen hata',
+                );
               }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF5C6BC0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Gonder',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
+            }
+          } else {
+            CustomNotification.warning(
+              dialogContext,
+              'Uyarı',
+              subtitle: 'Lütfen e-posta adresinizi girin',
+            );
+          }
+        },
       ),
     );
   }
 
   void _logout() async {
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Text(
-          'Cikis Yap',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Hesabinizdan cikis yapmak istediginize emin misiniz?',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('remember_me', false);
-              await _authService.signOut();
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.logout_rounded,
+        title: 'Çıkış Yap',
+        subtitle: 'Hesabınızdan çıkış yapmak istediğinize emin misiniz?',
+        cancelText: 'İptal',
+        confirmText: 'Çıkış Yap',
+        confirmButtonColor: Colors.orange,
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('remember_me', false);
+          await _authService.signOut();
 
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => WelcomeScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF5C6BC0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Cikis Yap',
-              style: GoogleFonts.poppins(color: Colors.white),
-            ),
-          ),
-        ],
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => WelcomeScreen()),
+              (route) => false,
+            );
+          }
+        },
       ),
     );
   }
@@ -599,213 +561,151 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _deleteAccount() {
     final passwordController = TextEditingController();
 
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.warning_rounded, color: Colors.red, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Hesabi Kalici Olarak Sil',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
+      barrierDismissible: false,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.delete_forever_rounded,
+        title: 'Hesabı Kalıcı Olarak Sil',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Uyarı başlığı
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    'BU ISLEM GERI ALINAMAZ!',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red[700],
+                  Icon(Icons.warning_rounded, color: Colors.red[700], size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'BU İŞLEM GERİ ALINAMAZ!',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red[700],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Silinecek veriler:',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _buildDeleteListItem('Profil bilgileriniz'),
-                  _buildDeleteListItem('Tum fotograflariniz'),
-                  _buildDeleteListItem('Eslesmeleriniz'),
-                  _buildDeleteListItem('Sohbetleriniz ve mesajlariniz'),
-                  _buildDeleteListItem('Begeni gecmisiniz'),
                 ],
               ),
             ),
             const SizedBox(height: 16),
+            // Silinecek veriler listesi
+            const DialogDeleteList(
+              items: [
+                'Profil bilgileriniz',
+                'Tüm fotoğraflarınız',
+                'Eşleşmeleriniz',
+                'Sohbetleriniz ve mesajlarınız',
+                'Beğeni geçmişiniz',
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Şifre girişi
             Text(
-              'Devam etmek icin sifrenizi girin:',
+              'Devam etmek için şifrenizi girin:',
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             TextField(
               controller: passwordController,
               obscureText: true,
               decoration: InputDecoration(
-                hintText: 'Sifre',
+                hintText: 'Şifreniz',
+                hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+                prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[500]),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
+              style: GoogleFonts.poppins(fontSize: 15),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Vazgec',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (passwordController.text.isEmpty) {
-                CustomNotification.error(
-                  dialogContext,
-                  'Hata',
-                  subtitle: 'Lutfen sifrenizi girin',
-                );
-                return;
-              }
+        cancelText: 'Vazgeç',
+        confirmText: 'Hesabı Sil',
+        onConfirm: () async {
+          if (passwordController.text.isEmpty) {
+            CustomNotification.error(
+              dialogContext,
+              'Hata',
+              subtitle: 'Lütfen şifrenizi girin',
+            );
+            return;
+          }
 
-              // Dialog'u kapat
-              Navigator.pop(dialogContext);
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
 
-              // Loading göster
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (loadingContext) => PopScope(
-                  canPop: false,
-                  child: AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(color: Colors.red),
-                        const SizedBox(height: 20),
-                        Text(
-                          'Hesabiniz siliniyor...',
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tum verileriniz temizleniyor.\nBu islem biraz zaman alabilir.',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-
-              // Hesabı sil (HARD DELETE)
-              final result = await _authService.deleteAccountWithData(
-                passwordController.text,
-              );
-
-              // Loading'i kapat
-              if (mounted) {
-                Navigator.of(context).pop();
-              }
-
-              if (result['success'] == true) {
-                // Başarılı - Welcome ekranına yönlendir
-                if (mounted) {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => WelcomeScreen()),
-                    (route) => false,
-                  );
-
-                  // Başarı mesajı göster (bir sonraki frame'de)
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    CustomNotification.success(
-                      context,
-                      'Hesap Silindi',
-                      subtitle: 'Hesabiniz ve tum verileriniz basariyla silindi.',
-                    );
-                  });
-                }
-              } else {
-                // Hata mesajı göster
-                if (mounted) {
-                  CustomNotification.error(
-                    context,
-                    'Hesap Silinemedi',
-                    subtitle: result['error'] ?? 'Bilinmeyen hata',
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          // Loading göster
+          showModernDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (loadingContext) => const PopScope(
+              canPop: false,
+              child: ModernLoadingDialog(
+                message: 'Hesabınız siliniyor...',
+                subtitle: 'Tüm verileriniz temizleniyor.\nBu işlem biraz zaman alabilir.',
+                color: Colors.red,
               ),
             ),
-            child: Text(
-              'Hesabi Sil',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+          );
+
+          // Hesabı sil (HARD DELETE)
+          final result = await _authService.deleteAccountWithData(
+            passwordController.text,
+          );
+
+          // Loading'i kapat
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+
+          if (result['success'] == true) {
+            if (mounted) {
+              final ctx = context;
+              Navigator.pushAndRemoveUntil(
+                ctx,
+                MaterialPageRoute(builder: (context) => WelcomeScreen()),
+                (route) => false,
+              );
+
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (mounted) {
+                  CustomNotification.success(
+                    ctx,
+                    'Hesap Silindi',
+                    subtitle: 'Hesabınız ve tüm verileriniz başarıyla silindi.',
+                  );
+                }
+              });
+            }
+          } else {
+            if (mounted) {
+              CustomNotification.error(
+                context,
+                'Hesap Silinemedi',
+                subtitle: result['error'] ?? 'Bilinmeyen hata',
+              );
+            }
+          }
+        },
       ),
     );
   }

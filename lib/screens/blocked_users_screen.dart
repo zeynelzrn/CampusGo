@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:overlay_support/overlay_support.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../models/user_profile.dart';
+import '../widgets/modern_animated_dialog.dart';
+import '../providers/likes_provider.dart';
 
 /// Screen to manage blocked users
 /// Accessible from Settings
-class BlockedUsersScreen extends StatefulWidget {
+class BlockedUsersScreen extends ConsumerStatefulWidget {
   const BlockedUsersScreen({super.key});
 
   @override
-  State<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
+  ConsumerState<BlockedUsersScreen> createState() => _BlockedUsersScreenState();
 }
 
-class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
+class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService();
 
@@ -74,99 +79,26 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
   }
 
   Future<void> _showUnblockDialog(UserProfile user) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModernDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.lock_open, color: Colors.green, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Engeli Kaldir',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.success,
+        icon: Icons.lock_open_rounded,
+        title: 'Engeli Kaldır',
+        subtitle: '${user.name} adlı kullanıcının engelini kaldırmak istiyor musunuz?',
+        content: const DialogInfoBox(
+          icon: Icons.info_outline,
+          text: 'Bu kişi size mesaj atabilir ve profilinizi görebilir.',
+          color: Colors.blue,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RichText(
-              text: TextSpan(
-                style: GoogleFonts.poppins(fontSize: 15, color: Colors.grey[800]),
-                children: [
-                  TextSpan(
-                    text: user.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const TextSpan(text: ' adli kullanicinin engelini kaldirmak istiyor musunuz?'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bu kisi size mesaj atabilir ve profilinizi gorebilir.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: Colors.blue[800],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Engeli Kaldir',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        cancelText: 'İptal',
+        confirmText: 'Engeli Kaldır',
+        confirmButtonColor: Colors.green,
+        onConfirm: () {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext, true);
+        },
+        onCancel: () => Navigator.pop(dialogContext, false),
       ),
     );
 
@@ -177,12 +109,14 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
   Future<void> _unblockUser(UserProfile user) async {
     // Show loading
-    showDialog(
+    showModernDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Engel kaldırılıyor...',
+          color: Colors.green,
         ),
       ),
     );
@@ -199,42 +133,113 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
           _blockedUsers.removeWhere((u) => u.id == user.id);
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${user.name} artik engelli degil',
-                    style: GoogleFonts.poppins(),
+        // Kullanıcıyı local state'den temizle (filtreye takılmasın)
+        ref.read(likesUIProvider.notifier).restoreUser(user.id);
+
+        // Provider'ları invalidate et - likes listesi yenilensin
+        ref.invalidate(receivedLikesProvider);
+
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade500, Colors.green.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withValues(alpha: 0.4),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.lock_open_rounded, color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Engel Kaldırıldı',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${user.name} artık size ulaşabilir',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white),
-                const SizedBox(width: 8),
-                Text(
-                  'Engel kaldirilamadi',
-                  style: GoogleFonts.poppins(),
+        showOverlayNotification(
+          (context) {
+            return SafeArea(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.red.shade500, Colors.red.shade400],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Engel kaldırılamadı. Lütfen tekrar deneyin.',
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+              ),
+            );
+          },
+          duration: const Duration(seconds: 3),
+          position: NotificationPosition.top,
         );
       }
     }
@@ -453,7 +458,10 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
 
           // Unblock button
           IconButton(
-            onPressed: () => _showUnblockDialog(user),
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showUnblockDialog(user);
+            },
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(

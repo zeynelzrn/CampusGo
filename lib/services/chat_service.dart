@@ -390,4 +390,30 @@ class ChatService {
       return false;
     }
   }
+
+  /// Delete chat with a specific user (if exists)
+  /// Used when blocking a user to remove their conversation
+  Future<bool> deleteChatWithUser(String targetUserId) async {
+    final userId = currentUserId;
+    if (userId == null) return false;
+
+    try {
+      // Generate chat ID (same format as createOrGetChat)
+      final sortedIds = [userId, targetUserId]..sort();
+      final chatId = '${sortedIds[0]}_${sortedIds[1]}';
+
+      // Check if chat exists
+      final chatDoc = await _chatsCollection.doc(chatId).get();
+      if (!chatDoc.exists) {
+        debugPrint('ChatService: No chat exists with user $targetUserId');
+        return true; // Chat doesn't exist, so technically "deleted"
+      }
+
+      // Delete the chat
+      return await deleteChat(chatId);
+    } catch (e) {
+      debugPrint('Error deleting chat with user: $e');
+      return false;
+    }
+  }
 }

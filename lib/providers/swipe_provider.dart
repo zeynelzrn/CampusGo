@@ -284,6 +284,26 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
     await _fetchNextBatch();
   }
+
+  /// Remove blocked user from profiles list
+  /// Called when user blocks someone from profile screen
+  void removeBlockedUser(String userId) {
+    // Remove from profiles list
+    final updatedProfiles = state.profiles.where((p) => p.id != userId).toList();
+
+    // Add to excluded IDs so they don't appear again
+    final updatedExcludedIds = Set<String>.from(state.excludedIds)..add(userId);
+
+    state = state.copyWith(
+      profiles: updatedProfiles,
+      excludedIds: updatedExcludedIds,
+    );
+
+    // Prefetch if needed
+    if (state.shouldPrefetch) {
+      _fetchNextBatch();
+    }
+  }
 }
 
 /// Repository provider

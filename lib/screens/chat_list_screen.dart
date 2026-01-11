@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
@@ -7,6 +8,7 @@ import 'package:overlay_support/overlay_support.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
+import '../widgets/modern_animated_dialog.dart';
 import 'chat_detail_screen.dart';
 import 'main_screen.dart';
 
@@ -514,101 +516,25 @@ class _ChatListScreenState extends State<ChatListScreen>
     // Önce swipe action'ı kapat
     _openSwipeActionChatId.value = null;
 
-    showDialog(
+    showModernDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.delete_outline_rounded,
+        title: 'Sohbeti Sil',
+        subtitle: '${chat.peerName} ile olan sohbeti silmek istediğinize emin misiniz?',
+        content: const DialogInfoBox(
+          icon: Icons.info_outline_rounded,
+          text: 'Bu kişi size tekrar mesaj atarsa yeni bir sohbet oluşacaktır.',
+          color: Colors.orange,
         ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.red.shade300.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.delete_outline_rounded,
-                color: Colors.red.shade400,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Sohbeti Sil',
-                style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${chat.peerName} ile olan sohbeti silmek istediginize emin misiniz?',
-              style: GoogleFonts.poppins(fontSize: 15),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bu kisi size tekrar mesaj atarsa yeni bir sohbet olusacaktir.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.orange[800],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Iptal',
-              style: GoogleFonts.poppins(color: Colors.grey[600]),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await _deleteChat(chat);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade400,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            ),
-            child: Text(
-              'Sil',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
+        cancelText: 'İptal',
+        confirmText: 'Sil',
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _deleteChat(chat);
+        },
       ),
     );
   }
@@ -976,7 +902,10 @@ class _SwipeableChatCardState extends State<_SwipeableChatCard>
               bottom: 0,
               width: _maxSlide,
               child: GestureDetector(
-                onTap: widget.onDelete,
+                onTap: () {
+                  HapticFeedback.mediumImpact();
+                  widget.onDelete();
+                },
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.red.shade300,

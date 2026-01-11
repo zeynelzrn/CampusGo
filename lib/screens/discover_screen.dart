@@ -5,9 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/swipe_provider.dart';
+import '../providers/likes_provider.dart';
 import '../models/user_profile.dart';
 import '../widgets/swipe_card.dart';
+import '../widgets/modern_animated_dialog.dart';
 import '../services/seed_service.dart';
+import '../services/user_service.dart';
+import '../services/chat_service.dart';
 import '../widgets/custom_notification.dart';
 import 'chat_detail_screen.dart';
 
@@ -20,6 +24,8 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   final PageController _pageController = PageController();
+  final UserService _userService = UserService();
+  final ChatService _chatService = ChatService();
 
   @override
   void dispose() {
@@ -43,6 +49,84 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     HapticFeedback.heavyImpact();
     final notifier = ref.read(swipeProvider.notifier);
     notifier.superLike(0);
+  }
+
+  /// Engelleme dialogunu göster
+  void _showBlockDialog(UserProfile profile) {
+    HapticFeedback.mediumImpact();
+
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.block_rounded,
+        title: 'Kullanıcıyı Engelle',
+        subtitle:
+            '${profile.name} adlı kullanıcıyı engellemek istediğinize emin misiniz?\n\nBirbirinizi bir daha göremeyecek ve mesajlaşamayacaksınız.',
+        cancelText: 'İptal',
+        confirmText: 'Engelle',
+        confirmButtonColor: Colors.red,
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _blockUserGlobally(profile);
+        },
+      ),
+    );
+  }
+
+  /// Global bloklama - Keşfet, Beğeniler ve Sohbetlerden kaldır
+  Future<void> _blockUserGlobally(UserProfile profile) async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Engelleniyor...',
+          color: Colors.red,
+        ),
+      ),
+    );
+
+    try {
+      // 1. Firestore'da engelle
+      final success = await _userService.blockUser(profile.id);
+
+      if (success) {
+        // 2. Keşfet'ten kaldır (bir sonraki profile geç)
+        ref.read(swipeProvider.notifier).removeBlockedUser(profile.id);
+
+        // 3. Beğenilerden kaldır
+        ref.read(likesUIProvider.notifier).removeUser(profile.id);
+
+        // 4. Sohbeti sil (varsa)
+        await _chatService.deleteChatWithUser(profile.id);
+
+        if (mounted) {
+          Navigator.pop(context); // Loading'i kapat
+
+          CustomNotification.show(
+            context: context,
+            message: 'Kullanıcı Engellendi',
+            subtitle: '${profile.name} artık sizi göremez',
+            type: NotificationType.error,
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.pop(context);
+          CustomNotification.error(context, 'Engelleme başarısız oldu');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error blocking user: $e');
+      if (mounted) {
+        Navigator.pop(context);
+        CustomNotification.error(context, 'Bir hata oluştu');
+      }
+    }
   }
 
   @override
@@ -141,6 +225,33 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               child: SizedBox(height: 120),
             ),
           ],
+        ),
+        // Engelleme butonu - sağ üst köşe (Premium haptic)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          right: 16,
+          child: _PremiumHapticButton(
+            onTap: () => _showBlockDialog(profile),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.block_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+          ),
         ),
         // Fixed action buttons at bottom
         Positioned(
@@ -890,5 +1001,53 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         ),
       );
     }
+  }
+}
+
+/// Premium Haptic Button - Görsel ve fiziksel geri bildirim veren buton
+/// Tıklandığında küçülme animasyonu ve haptic feedback sağlar
+class _PremiumHapticButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _PremiumHapticButton({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_PremiumHapticButton> createState() => _PremiumHapticButtonState();
+}
+
+class _PremiumHapticButtonState extends State<_PremiumHapticButton> {
+  bool _isPressed = false;
+
+  void _onTapDown(TapDownDetails details) {
+    setState(() => _isPressed = true);
+    HapticFeedback.heavyImpact();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    setState(() => _isPressed = false);
+    widget.onTap();
+  }
+
+  void _onTapCancel() {
+    setState(() => _isPressed = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.85 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeInOut,
+        child: widget.child,
+      ),
+    );
   }
 }

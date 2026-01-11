@@ -12,6 +12,7 @@ import '../services/seed_service.dart';
 import '../services/chat_service.dart';
 import '../providers/likes_provider.dart';
 import 'chat_detail_screen.dart';
+import 'user_profile_screen.dart';
 
 class LikesScreen extends ConsumerStatefulWidget {
   const LikesScreen({super.key});
@@ -149,53 +150,49 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   Future<void> _dismissUser(UserProfile user) async {
     final uiState = ref.read(likesUIProvider);
 
-    // Zaten animasyon oynatılıyorsa tekrar başlatma
-    if (uiState.dismissingUserIds.contains(user.id)) return;
+    // Zaten animasyon oynatılıyorsa veya zaten kaldırılmışsa tekrar başlatma
+    if (uiState.dismissingUserIds.contains(user.id) ||
+        uiState.removedUserIds.contains(user.id)) {
+      return;
+    }
 
     HapticFeedback.mediumImpact();
 
     // Step 1: Çıkış animasyonunu başlat
+    // Animasyon bittiğinde _AnimatedLikeCard callback'i removeUser çağıracak
     ref.read(likesUIProvider.notifier).startDismissing(user.id);
 
-    // Step 2: Animasyon süresince bekle
-    await Future.delayed(_animationDuration);
-
-    // Step 3: Animasyon bittikten sonra veritabanını güncelle
+    // Step 2: Firestore'u güncelle (arka planda, animasyondan bağımsız)
     try {
-      final result = await ref.read(likesRepositoryProvider).dismissUser(user.id);
-
-      if (result['success'] == true) {
-        // Stream will automatically update the list
-        ref.read(likesUIProvider.notifier).finishDismissing(user.id);
-      } else {
-        if (mounted) {
-          ref.read(likesUIProvider.notifier).cancelDismissing(user.id);
-          CustomNotification.error(context, 'Bir hata olustu');
-        }
-      }
+      await ref.read(likesRepositoryProvider).dismissUser(user.id);
     } catch (e) {
-      debugPrint('Error dismissing user: $e');
-      if (mounted) {
-        ref.read(likesUIProvider.notifier).cancelDismissing(user.id);
-        CustomNotification.error(context, 'Bir hata olustu');
-      }
+      debugPrint('Error dismissing user in Firestore: $e');
+      // Firestore hatası olsa bile animasyon devam etsin
+      // Kullanıcı yeniden giriş yapınca stream güncellenecek
     }
   }
 
   void _showProfileDetail(UserProfile user) {
-    // Hero Animation + iOS Swipe-Back ile detay sayfasına git
+    // UserProfileScreen ile profil detayına git
+    // Engelleme özelliği ve like/dislike butonları UserProfileScreen'de mevcut
     Navigator.of(context).push(
       CupertinoPageRoute(
-        builder: (context) => _ProfileDetailPage(
-          user: user,
-          onLike: () {
-            Navigator.pop(context);
-            _likeUser(user);
+        builder: (context) => UserProfileScreen(
+          userId: user.id,
+          onUserBlocked: (blockedUserId) {
+            // Kullanıcı engellendiğinde:
+            // 1. Önce profil ekranını kapat
+            Navigator.of(context).pop();
+            // 2. Sonra animasyonu tetikle (bir frame sonra state güncellenir)
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                // startDismissing ile animasyonu başlat
+                ref.read(likesUIProvider.notifier).startDismissing(blockedUserId);
+              }
+            });
           },
-          onDislike: () {
-            Navigator.pop(context);
-            _dislikeUser(user);
-          },
+          onLike: () => _likeUser(user),
+          onDislike: () => _dislikeUser(user),
         ),
       ),
     );
@@ -544,6 +541,16 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   }
 
   Widget _buildLikesList(List<UserProfile> likedByUsers, LikesUIState uiState) {
+    // removedUserIds'teki kullanıcıları listeden tamamen çıkar
+    // Bu sayede GridView'daki index'ler düzgün çalışır ve boşluk kalmaz
+    final filteredUsers = likedByUsers
+        .where((user) => !uiState.removedUserIds.contains(user.id))
+        .toList();
+
+    if (filteredUsers.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return RefreshIndicator(
       onRefresh: () async => ref.invalidate(receivedLikesProvider),
       color: const Color(0xFF5C6BC0),
@@ -555,15 +562,27 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
           mainAxisSpacing: 16,
           childAspectRatio: 0.75,
         ),
-        itemCount: likedByUsers.length,
+        itemCount: filteredUsers.length,
         itemBuilder: (context, index) {
-          final user = likedByUsers[index];
+          final user = filteredUsers[index];
           final isEliminated = uiState.eliminatedUserIds.contains(user.id);
           final isDismissing = uiState.dismissingUserIds.contains(user.id);
-          return _buildLikeCard(
-            user,
+
+          // Animasyonlu kart - silinme animasyonu bitince removeUser çağrılır
+          return _AnimatedLikeCard(
+            key: ValueKey(user.id),
+            user: user,
             isEliminated: isEliminated,
             isDismissing: isDismissing,
+            onDismissAnimationComplete: () {
+              // Animasyon bitince kullanıcıyı listeden tamamen kaldır
+              ref.read(likesUIProvider.notifier).removeUser(user.id);
+            },
+            child: _buildLikeCard(
+              user,
+              isEliminated: isEliminated,
+              isDismissing: isDismissing,
+            ),
           );
         },
       ),
@@ -941,629 +960,95 @@ class _BounceCardState extends State<_BounceCard>
   }
 }
 
-// Profile Detail Page with CustomScrollView + iOS Swipe-Back
-class _ProfileDetailPage extends StatelessWidget {
+/// Animasyonlu kart - silinirken fade out + scale animasyonu yapar
+/// Animasyon bittiğinde callback çağrılır ve kart listeden fiziksel olarak çıkar
+class _AnimatedLikeCard extends StatefulWidget {
+  final Widget child;
   final UserProfile user;
-  final VoidCallback onLike;
-  final VoidCallback onDislike;
+  final bool isDismissing;
+  final bool isEliminated;
+  final VoidCallback onDismissAnimationComplete;
 
-  const _ProfileDetailPage({
+  const _AnimatedLikeCard({
+    super.key,
+    required this.child,
     required this.user,
-    required this.onLike,
-    required this.onDislike,
+    required this.isDismissing,
+    required this.isEliminated,
+    required this.onDismissAnimationComplete,
   });
 
-  /// X butonuna basıldığında özel tasarımlı onay dialog'u göster
-  Future<void> _showDislikeConfirmation(BuildContext context) async {
-    final confirmed = await showGeneralDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss',
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 300),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return ScaleTransition(
-          scale: CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutBack,
-          ),
-          child: FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
-        );
-      },
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Üzgün yüz ikonu
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.sentiment_dissatisfied_rounded,
-                      color: Color(0xFF5C6BC0),
-                      size: 36,
-                    ),
-                  ),
+  @override
+  State<_AnimatedLikeCard> createState() => _AnimatedLikeCardState();
+}
 
-                  const SizedBox(height: 20),
+class _AnimatedLikeCardState extends State<_AnimatedLikeCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+  bool _animationCompleted = false;
 
-                  // Başlık
-                  Text(
-                    'Emin misiniz?',
-                    style: GoogleFonts.poppins(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[900],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Açıklama
-                  Text(
-                    '${user.name} ile arkadas olmak istemediginize emin misiniz?',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      color: Colors.grey[600],
-                      height: 1.5,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Uyarı
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 16,
-                          color: Colors.amber[700],
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Bu islem geri alinamaz',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.amber[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Butonlar
-                  Row(
-                    children: [
-                      // Vazgeç butonu
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(false),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Vazgec',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      // Evet butonu - Gradient
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.mediumImpact();
-                            Navigator.of(context).pop(true);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                                begin: Alignment.centerLeft,
-                                end: Alignment.centerRight,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Evet',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
     );
 
-    if (confirmed == true) {
-      onDislike();
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    // Animasyon bittiğinde callback çağır
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && !_animationCompleted) {
+        _animationCompleted = true;
+        widget.onDismissAnimationComplete();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedLikeCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Dismissing durumu değiştiğinde animasyonu başlat
+    if (widget.isDismissing && !oldWidget.isDismissing && !_animationCompleted) {
+      _controller.forward();
     }
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final expandedHeight = screenHeight * 0.6; // Ekranın %60'ı fotoğraf
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // Ana içerik - CustomScrollView ile tek scroll
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // SliverAppBar - Collapsing fotoğraf
-              SliverAppBar(
-                expandedHeight: expandedHeight,
-                pinned: false,
-                floating: false,
-                stretch: true,
-                backgroundColor: Colors.white,
-                elevation: 0,
-                automaticallyImplyLeading: false,
-                flexibleSpace: FlexibleSpaceBar(
-                  stretchModes: const [
-                    StretchMode.zoomBackground,
-                    StretchMode.blurBackground,
-                  ],
-                  background: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Fotoğraf (Hero kaldırıldı)
-                      user.photos.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: user.photos.first,
-                              fit: BoxFit.cover,
-                            )
-                          : Container(
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.person, size: 100),
-                            ),
-
-                      // Alt gradient (içerik okunabilirliği için)
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: 150,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.6),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Üst gradient (status bar için)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 100,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.4),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // İsim ve yaş (fotoğraf üzerinde)
-                      Positioned(
-                        bottom: 20,
-                        left: 20,
-                        right: 20,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${user.name}, ${user.age}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withValues(alpha: 0.5),
-                                    blurRadius: 10,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (user.university.isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.school_rounded,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    user.university,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 16,
-                                      color: Colors.white.withValues(alpha: 0.9),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // İçerik
-              SliverToBoxAdapter(
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Bölüm
-                      if (user.department.isNotEmpty) ...[
-                        _buildInfoRow(
-                          Icons.menu_book_rounded,
-                          user.department,
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Biyografi
-                      if (user.bio.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Hakkinda',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                user.bio,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  color: Colors.grey[800],
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // İlgi alanları
-                      if (user.interests.isNotEmpty) ...[
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[50],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Ilgi Alanlari',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: user.interests.map((interest) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                                          const Color(0xFF7986CB).withValues(alpha: 0.1),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      interest,
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        color: const Color(0xFF5C6BC0),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Diğer fotoğraflar
-                      if (user.photos.length > 1) ...[
-                        ...user.photos.skip(1).map((photo) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(20),
-                              child: CachedNetworkImage(
-                                imageUrl: photo,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-
-                      // Alt butonlar için boşluk
-                      SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnimation.value,
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
           ),
-
-          // Geri butonu (sabit üst sol)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 16,
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-
-          // Aksiyon butonları (sabit alt kısım)
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.fromLTRB(
-                32,
-                16,
-                32,
-                MediaQuery.of(context).padding.bottom + 16,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Dislike butonu - Onay dialog'u ile
-                  _buildActionButton(
-                    onTap: () => _showDislikeConfirmation(context),
-                    icon: Icons.close_rounded,
-                    size: 60,
-                    iconSize: 28,
-                    colors: [Colors.grey[100]!, Colors.grey[200]!],
-                    iconColor: Colors.grey[600]!,
-                    shadowColor: Colors.grey.withValues(alpha: 0.3),
-                  ),
-
-                  // Like butonu (büyük)
-                  _buildActionButton(
-                    onTap: onLike,
-                    icon: Icons.waving_hand_rounded,
-                    size: 72,
-                    iconSize: 34,
-                    colors: const [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                    iconColor: Colors.white,
-                    shadowColor: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-                    isGradient: true,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            color: const Color(0xFF5C6BC0),
-            size: 18,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: GoogleFonts.poppins(
-              fontSize: 15,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton({
-    required VoidCallback onTap,
-    required IconData icon,
-    required double size,
-    required double iconSize,
-    required List<Color> colors,
-    required Color iconColor,
-    required Color shadowColor,
-    bool isGradient = false,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.mediumImpact();
-        onTap();
+        );
       },
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          gradient: isGradient
-              ? LinearGradient(
-                  colors: colors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isGradient ? null : colors.first,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: 16,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Icon(
-          icon,
-          color: iconColor,
-          size: iconSize,
-        ),
-      ),
+      child: widget.child,
     );
   }
 }
