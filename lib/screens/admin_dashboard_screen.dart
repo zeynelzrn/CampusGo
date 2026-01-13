@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/app_notification.dart';
 
 /// Admin Dashboard - Şikayet Yönetimi Ekranı
 ///
@@ -454,26 +455,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Sikayet reddedildi',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.grey[700],
-          ),
+        AppNotification.info(
+          title: 'Şikayet Reddedildi',
+          subtitle: 'Bu şikayet işlendi olarak işaretlendi',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Hata: $e',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppNotification.error(
+          title: 'Hata',
+          subtitle: e.toString(),
         );
       }
     }
@@ -628,20 +619,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         // Loading'i kapat
         Navigator.pop(context);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Text(
-                  'Kullanici banlandi',
-                  style: GoogleFonts.poppins(),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.green,
-          ),
+        AppNotification.success(
+          title: 'Kullanıcı Banlandı',
+          subtitle: 'Bu kullanıcı artık uygulamayı kullanamaz',
         );
       }
     } catch (e) {
@@ -649,14 +629,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         // Loading'i kapat
         Navigator.pop(context);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Hata: $e',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Colors.red,
-          ),
+        AppNotification.error(
+          title: 'Hata',
+          subtitle: e.toString(),
         );
       }
     }

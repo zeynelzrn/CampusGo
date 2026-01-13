@@ -7,7 +7,7 @@ import '../services/auth_service.dart';
 import '../services/seed_service.dart';
 import '../providers/swipe_provider.dart';
 import '../widgets/swipe_card.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import '../models/user_profile.dart';
 import 'login_screen.dart';
 import 'profile_edit_screen.dart';
@@ -472,9 +472,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       if (mounted) {
         Navigator.pop(context); // Close loading
-        CustomNotification.success(
-          context,
-          'Test Profilleri Eklendi',
+        AppNotification.success(
+          title: 'Test Profilleri Eklendi',
           subtitle: 'Yeni profiller keşfetmeye hazır',
         );
         ref.read(swipeProvider.notifier).refresh();

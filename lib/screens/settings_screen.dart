@@ -8,7 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/debug_service.dart';
 import '../providers/swipe_provider.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import '../widgets/modern_animated_dialog.dart';
 import 'welcome_screen.dart';
 import 'splash_screen.dart';
@@ -503,23 +503,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             );
             if (mounted) {
               if (result['success'] == true) {
-                CustomNotification.success(
-                  context,
-                  'Başarılı',
+                AppNotification.success(
+                  title: 'Başarılı',
                   subtitle: 'Şifre sıfırlama bağlantısı gönderildi',
                 );
               } else {
-                CustomNotification.error(
-                  context,
-                  'Hata',
+                AppNotification.error(
+                  title: 'Hata',
                   subtitle: result['error'] ?? 'Bilinmeyen hata',
                 );
               }
             }
           } else {
-            CustomNotification.warning(
-              dialogContext,
-              'Uyarı',
+            AppNotification.warning(
+              title: 'Uyarı',
               subtitle: 'Lütfen e-posta adresinizi girin',
             );
           }
@@ -642,9 +639,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         confirmText: 'Hesabı Sil',
         onConfirm: () async {
           if (passwordController.text.isEmpty) {
-            CustomNotification.error(
-              dialogContext,
-              'Hata',
+            AppNotification.error(
+              title: 'Hata',
               subtitle: 'Lütfen şifrenizi girin',
             );
             return;
@@ -688,9 +684,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
               Future.delayed(const Duration(milliseconds: 100), () {
                 if (mounted) {
-                  CustomNotification.success(
-                    ctx,
-                    'Hesap Silindi',
+                  AppNotification.success(
+                    title: 'Hesap Silindi',
                     subtitle: 'Hesabınız ve tüm verileriniz başarıyla silindi.',
                   );
                 }
@@ -698,9 +693,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             }
           } else {
             if (mounted) {
-              CustomNotification.error(
-                context,
-                'Hesap Silinemedi',
+              AppNotification.error(
+                title: 'Hesap Silinemedi',
                 subtitle: result['error'] ?? 'Bilinmeyen hata',
               );
             }
@@ -1427,20 +1421,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final deletedMatches = result['deletedMatches'] ?? 0;
         final deletedChats = result['deletedChats'] ?? 0;
         final deletedMessages = result['deletedMessages'] ?? 0;
-        final deletedActions = result['deletedActions'] ?? 0;
-        final clearedUserData = result['clearedUserData'] ?? 0;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Basariyla sifirlandi!\n'
-              '$deletedMatches baglanti, $deletedChats sohbet, '
-              '$deletedMessages mesaj, $deletedActions aksiyon, '
-              '$clearedUserData kullanici verisi silindi.',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
+        AppNotification.success(
+          title: 'Başarıyla sıfırlandı!',
+          subtitle: '$deletedMatches bağlantı, $deletedChats sohbet, $deletedMessages mesaj silindi.',
         );
 
         // CRITICAL: Invalidate SwipeProvider to clear cached excludedIds
@@ -1458,18 +1442,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           );
         }
       } else {
-        CustomNotification.error(
-          context,
-          'Hata',
+        AppNotification.error(
+          title: 'Hata',
           subtitle: result['error'] ?? 'Bilinmeyen hata',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDebugLoading = false);
-        CustomNotification.error(
-          context,
-          'Hata',
+        AppNotification.error(
+          title: 'Hata',
           subtitle: e.toString(),
         );
       }
@@ -1490,15 +1472,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         final deletedUsers = result['deletedUsers'] ?? 0;
         final protectedUsers = result['protectedUsers'] ?? 0;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Demo kullanicilar silindi!\n'
-              '$deletedUsers kullanici silindi, $protectedUsers kullanici korundu.',
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
+        AppNotification.success(
+          title: 'Demo kullanıcılar silindi!',
+          subtitle: '$deletedUsers kullanıcı silindi, $protectedUsers kullanıcı korundu.',
         );
 
         // CRITICAL: Invalidate SwipeProvider to clear cached data
@@ -1516,18 +1492,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           );
         }
       } else {
-        CustomNotification.error(
-          context,
-          'Hata',
+        AppNotification.error(
+          title: 'Hata',
           subtitle: result['error'] ?? 'Bilinmeyen hata',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isDebugLoading = false);
-        CustomNotification.error(
-          context,
-          'Hata',
+        AppNotification.error(
+          title: 'Hata',
           subtitle: e.toString(),
         );
       }

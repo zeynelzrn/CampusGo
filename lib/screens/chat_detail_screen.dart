@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:overlay_support/overlay_support.dart';
+import '../widgets/app_notification.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
@@ -718,17 +718,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       _isMuted = !_isMuted;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isMuted ? 'Sohbet sessize alindi' : 'Bildirimler acildi',
-          style: GoogleFonts.poppins(),
-        ),
-        backgroundColor: const Color(0xFF5C6BC0),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
+    AppNotification.info(
+      title: _isMuted ? 'Sohbet sessize alındı' : 'Bildirimler açıldı',
+      subtitle: _isMuted ? 'Bu sohbetten bildirim almayacaksınız' : 'Bu sohbetin bildirimleri açık',
     );
   }
 
@@ -756,173 +748,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     try {
       await _chatService.clearChat(widget.chatId);
       if (mounted) {
-        // Navigate back to chat list
         Navigator.pop(context);
-
-        // Show modern green overlay notification
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.cleaning_services_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Sohbet Temizlendi',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${widget.peerName} ile sohbet gecmisi silindi',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.success(
+          title: 'Sohbet Temizlendi',
+          subtitle: '${widget.peerName} ile sohbet geçmişi silindi',
         );
       }
     } catch (e) {
       if (mounted) {
-        // Show modern red overlay notification for error
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade500, Colors.red.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.error_outline_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Hata Olustu',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Sohbet temizlenemedi. Lutfen tekrar deneyin.',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 4),
-          position: NotificationPosition.top,
+        AppNotification.error(
+          title: 'Hata Oluştu',
+          subtitle: 'Sohbet temizlenemedi. Lütfen tekrar deneyin.',
         );
       }
     }
@@ -1004,116 +840,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     final success = await _userService.blockUser(widget.peerId);
 
     if (mounted) {
-      // Close loading dialog
       Navigator.pop(context);
 
       if (success) {
-        // Show success notification
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.block_rounded, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Kullanıcı Engellendi',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${widget.peerName} artık size ulaşamaz',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.blocked(
+          title: 'Kullanıcı Engellendi',
+          subtitle: '${widget.peerName} artık size ulaşamaz',
         );
-
-        // Navigate back to chat list
         Navigator.pop(context);
       } else {
-        // Show error notification
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade500, Colors.red.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Engelleme başarısız oldu. Lütfen tekrar deneyin.',
-                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.error(
+          title: 'Engelleme başarısız oldu',
+          subtitle: 'Lütfen tekrar deneyin',
         );
       }
     }
@@ -1307,172 +1045,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     );
 
     if (mounted) {
-      // Close loading dialog
       Navigator.pop(context);
 
       if (success) {
-        // Show modern green overlay notification
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.check_circle_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Rapor Gonderildi',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Raporunuz alindi, tesekkur ederiz!',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+        AppNotification.success(
+          title: 'Rapor Gönderildi',
+          subtitle: 'Raporunuz alındı, teşekkür ederiz!',
           duration: const Duration(seconds: 4),
-          position: NotificationPosition.top,
         );
       } else {
-        // Show modern red overlay notification for error
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade500, Colors.red.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.error_outline_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Hata Olustu',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                'Rapor gonderilemedi. Lutfen tekrar deneyin.',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => OverlaySupportEntry.of(context)?.dismiss(),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+        AppNotification.error(
+          title: 'Hata Oluştu',
+          subtitle: 'Rapor gönderilemedi. Lütfen tekrar deneyin.',
           duration: const Duration(seconds: 4),
-          position: NotificationPosition.top,
         );
       }
     }

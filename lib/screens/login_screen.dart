@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'register_screen.dart';
 import '../services/auth_service.dart';
 import '../repositories/profile_repository.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import 'main_screen.dart';
 import 'create_profile_screen.dart';
 
@@ -197,9 +197,8 @@ class _LoginScreenState extends State<LoginScreen>
                     ? null
                     : () async {
                         if (resetEmailController.text.trim().isEmpty) {
-                          CustomNotification.error(
-                            context,
-                            'Lütfen e-posta adresinizi girin',
+                          AppNotification.error(
+                            title: 'Lütfen e-posta adresinizi girin',
                           );
                           return;
                         }
@@ -216,15 +215,13 @@ class _LoginScreenState extends State<LoginScreen>
                           Navigator.pop(context);
 
                           if (result['success']) {
-                            CustomNotification.success(
-                              context,
-                              'Şifre Sıfırlama',
+                            AppNotification.success(
+                              title: 'Şifre Sıfırlama',
                               subtitle: result['message'],
                             );
                           } else {
-                            CustomNotification.error(
-                              context,
-                              result['error'] ?? 'Bir hata oluştu',
+                            AppNotification.error(
+                              title: result['error'] ?? 'Bir hata oluştu',
                             );
                           }
                         }

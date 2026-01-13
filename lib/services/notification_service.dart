@@ -1,14 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:overlay_support/overlay_support.dart';
+import '../widgets/app_notification.dart';
 import '../main.dart';
 
 /// Service for handling FCM token management and local notifications
@@ -298,287 +296,43 @@ class NotificationService {
 
   /// Pink overlay for likes
   void _showLikeOverlay(String title, String body, Map<String, dynamic> data) {
-    showOverlayNotification(
-      (context) {
-        return GestureDetector(
-          onTap: () {
-            OverlaySupportEntry.of(context)?.dismiss();
-            _navigateToScreen(data);
-          },
-          child: SafeArea(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.waving_hand_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              title.isNotEmpty ? title : 'Biri seninle tanismak istiyor!',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (body.isNotEmpty)
-                              Text(
-                                body,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    AppNotification.like(
+      title: title.isNotEmpty ? title : 'Biri seninle tanışmak istiyor!',
+      subtitle: body.isNotEmpty ? body : null,
       duration: const Duration(seconds: 4),
-      position: NotificationPosition.top,
+      onTap: () => _navigateToScreen(data),
     );
   }
 
   /// Purple overlay for messages
   void _showMessageOverlay(String title, String body, Map<String, dynamic> data) {
-    showOverlayNotification(
-      (context) {
-        return GestureDetector(
-          onTap: () {
-            OverlaySupportEntry.of(context)?.dismiss();
-            _navigateToScreen(data);
-          },
-          child: SafeArea(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7C4DFF), Color(0xFFB388FF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7C4DFF).withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.chat_bubble_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              title.isNotEmpty ? title : 'Yeni mesajin var!',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (body.isNotEmpty)
-                              Text(
-                                body,
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    AppNotification.message(
+      title: title.isNotEmpty ? title : 'Yeni mesajın var!',
+      subtitle: body.isNotEmpty ? body : null,
       duration: const Duration(seconds: 4),
-      position: NotificationPosition.top,
+      onTap: () => _navigateToScreen(data),
     );
   }
 
   /// Pink-orange overlay for matches
   void _showMatchOverlay(String title, String body, Map<String, dynamic> data) {
-    showOverlayNotification(
-      (context) {
-        return GestureDetector(
-          onTap: () {
-            OverlaySupportEntry.of(context)?.dismiss();
-            _navigateToScreen(data);
-          },
-          child: SafeArea(
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF5C6BC0), Color(0xFFFF7043)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.celebration_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              title.isNotEmpty ? title : 'Yeni Baglanti!',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              body.isNotEmpty ? body : 'Yeni bir arkadaslik kuruldu!',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 13,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+    AppNotification.custom(
+      title: title.isNotEmpty ? title : 'Yeni Bağlantı!',
+      subtitle: body.isNotEmpty ? body : 'Yeni bir arkadaşlık kuruldu!',
+      icon: Icons.celebration_rounded,
+      gradientColors: [const Color(0xFF5C6BC0), const Color(0xFFFF7043)],
+      shadowColor: const Color(0xFF5C6BC0),
       duration: const Duration(seconds: 4),
-      position: NotificationPosition.top,
+      onTap: () => _navigateToScreen(data),
     );
   }
 
   /// Generic overlay notification
   void _showGenericOverlay(String title, String body) {
-    showSimpleNotification(
-      Text(
-        title.isNotEmpty ? title : 'CampusGo',
-        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-      ),
-      subtitle: body.isNotEmpty
-          ? Text(body, style: GoogleFonts.poppins(fontSize: 13))
-          : null,
-      background: const Color(0xFF5C6BC0),
-      foreground: Colors.white,
+    AppNotification.info(
+      title: title.isNotEmpty ? title : 'CampusGo',
+      subtitle: body.isNotEmpty ? body : null,
       duration: const Duration(seconds: 4),
-      slideDismissDirection: DismissDirection.up,
     );
   }
 

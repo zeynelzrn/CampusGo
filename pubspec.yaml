@@ -38,6 +38,8 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   # In-App Overlay Notifications
   overlay_support: ^2.1.0
+  # Reactive Extensions for Dart (Stream combining)
+  rxdart: ^0.28.0
 
 dev_dependencies:
   flutter_test:

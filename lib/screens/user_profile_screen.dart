@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:overlay_support/overlay_support.dart';
+import '../widgets/app_notification.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../models/user_profile.dart';
@@ -183,28 +183,17 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ref.invalidate(receivedLikesProvider);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                success ? Icons.check_circle : Icons.error_outline,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                success
-                    ? 'Engel kaldirildi'
-                    : 'Engel kaldirilamadi',
-                style: GoogleFonts.poppins(),
-              ),
-            ],
-          ),
-          backgroundColor: success ? Colors.green : Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+      if (success) {
+        AppNotification.unblocked(
+          title: 'Engel Kaldırıldı',
+          subtitle: 'Bu kullanıcı artık size ulaşabilir',
+        );
+      } else {
+        AppNotification.error(
+          title: 'Engel kaldırılamadı',
+          subtitle: 'Lütfen tekrar deneyin',
+        );
+      }
     }
   }
 
@@ -516,108 +505,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         }
 
         // Başarı bildirimi göster
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.block_rounded, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Kullanıcı Engellendi',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${_profile?.name ?? 'Kullanıcı'} artık seni göremez',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.blocked(
+          title: 'Kullanıcı Engellendi',
+          subtitle: '${_profile?.name ?? 'Kullanıcı'} artık seni göremez',
         );
       } else {
         // Hata bildirimi göster
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade500, Colors.red.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Engelleme başarısız oldu. Lütfen tekrar deneyin.',
-                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.error(
+          title: 'Engelleme başarısız oldu',
+          subtitle: 'Lütfen tekrar deneyin',
         );
       }
     }

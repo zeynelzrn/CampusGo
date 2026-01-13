@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/profile_provider.dart';
 import '../repositories/profile_repository.dart';
 import '../data/turkish_universities.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import '../utils/image_helper.dart';
 import 'main_screen.dart';
 import 'welcome_screen.dart';
@@ -152,12 +152,12 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    CustomNotification.error(context, message);
+    AppNotification.error(title: message);
   }
 
   void _showSuccess(String message, {String? subtitle}) {
     if (!mounted) return;
-    CustomNotification.success(context, message, subtitle: subtitle);
+    AppNotification.success(title: message, subtitle: subtitle);
   }
 
   Future<void> _submitProfile() async {

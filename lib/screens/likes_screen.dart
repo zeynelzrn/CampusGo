@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_profile.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import '../widgets/swipe_card.dart';
 import '../services/seed_service.dart';
 import '../services/chat_service.dart';
@@ -55,13 +55,13 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
         }
       } else {
         if (mounted) {
-          CustomNotification.error(context, 'Bir hata olustu');
+          AppNotification.error(title: 'Bir hata oluştu');
         }
       }
     } catch (e) {
       debugPrint('Error liking user: $e');
       if (mounted) {
-        CustomNotification.error(context, 'Bir hata olustu');
+        AppNotification.error(title: 'Bir hata oluştu');
       }
     }
   }
@@ -135,13 +135,13 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
         ref.read(likesUIProvider.notifier).markAsEliminated(user.id);
       } else {
         if (mounted) {
-          CustomNotification.error(context, 'Bir hata olustu');
+          AppNotification.error(title: 'Bir hata oluştu');
         }
       }
     } catch (e) {
       debugPrint('Error disliking user: $e');
       if (mounted) {
-        CustomNotification.error(context, 'Bir hata olustu');
+        AppNotification.error(title: 'Bir hata oluştu');
       }
     }
   }
@@ -406,21 +406,20 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
         // Invalidate the provider to refresh the stream
         ref.invalidate(receivedLikesProvider);
         if (mounted) {
-          CustomNotification.success(
-            context,
-            'Demo veriler eklendi',
-            subtitle: '$count kisi seninle tanismak istiyor!',
+          AppNotification.success(
+            title: 'Demo veriler eklendi',
+            subtitle: '$count kişi seninle tanışmak istiyor!',
           );
         }
       } else {
         if (mounted) {
-          CustomNotification.error(context, 'Demo veri eklenemedi');
+          AppNotification.error(title: 'Demo veri eklenemedi');
         }
       }
     } catch (e) {
       debugPrint('Error seeding demo likes: $e');
       if (mounted) {
-        CustomNotification.error(context, 'Bir hata olustu');
+        AppNotification.error(title: 'Bir hata oluştu');
       }
     }
   }

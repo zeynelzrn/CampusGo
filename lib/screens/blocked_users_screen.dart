@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:overlay_support/overlay_support.dart';
+import '../widgets/app_notification.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../models/user_profile.dart';
@@ -139,107 +139,14 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
         // Provider'ları invalidate et - likes listesi yenilensin
         ref.invalidate(receivedLikesProvider);
 
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade500, Colors.green.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.lock_open_rounded, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Engel Kaldırıldı',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${user.name} artık size ulaşabilir',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.unblocked(
+          title: 'Engel Kaldırıldı',
+          subtitle: '${user.name} artık size ulaşabilir',
         );
       } else {
-        showOverlayNotification(
-          (context) {
-            return SafeArea(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.red.shade500, Colors.red.shade400],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.error_outline, color: Colors.white, size: 24),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            'Engel kaldırılamadı. Lütfen tekrar deneyin.',
-                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-          duration: const Duration(seconds: 3),
-          position: NotificationPosition.top,
+        AppNotification.error(
+          title: 'Engel kaldırılamadı',
+          subtitle: 'Lütfen tekrar deneyin',
         );
       }
     }

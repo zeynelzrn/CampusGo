@@ -1,16 +1,41 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:rxdart/rxdart.dart';
 import '../models/user_profile.dart';
 import '../repositories/likes_repository.dart';
+import '../services/user_service.dart';
 
 /// Provider for LikesRepository instance
 final likesRepositoryProvider = Provider<LikesRepository>((ref) {
   return LikesRepository();
 });
 
+/// Provider for UserService instance
+final userServiceProvider = Provider<UserService>((ref) {
+  return UserService();
+});
+
+/// Stream provider for restricted (blocked) user IDs
+/// Combines: users I blocked + users who blocked me
+final restrictedUserIdsProvider = StreamProvider<Set<String>>((ref) {
+  final userService = ref.watch(userServiceProvider);
+  return userService.watchAllRestrictedUserIds();
+});
+
 /// Stream provider for received likes (real-time updates)
+/// Now filters out blocked users automatically
 final receivedLikesProvider = StreamProvider<List<UserProfile>>((ref) {
   final repository = ref.watch(likesRepositoryProvider);
-  return repository.watchReceivedLikes();
+  final userService = ref.watch(userServiceProvider);
+
+  // Combine both streams: likes stream + restricted users stream
+  return Rx.combineLatest2<List<UserProfile>, Set<String>, List<UserProfile>>(
+    repository.watchReceivedLikes(),
+    userService.watchAllRestrictedUserIds(),
+    (likes, restrictedIds) {
+      // Filter out blocked users from likes list
+      return likes.where((user) => !restrictedIds.contains(user.id)).toList();
+    },
+  );
 });
 
 /// Provider for eliminated user IDs (disliked users)

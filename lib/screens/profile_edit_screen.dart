@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart'; // ImageSource enum icin gerekl
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import '../providers/swipe_provider.dart';
 import '../utils/image_helper.dart';
 import 'user_profile_screen.dart';
@@ -507,9 +507,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
           // Show beautiful success notification (check mounted after async)
           if (mounted) {
-            CustomNotification.success(
-              context,
-              'Profil Güncellendi',
+            AppNotification.success(
+              title: 'Profil Güncellendi',
               subtitle: 'Değişiklikler başarıyla kaydedildi',
             );
           }
@@ -528,12 +527,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    CustomNotification.error(context, message);
+    AppNotification.error(title: message);
   }
 
   void _showWarning(String message) {
     if (!mounted) return;
-    CustomNotification.warning(context, message);
+    AppNotification.warning(title: message);
   }
 
   /// Navigate to UserProfileScreen to preview own profile as others see it

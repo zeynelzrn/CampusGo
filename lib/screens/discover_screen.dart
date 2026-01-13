@@ -12,7 +12,7 @@ import '../widgets/modern_animated_dialog.dart';
 import '../services/seed_service.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
-import '../widgets/custom_notification.dart';
+import '../widgets/app_notification.dart';
 import 'chat_detail_screen.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -107,24 +107,22 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         if (mounted) {
           Navigator.pop(context); // Loading'i kapat
 
-          CustomNotification.show(
-            context: context,
-            message: 'Kullanıcı Engellendi',
+          AppNotification.blocked(
+            title: 'Kullanıcı Engellendi',
             subtitle: '${profile.name} artık sizi göremez',
-            type: NotificationType.error,
           );
         }
       } else {
         if (mounted) {
           Navigator.pop(context);
-          CustomNotification.error(context, 'Engelleme başarısız oldu');
+          AppNotification.error(title: 'Engelleme başarısız oldu');
         }
       }
     } catch (e) {
       debugPrint('Error blocking user: $e');
       if (mounted) {
         Navigator.pop(context);
-        CustomNotification.error(context, 'Bir hata oluştu');
+        AppNotification.error(title: 'Bir hata oluştu');
       }
     }
   }
@@ -926,21 +924,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
       if (mounted) {
         Navigator.pop(context);
-        CustomNotification.success(
-          context,
-          'Test Profilleri Eklendi',
+        AppNotification.success(
+          title: 'Test Profilleri Eklendi',
           subtitle: likeCount > 0
-              ? '$likeCount kisi seninle tanismak istiyor!'
-              : 'Yeni profiller kesfetmeye hazir',
+              ? '$likeCount kişi seninle tanışmak istiyor!'
+              : 'Yeni profiller keşfetmeye hazır',
         );
         ref.read(swipeProvider.notifier).refresh();
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context);
-        CustomNotification.error(
-          context,
-          'Hata',
+        AppNotification.error(
+          title: 'Hata',
           subtitle: 'Profiller eklenemedi',
         );
       }
