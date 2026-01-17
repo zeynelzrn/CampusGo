@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
+import '../utils/image_helper.dart';
 
 class MatchesScreen extends ConsumerStatefulWidget {
   const MatchesScreen({super.key});
@@ -268,14 +270,20 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                         ? CachedNetworkImage(
                             imageUrl: match.photoUrl!,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              color: Colors.grey[200],
+                            cacheManager: AppCacheManager.instance,
+                            placeholder: (context, url) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(color: Colors.grey[200]),
                             ),
-                            errorWidget: (context, url, error) => Container(
-                              color: Colors.grey[200],
-                              child: Icon(
-                                Icons.person,
-                                color: Colors.grey[400],
+                            errorWidget: (context, url, error) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                color: Colors.grey[200],
+                                child: Center(
+                                  child: Icon(Icons.person, color: Colors.grey[400]),
+                                ),
                               ),
                             ),
                           )

@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import '../models/user_profile.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
@@ -32,6 +35,22 @@ class SwipeRepository {
 
   CollectionReference<Map<String, dynamic>> get _matchesCollection =>
       _firestore.collection('matches');
+
+  // ==================== CONNECTIVITY CHECK ====================
+
+  /// İnternet bağlantısını kontrol et
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final hasConnection = await InternetConnection().hasInternetAccess;
+      if (!hasConnection) {
+        debugPrint('SwipeRepository: İnternet bağlantısı yok!');
+      }
+      return hasConnection;
+    } catch (e) {
+      debugPrint('SwipeRepository: İnternet kontrolü hatası: $e');
+      return false;
+    }
+  }
 
   /// Fetch ALL exclusion IDs for the current user (for client-side filtering)
   /// This includes:
@@ -158,6 +177,12 @@ class SwipeRepository {
     final userId = currentUserId;
     if (userId == null) {
       return {'success': false, 'isMatch': false};
+    }
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('SwipeRepository: İnternet bağlantısı yok - swipe kaydedilemedi');
+      throw const SocketException('İnternet bağlantısı yok');
     }
 
     try {
@@ -304,6 +329,12 @@ class SwipeRepository {
   Future<bool> undoLastSwipe(String targetUserId) async {
     final userId = currentUserId;
     if (userId == null) return false;
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('SwipeRepository: İnternet bağlantısı yok - geri al işlemi yapılamadı');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
 
     try {
       final actionId = SwipeAction.generateId(userId, targetUserId);

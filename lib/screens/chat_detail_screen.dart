@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../widgets/app_notification.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
+import '../providers/connectivity_provider.dart';
 import '../widgets/modern_animated_dialog.dart';
+import '../utils/image_helper.dart';
 import 'user_profile_screen.dart';
 
-class ChatDetailScreen extends StatefulWidget {
+class ChatDetailScreen extends ConsumerStatefulWidget {
   final String chatId;
   final String peerName;
   final String? peerImage;
@@ -24,10 +28,10 @@ class ChatDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+  ConsumerState<ChatDetailScreen> createState() => _ChatDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen>
+class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
     with TickerProviderStateMixin {
   final ChatService _chatService = ChatService();
   final UserService _userService = UserService();
@@ -130,6 +134,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                     ? CachedNetworkImage(
                         imageUrl: widget.peerImage!,
                         fit: BoxFit.cover,
+                        cacheManager: AppCacheManager.instance,
                         placeholder: (context, url) => _buildDefaultAvatar(),
                         errorWidget: (context, url, error) => _buildDefaultAvatar(),
                       )
@@ -179,18 +184,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
 
   Widget _buildDefaultAvatar() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFF5C6BC0),
+      highlightColor: const Color(0xFF7986CB),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
-      child: const Icon(
-        Icons.person_rounded,
-        color: Colors.white,
-        size: 24,
+        child: const Center(
+          child: Icon(
+            Icons.person_rounded,
+            color: Colors.white70,
+            size: 24,
+          ),
+        ),
       ),
     );
   }
@@ -463,6 +474,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
 
   Widget _buildInputArea() {
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -480,119 +493,161 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Text field
-          Expanded(
-            child: Container(
+          // Offline indicator
+          if (!isOnline)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: _focusNode.hasFocus
-                      ? const Color(0xFF5C6BC0).withValues(alpha: 0.5)
-                      : Colors.transparent,
-                  width: 2,
-                ),
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Emoji button
-                  IconButton(
-                    icon: const Icon(
-                      Icons.emoji_emotions_outlined,
-                      color: Colors.grey,
-                      size: 24,
+                  const Icon(Icons.wifi_off_rounded, size: 14, color: Colors.red),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Çevrimdışı - Mesaj gönderilemez',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red,
                     ),
-                    onPressed: () {
-                      // TODO: Emoji picker
-                    },
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      focusNode: _focusNode,
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: 4,
-                      minLines: 1,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        color: Colors.grey[800],
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Mesaj yaz...',
-                        hintStyle: GoogleFonts.poppins(
-                          fontSize: 15,
-                          color: Colors.grey[400],
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                        ),
-                      ),
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                  // Attachment button
-                  IconButton(
-                    icon: const Icon(
-                      Icons.attach_file_rounded,
-                      color: Colors.grey,
-                      size: 24,
-                    ),
-                    onPressed: () {
-                      // TODO: Attachment picker
-                    },
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Send button
-          ScaleTransition(
-            scale: _sendButtonAnimation,
-            child: GestureDetector(
-              onTapDown: (_) => _sendButtonController.forward(),
-              onTapUp: (_) {
-                _sendButtonController.reverse();
-                _sendMessage();
-              },
-              onTapCancel: () => _sendButtonController.reverse(),
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: _isSending
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 22,
+          Row(
+            children: [
+              // Text field
+              Expanded(
+                child: AnimatedOpacity(
+                  opacity: isOnline ? 1.0 : 0.6,
+                  duration: const Duration(milliseconds: 300),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: !isOnline
+                            ? Colors.red.withValues(alpha: 0.3)
+                            : _focusNode.hasFocus
+                                ? const Color(0xFF5C6BC0).withValues(alpha: 0.5)
+                                : Colors.transparent,
+                        width: 2,
                       ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Emoji button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.emoji_emotions_outlined,
+                            color: Colors.grey,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            // TODO: Emoji picker
+                          },
+                        ),
+                        Expanded(
+                          child: TextField(
+                            controller: _messageController,
+                            focusNode: _focusNode,
+                            textCapitalization: TextCapitalization.sentences,
+                            maxLines: 4,
+                            minLines: 1,
+                            enabled: isOnline,
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              color: Colors.grey[800],
+                            ),
+                            decoration: InputDecoration(
+                              hintText: isOnline ? 'Mesaj yaz...' : 'Bağlantı bekleniyor...',
+                              hintStyle: GoogleFonts.poppins(
+                                fontSize: 15,
+                                color: Colors.grey[400],
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
+                            ),
+                            onSubmitted: (_) => _sendMessage(),
+                          ),
+                        ),
+                        // Attachment button
+                        IconButton(
+                          icon: const Icon(
+                            Icons.attach_file_rounded,
+                            color: Colors.grey,
+                            size: 24,
+                          ),
+                          onPressed: () {
+                            // TODO: Attachment picker
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              // Send button
+              ScaleTransition(
+                scale: _sendButtonAnimation,
+                child: GestureDetector(
+                  onTapDown: (_) => _sendButtonController.forward(),
+                  onTapUp: (_) {
+                    _sendButtonController.reverse();
+                    _sendMessage();
+                  },
+                  onTapCancel: () => _sendButtonController.reverse(),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isOnline
+                            ? [const Color(0xFF5C6BC0), const Color(0xFF7986CB)]
+                            : [Colors.grey[400]!, Colors.grey[500]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: isOnline
+                              ? const Color(0xFF5C6BC0).withValues(alpha: 0.4)
+                              : Colors.grey.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: _isSending
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Icon(
+                            isOnline ? Icons.send_rounded : Icons.wifi_off_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -602,6 +657,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
+
+    // İnternet kontrolü
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      HapticFeedback.heavyImpact();
+      _showOfflineWarning();
+      return;
+    }
 
     setState(() => _isSending = true);
 
@@ -629,6 +692,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     }
 
     setState(() => _isSending = false);
+  }
+
+  /// Offline uyarı dialogu göster
+  void _showOfflineWarning() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.wifi_off_rounded,
+        title: 'Bağlantı Yok',
+        subtitle: 'İnternet bağlantınız olmadan mesaj gönderemezsiniz.\n\nLütfen bağlantınızı kontrol edip tekrar deneyin.',
+        confirmText: 'Tamam',
+        confirmButtonColor: const Color(0xFF5C6BC0),
+        onConfirm: () => Navigator.pop(dialogContext),
+      ),
+    );
   }
 
   void _showOptionsMenu() {

@@ -5,6 +5,169 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 import 'package:path/path.dart' as path;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:shimmer/shimmer.dart';
+
+// ==================== GLOBAL CACHE MANAGER ====================
+
+/// 7 gün önbellekleme süreli global cache manager
+/// Tüm uygulama genelinde kullanılır
+class AppCacheManager {
+  static const key = 'campusgo_image_cache';
+
+  static CacheManager? _instance;
+
+  static CacheManager get instance {
+    _instance ??= CacheManager(
+      Config(
+        key,
+        stalePeriod: const Duration(days: 7), // 7 gün önbellekleme
+        maxNrOfCacheObjects: 500, // Maksimum 500 görsel
+        repo: JsonCacheInfoRepository(databaseName: key),
+        fileService: HttpFileService(),
+      ),
+    );
+    return _instance!;
+  }
+
+  /// Yüksek öncelikli cache manager (kullanıcı profil fotoğrafları için)
+  static CacheManager? _highPriorityInstance;
+
+  static CacheManager get highPriorityInstance {
+    _highPriorityInstance ??= CacheManager(
+      Config(
+        '${key}_high_priority',
+        stalePeriod: const Duration(days: 30), // 30 gün önbellekleme
+        maxNrOfCacheObjects: 100, // Maksimum 100 görsel
+        repo: JsonCacheInfoRepository(databaseName: '${key}_high_priority'),
+        fileService: HttpFileService(),
+      ),
+    );
+    return _highPriorityInstance!;
+  }
+
+  /// Önbelleği temizle
+  static Future<void> clearCache() async {
+    await _instance?.emptyCache();
+    await _highPriorityInstance?.emptyCache();
+  }
+}
+
+// ==================== CACHED IMAGE WIDGET BUILDERS ====================
+
+/// Standart önbellekli görsel widget'ı (Shimmer placeholder ile)
+/// Tüm uygulama genelinde kullanılacak
+Widget buildCachedImage({
+  required String imageUrl,
+  BoxFit fit = BoxFit.cover,
+  double? width,
+  double? height,
+  BorderRadius? borderRadius,
+  bool highPriority = false,
+  Color shimmerBaseColor = const Color(0xFFE0E0E0),
+  Color shimmerHighlightColor = const Color(0xFFF5F5F5),
+  IconData placeholderIcon = Icons.person,
+  double iconSize = 60,
+}) {
+  final cacheManager = highPriority
+      ? AppCacheManager.highPriorityInstance
+      : AppCacheManager.instance;
+
+  Widget shimmerPlaceholder() {
+    return Shimmer.fromColors(
+      baseColor: shimmerBaseColor,
+      highlightColor: shimmerHighlightColor,
+      child: Container(
+        width: width,
+        height: height,
+        color: shimmerBaseColor,
+        child: Center(
+          child: Icon(
+            placeholderIcon,
+            size: iconSize,
+            color: shimmerHighlightColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget image = CachedNetworkImage(
+    imageUrl: imageUrl,
+    fit: fit,
+    width: width,
+    height: height,
+    cacheManager: cacheManager,
+    placeholder: (context, url) => shimmerPlaceholder(),
+    errorWidget: (context, url, error) => shimmerPlaceholder(),
+    fadeInDuration: const Duration(milliseconds: 300),
+    fadeOutDuration: const Duration(milliseconds: 300),
+  );
+
+  if (borderRadius != null) {
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: image,
+    );
+  }
+
+  return image;
+}
+
+/// Profil fotoğrafı için özel widget (yüksek öncelikli önbellekleme)
+Widget buildProfileImage({
+  required String imageUrl,
+  BoxFit fit = BoxFit.cover,
+  double? width,
+  double? height,
+  BorderRadius? borderRadius,
+}) {
+  return buildCachedImage(
+    imageUrl: imageUrl,
+    fit: fit,
+    width: width,
+    height: height,
+    borderRadius: borderRadius,
+    highPriority: true,
+    shimmerBaseColor: const Color(0xFF5C6BC0),
+    shimmerHighlightColor: const Color(0xFF7986CB),
+    placeholderIcon: Icons.person,
+    iconSize: 80,
+  );
+}
+
+/// Avatar için özel widget (küçük boyutlu)
+Widget buildAvatarImage({
+  required String imageUrl,
+  double size = 56,
+  bool highPriority = false,
+}) {
+  return ClipOval(
+    child: buildCachedImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      width: size,
+      height: size,
+      highPriority: highPriority,
+      iconSize: size * 0.5,
+    ),
+  );
+}
+
+/// Swipe kartı için özel widget (tam ekran)
+Widget buildSwipeCardImage({
+  required String imageUrl,
+  BoxFit fit = BoxFit.cover,
+}) {
+  return buildCachedImage(
+    imageUrl: imageUrl,
+    fit: fit,
+    shimmerBaseColor: Colors.grey[300]!,
+    shimmerHighlightColor: Colors.grey[100]!,
+    iconSize: 80,
+  );
+}
 
 /// Resim sikistirma, secme ve izin yonetimi icin yardimci sinif
 class ImageHelper {

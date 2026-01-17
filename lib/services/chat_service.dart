@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import '../models/chat.dart';
 import '../models/user_profile.dart';
 
@@ -24,6 +26,23 @@ class ChatService {
 
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _firestore.collection('users');
+
+  // ==================== CONNECTIVITY CHECK ====================
+
+  /// İnternet bağlantısını kontrol et
+  /// Firestore yazma işlemlerinden önce çağrılmalı
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final hasConnection = await InternetConnection().hasInternetAccess;
+      if (!hasConnection) {
+        debugPrint('ChatService: İnternet bağlantısı yok!');
+      }
+      return hasConnection;
+    } catch (e) {
+      debugPrint('ChatService: İnternet kontrolü hatası: $e');
+      return false;
+    }
+  }
 
   // ==================== CHAT LIST OPERATIONS ====================
 
@@ -99,6 +118,12 @@ class ChatService {
     final userId = currentUserId;
     if (userId == null) return null;
 
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - sohbet oluşturulamadı');
+      return null;
+    }
+
     try {
       final chatId = Chat.generateChatId(userId, peerId);
 
@@ -155,6 +180,12 @@ class ChatService {
   /// Create chat when match happens (called from SwipeRepository)
   /// Takes both user IDs to ensure proper chat creation
   Future<String?> createMatchChat(String userId1, String userId2) async {
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - chat oluşturulamadı');
+      return null;
+    }
+
     try {
       final chatId = Chat.generateChatId(userId1, userId2);
 
@@ -246,6 +277,12 @@ class ChatService {
     final userId = currentUserId;
     if (userId == null || text.trim().isEmpty) return false;
 
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - mesaj gönderilemedi');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
+
     try {
       // Use batch write for atomicity
       final batch = _firestore.batch();
@@ -281,6 +318,12 @@ class ChatService {
   Future<void> markChatAsRead(String chatId) async {
     final userId = currentUserId;
     if (userId == null) return;
+
+    // İnternet bağlantısı kontrolü - sessiz fail (kritik değil)
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet yok - okundu işareti atlanadı');
+      return;
+    }
 
     try {
       await _chatsCollection.doc(chatId).update({
@@ -339,6 +382,12 @@ class ChatService {
     final userId = currentUserId;
     if (userId == null) return false;
 
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - sohbet temizlenemedi');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
+
     try {
       // Delete all messages
       final messagesSnapshot =
@@ -370,6 +419,12 @@ class ChatService {
     final userId = currentUserId;
     if (userId == null) return false;
 
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - sohbet silinemedi');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
+
     try {
       // Delete all messages first
       final messagesSnapshot =
@@ -396,6 +451,12 @@ class ChatService {
   Future<bool> deleteChatWithUser(String targetUserId) async {
     final userId = currentUserId;
     if (userId == null) return false;
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ChatService: İnternet bağlantısı yok - sohbet silinemedi');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
 
     try {
       // Generate chat ID (same format as createOrGetChat)

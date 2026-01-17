@@ -4,12 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../widgets/app_notification.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../models/user_profile.dart';
 import '../widgets/modern_animated_dialog.dart';
 import '../providers/likes_provider.dart';
+import '../utils/image_helper.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String userId;
@@ -77,17 +79,26 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       return CachedNetworkImage(
         imageUrl: photoPath,
         fit: fit,
-        placeholder: (context, url) => Container(
-          color: Colors.grey[300],
-          child: const Center(
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+        cacheManager: AppCacheManager.highPriorityInstance,
+        placeholder: (context, url) => Shimmer.fromColors(
+          baseColor: const Color(0xFF5C6BC0),
+          highlightColor: const Color(0xFF7986CB),
+          child: Container(
+            color: const Color(0xFF5C6BC0),
+            child: const Center(
+              child: Icon(Icons.person, size: 100, color: Colors.white54),
             ),
           ),
         ),
-        errorWidget: (context, url, error) => Container(
-          color: const Color(0xFF5C6BC0),
-          child: const Icon(Icons.person, size: 100, color: Colors.white),
+        errorWidget: (context, url, error) => Shimmer.fromColors(
+          baseColor: const Color(0xFF5C6BC0),
+          highlightColor: const Color(0xFF7986CB),
+          child: Container(
+            color: const Color(0xFF5C6BC0),
+            child: const Center(
+              child: Icon(Icons.person, size: 100, color: Colors.white54),
+            ),
+          ),
         ),
       );
     }
@@ -1446,15 +1457,47 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ? Image.file(
                       File(photoPath.replaceFirst('file://', '')),
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => const Icon(
-                        Icons.broken_image,
-                        size: 100,
-                        color: Colors.white,
+                      errorBuilder: (context, error, stackTrace) => Shimmer.fromColors(
+                        baseColor: Colors.grey[800]!,
+                        highlightColor: Colors.grey[600]!,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: Icon(Icons.person, size: 80, color: Colors.white38),
+                          ),
+                        ),
                       ),
                     )
                   : CachedNetworkImage(
                       imageUrl: photoPath,
                       fit: BoxFit.contain,
+                      cacheManager: AppCacheManager.highPriorityInstance,
+                      placeholder: (context, url) => Shimmer.fromColors(
+                        baseColor: Colors.grey[800]!,
+                        highlightColor: Colors.grey[600]!,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: Icon(Icons.person, size: 80, color: Colors.white38),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Shimmer.fromColors(
+                        baseColor: Colors.grey[800]!,
+                        highlightColor: Colors.grey[600]!,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          color: Colors.grey[800],
+                          child: const Center(
+                            child: Icon(Icons.person, size: 80, color: Colors.white38),
+                          ),
+                        ),
+                      ),
                     ),
             ),
           ),

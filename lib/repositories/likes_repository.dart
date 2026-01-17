@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_profile.dart';
 
 /// Repository for handling likes data with real-time Stream support
@@ -8,7 +9,91 @@ class LikesRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  /// In-memory cache for user profiles (prevents re-fetching)
+  static final Map<String, UserProfile> _profileCache = {};
+
+  /// Cache validity duration
+  static const Duration _cacheValidityDuration = Duration(minutes: 5);
+  static final Map<String, DateTime> _cacheTimestamps = {};
+
   String? get currentUserId => _auth.currentUser?.uid;
+
+  /// Batch fetch profiles using Firestore whereIn (max 30 IDs per query)
+  /// This optimizes N+1 queries: 100 users = 4 reads instead of 100 reads
+  Future<List<UserProfile>> _batchFetchProfiles(List<String> userIds) async {
+    if (userIds.isEmpty) return [];
+
+    final now = DateTime.now();
+    final idsToFetch = <String>[];
+    final cachedProfiles = <String, UserProfile>{};
+
+    // Check cache first - only use if not expired
+    for (final id in userIds) {
+      final cacheTime = _cacheTimestamps[id];
+      final isCacheValid = cacheTime != null &&
+          now.difference(cacheTime) < _cacheValidityDuration;
+
+      if (isCacheValid && _profileCache.containsKey(id)) {
+        cachedProfiles[id] = _profileCache[id]!;
+      } else {
+        idsToFetch.add(id);
+      }
+    }
+
+    // Fetch uncached profiles in chunks of 30 (Firestore whereIn limit)
+    if (idsToFetch.isNotEmpty) {
+      const chunkSize = 30;
+
+      for (var i = 0; i < idsToFetch.length; i += chunkSize) {
+        final end = (i + chunkSize > idsToFetch.length)
+            ? idsToFetch.length
+            : i + chunkSize;
+        final chunk = idsToFetch.sublist(i, end);
+
+        try {
+          final snapshot = await _firestore
+              .collection('users')
+              .where(FieldPath.documentId, whereIn: chunk)
+              .get();
+
+          for (final doc in snapshot.docs) {
+            // snapshot.docs already contains existing documents
+            final data = doc.data();
+            if (data.isNotEmpty) {
+              final profile = UserProfile.fromFirestore(doc);
+              _profileCache[profile.id] = profile;
+              _cacheTimestamps[profile.id] = now;
+              cachedProfiles[profile.id] = profile;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error batch fetching profiles chunk: $e');
+        }
+      }
+    }
+
+    // Preserve original order (important for sorted likes list)
+    final orderedResult = <UserProfile>[];
+    for (final id in userIds) {
+      if (cachedProfiles.containsKey(id)) {
+        orderedResult.add(cachedProfiles[id]!);
+      }
+    }
+
+    return orderedResult;
+  }
+
+  /// Clear profile cache (call when user logs out or data changes)
+  static void clearCache() {
+    _profileCache.clear();
+    _cacheTimestamps.clear();
+  }
+
+  /// Remove a specific user from cache (call after blocking/unblocking)
+  static void invalidateUser(String userId) {
+    _profileCache.remove(userId);
+    _cacheTimestamps.remove(userId);
+  }
 
   /// Watch received likes in real-time
   /// Returns a Stream of UserProfiles who have liked the current user
@@ -97,18 +182,10 @@ class LikesRepository {
         return <UserProfile>[];
       }
 
-      // Step 4: Fetch user profiles
-      final profiles = <UserProfile>[];
-      for (String id in finalUserIds) {
-        try {
-          final userDoc = await _firestore.collection('users').doc(id).get();
-          if (userDoc.exists && userDoc.data() != null) {
-            profiles.add(UserProfile.fromFirestore(userDoc));
-          }
-        } catch (e) {
-          print('Error loading profile for $id: $e');
-        }
-      }
+      // Step 4: Batch fetch user profiles (OPTIMIZED - 30 IDs per query)
+      // Old: 100 users = 100 reads (N+1 problem)
+      // New: 100 users = 4 reads (whereIn with 30-item chunks)
+      final profiles = await _batchFetchProfiles(finalUserIds);
 
       return profiles;
     });

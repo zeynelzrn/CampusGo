@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'notification_service.dart';
 import 'user_service.dart';
+import 'profile_cache_service.dart';
+import '../repositories/likes_repository.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -10,6 +13,20 @@ class AuthService {
 
   // Mevcut kullanıcıyı al
   User? get currentUser => _auth.currentUser;
+
+  /// İnternet bağlantısını kontrol et
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final hasConnection = await InternetConnection().hasInternetAccess;
+      if (!hasConnection) {
+        debugPrint('AuthService: İnternet bağlantısı yok!');
+      }
+      return hasConnection;
+    } catch (e) {
+      debugPrint('AuthService: İnternet kontrolü hatası: $e');
+      return false;
+    }
+  }
 
   // Auth durumunu dinle
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -135,6 +152,13 @@ class AuthService {
     if (user != null) {
       await _notificationService.deleteTokenFromFirestore(user.uid);
     }
+
+    // Clear all caches on logout
+    await ProfileCacheService.instance.clearCache();
+    LikesRepository.clearCache();
+
+    debugPrint('AuthService: Çıkış yapıldı - tüm cache temizlendi');
+
     await _auth.signOut();
   }
 
@@ -174,6 +198,15 @@ class AuthService {
   // 5. FCM token temizliği
   // 6. Firebase Auth hesabını sil (EN SON)
   Future<Map<String, dynamic>> deleteAccountWithData(String password) async {
+    // İnternet bağlantısı kontrolü - EN BAŞTA!
+    if (!await _checkInternetConnection()) {
+      debugPrint('AuthService: İnternet bağlantısı yok - hesap silinemedi');
+      return {
+        'success': false,
+        'error': 'İnternet bağlantınız yok. Lütfen bağlantınızı kontrol edin.',
+      };
+    }
+
     debugPrint('');
     debugPrint('╔══════════════════════════════════════════════════════════════╗');
     debugPrint('║         HESAP SİLME İŞLEMİ BAŞLIYOR                          ║');

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'firebase_options.dart';
 import 'widgets/app_notification.dart';
+import 'widgets/connectivity_banner.dart';
 import 'screens/splash_screen.dart';
 import 'screens/main_screen.dart';
 import 'services/notification_service.dart';
@@ -194,6 +195,12 @@ class _MyAppState extends State<MyApp> {
         title: 'Campus Go',
         debugShowCheckedModeBanner: false,
         debugShowMaterialGrid: false,
+        // ConnectivityWrapper inside builder to have access to MaterialApp's Directionality
+        builder: (context, child) {
+          return ConnectivityWrapper(
+            child: child ?? const SizedBox.shrink(),
+          );
+        },
         home: const SplashScreen(),
       ),
     );

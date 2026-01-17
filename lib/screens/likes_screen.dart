@@ -5,12 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/user_profile.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/swipe_card.dart';
+import '../widgets/modern_animated_dialog.dart';
 import '../services/seed_service.dart';
 import '../services/chat_service.dart';
 import '../providers/likes_provider.dart';
+import '../providers/connectivity_provider.dart';
+import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
 import 'user_profile_screen.dart';
 
@@ -34,7 +38,37 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     ref.read(likesUIProvider.notifier).initializeEliminatedIds(eliminatedIds);
   }
 
+  /// İnternet bağlantısını kontrol et
+  bool _checkConnectivity() {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      HapticFeedback.heavyImpact();
+      _showOfflineWarning();
+      return false;
+    }
+    return true;
+  }
+
+  /// Offline uyarı dialogu göster
+  void _showOfflineWarning() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.wifi_off_rounded,
+        title: 'Bağlantı Yok',
+        subtitle: 'İnternet bağlantınız olmadan bu işlemi yapamazsınız.\n\nLütfen bağlantınızı kontrol edip tekrar deneyin.',
+        confirmText: 'Tamam',
+        confirmButtonColor: const Color(0xFF5C6BC0),
+        onConfirm: () => Navigator.pop(dialogContext),
+      ),
+    );
+  }
+
   Future<void> _likeUser(UserProfile user) async {
+    // İnternet kontrolü
+    if (!_checkConnectivity()) return;
+
     HapticFeedback.mediumImpact();
 
     try {
@@ -124,6 +158,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
   }
 
   Future<void> _dislikeUser(UserProfile user) async {
+    // İnternet kontrolü
+    if (!_checkConnectivity()) return;
+
     HapticFeedback.mediumImpact();
 
     try {
@@ -148,6 +185,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
 
   /// Elenmiş kullanıcıyı tamamen listeden kaldır (X butonuna basıldığında)
   Future<void> _dismissUser(UserProfile user) async {
+    // İnternet kontrolü
+    if (!_checkConnectivity()) return;
+
     final uiState = ref.read(likesUIProvider);
 
     // Zaten animasyon oynatılıyorsa veya zaten kaldırılmışsa tekrar başlatma
@@ -203,12 +243,42 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     // Watch the stream of received likes
     final likesAsync = ref.watch(receivedLikesProvider);
     final uiState = ref.watch(likesUIProvider);
+    final isOnline = ref.watch(isOnlineProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
+            // Offline banner
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: isOnline ? 0 : 40,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 300),
+                opacity: isOnline ? 0 : 1,
+                child: Container(
+                  color: Colors.orange[700],
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'İnternet bağlantınız yok - İşlemler devre dışı',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             _buildHeader(likesAsync),
             Expanded(
               child: likesAsync.when(
@@ -668,19 +738,26 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
                             ? CachedNetworkImage(
                                 imageUrl: user.photos.first,
                                 fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF5C6BC0),
-                                      ),
+                                cacheManager: AppCacheManager.instance,
+                                placeholder: (context, url) => Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(
+                                    color: Colors.grey[200],
+                                    child: Center(
+                                      child: Icon(Icons.person, size: 60, color: Colors.grey[400]),
                                     ),
                                   ),
                                 ),
-                                errorWidget: (context, url, error) => Container(
-                                  color: Colors.grey[200],
-                                  child: Icon(Icons.person, size: 60, color: Colors.grey[400]),
+                                errorWidget: (context, url, error) => Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(
+                                    color: Colors.grey[200],
+                                    child: Center(
+                                      child: Icon(Icons.person, size: 60, color: Colors.grey[400]),
+                                    ),
+                                  ),
                                 ),
                               )
                             : Container(

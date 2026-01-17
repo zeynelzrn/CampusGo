@@ -31,6 +31,7 @@ dependencies:
   flutter_card_swiper: ^7.0.1
   # Image Caching
   cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.4.1
   # Shimmer effect
   shimmer: ^3.0.0
   # Push Notifications
@@ -40,12 +41,15 @@ dependencies:
   overlay_support: ^2.1.0
   # Reactive Extensions for Dart (Stream combining)
   rxdart: ^0.28.0
+  connectivity_plus: ^7.0.0
+  internet_connection_checker_plus: ^2.9.1+2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   flutter_launcher_icons: ^0.14.2
+  flutter_native_splash: ^2.4.7
 
 # App Icon Configuration
 flutter_launcher_icons:
@@ -63,6 +67,20 @@ flutter_launcher_icons:
     generate: false
   macos:
     generate: false
+
+# Splash Screen Configuration
+flutter_native_splash:
+  # Sadece renk, görsel YOK
+  color: "#5C6BC0"  # CampusGo İndigo Rengi
+  color_dark: "#5C6BC0"  # Dark mode için de aynı renk
+
+  # Android 12+ için de sadece renk
+  android_12:
+    color: "#5C6BC0"
+    color_dark: "#5C6BC0"
+
+  ios: true
+  android: true
 
 flutter:
   uses-material-design: true

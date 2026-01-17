@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import '../models/user_profile.dart';
+import '../services/profile_cache_service.dart';
 
 /// Profile data model for creating/updating profiles
 class ProfileData {
@@ -45,6 +47,7 @@ class ProfileRepository {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final FirebaseStorage _storage;
+  final ProfileCacheService _cacheService = ProfileCacheService.instance;
 
   ProfileRepository({
     FirebaseFirestore? firestore,
@@ -174,7 +177,7 @@ class ProfileRepository {
     );
   }
 
-  /// Get current user's profile
+  /// Get current user's profile (Map format - legacy)
   Future<Map<String, dynamic>?> getProfile() async {
     final userId = currentUserId;
     if (userId == null) return null;
@@ -182,10 +185,164 @@ class ProfileRepository {
     try {
       final doc = await _firestore.collection('users').doc(userId).get();
       if (!doc.exists) return null;
-      return doc.data();
+
+      final data = doc.data();
+
+      // Cache the profile for instant loading next time
+      if (data != null) {
+        final profile = UserProfile.fromFirestore(doc);
+        await _cacheService.cacheProfile(profile);
+      }
+
+      return data;
     } catch (e) {
       return null;
     }
+  }
+
+  /// Get current user's profile with Cache-First strategy
+  /// Returns cached profile immediately, then fetches fresh data in background
+  ///
+  /// Usage with StreamController for UI updates:
+  /// ```dart
+  /// final cachedProfile = await repository.getCachedUserProfile();
+  /// if (cachedProfile != null) {
+  ///   // Show immediately
+  ///   setState(() => _profile = cachedProfile);
+  /// }
+  /// // Fetch fresh data
+  /// final freshProfile = await repository.getUserProfile(forceRefresh: cachedProfile != null);
+  /// if (freshProfile != null && freshProfile != cachedProfile) {
+  ///   setState(() => _profile = freshProfile);
+  /// }
+  /// ```
+  Future<UserProfile?> getCachedUserProfile() async {
+    final userId = currentUserId;
+    if (userId == null) return null;
+
+    return await _cacheService.getCachedProfile(userId);
+  }
+
+  /// Get current user's profile as UserProfile object
+  /// If forceRefresh is false and cache is valid, returns cache
+  /// Otherwise fetches from Firestore and updates cache
+  Future<UserProfile?> getUserProfile({bool forceRefresh = false}) async {
+    final userId = currentUserId;
+    if (userId == null) return null;
+
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      final cached = await _cacheService.getCachedProfile(userId);
+      final isValid = await _cacheService.isCacheValid();
+
+      if (cached != null && isValid) {
+        debugPrint('ProfileRepository: Cache\'den yüklendi (${cached.name})');
+        return cached;
+      }
+    }
+
+    // Fetch from Firestore
+    try {
+      debugPrint('ProfileRepository: Firestore\'dan yükleniyor...');
+      final doc = await _firestore.collection('users').doc(userId).get();
+
+      if (!doc.exists || doc.data() == null) {
+        return null;
+      }
+
+      final profile = UserProfile.fromFirestore(doc);
+
+      // Update cache
+      await _cacheService.cacheProfile(profile);
+
+      debugPrint('ProfileRepository: Firestore\'dan yüklendi ve önbelleğe alındı');
+      return profile;
+    } catch (e) {
+      debugPrint('ProfileRepository: Firestore hatası: $e');
+
+      // On network error, try to return cached version
+      final cached = await _cacheService.getCachedProfile(userId);
+      if (cached != null) {
+        debugPrint('ProfileRepository: Hata sonrası cache\'den yüklendi');
+        return cached;
+      }
+
+      return null;
+    }
+  }
+
+  /// Stream that emits cached profile immediately, then fresh profile
+  /// Perfect for UI that needs instant display + background refresh
+  Stream<UserProfile?> watchCurrentUserProfile() async* {
+    final userId = currentUserId;
+    if (userId == null) {
+      yield null;
+      return;
+    }
+
+    // First, emit cached profile immediately (if exists)
+    final cached = await _cacheService.getCachedProfile(userId);
+    if (cached != null) {
+      debugPrint('ProfileRepository: Stream - Cache emitted');
+      yield cached;
+    }
+
+    // Then fetch fresh from Firestore
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+
+      if (doc.exists && doc.data() != null) {
+        final freshProfile = UserProfile.fromFirestore(doc);
+
+        // Update cache
+        await _cacheService.cacheProfile(freshProfile);
+
+        // Only emit if different from cached
+        if (cached == null || _hasProfileChanged(cached, freshProfile)) {
+          debugPrint('ProfileRepository: Stream - Fresh profile emitted');
+          yield freshProfile;
+        } else {
+          debugPrint('ProfileRepository: Stream - No changes detected');
+        }
+      } else if (cached == null) {
+        yield null;
+      }
+    } catch (e) {
+      debugPrint('ProfileRepository: Stream error: $e');
+      // If error and no cache was emitted, emit null
+      if (cached == null) {
+        yield null;
+      }
+    }
+  }
+
+  /// Check if profile has meaningful changes
+  bool _hasProfileChanged(UserProfile cached, UserProfile fresh) {
+    return cached.name != fresh.name ||
+        cached.bio != fresh.bio ||
+        cached.age != fresh.age ||
+        cached.university != fresh.university ||
+        cached.department != fresh.department ||
+        cached.grade != fresh.grade ||
+        cached.photos.length != fresh.photos.length ||
+        cached.interests.length != fresh.interests.length ||
+        cached.clubs.length != fresh.clubs.length ||
+        cached.intent.length != fresh.intent.length ||
+        !_listEquals(cached.photos, fresh.photos);
+  }
+
+  bool _listEquals(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  /// Clear profile cache (call on logout)
+  Future<void> clearProfileCache() async {
+    await _cacheService.clearCache();
+    debugPrint('ProfileRepository: Cache temizlendi');
   }
 
   /// Update profile fields
@@ -200,6 +357,11 @@ class ProfileRepository {
         ...updates,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+
+      // Update cache with new values
+      await _cacheService.updateCachedFields(updates);
+
+      debugPrint('ProfileRepository: Profil güncellendi ve cache yenilendi');
     } on FirebaseException catch (e) {
       throw Exception('Profil güncellenirken hata: ${e.message}');
     }

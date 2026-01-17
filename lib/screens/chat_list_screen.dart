@@ -9,6 +9,7 @@ import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../widgets/modern_animated_dialog.dart';
+import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
 import 'main_screen.dart';
 
@@ -580,16 +581,8 @@ class _ChatListScreenState extends State<ChatListScreen>
             ? CachedNetworkImage(
                 imageUrl: chat.peerImage!,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Colors.grey[200],
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
-                    ),
-                  ),
-                ),
+                cacheManager: AppCacheManager.instance,
+                placeholder: (context, url) => _buildDefaultAvatar(),
                 errorWidget: (context, url, error) => _buildDefaultAvatar(),
               )
             : _buildDefaultAvatar(),
@@ -598,18 +591,25 @@ class _ChatListScreenState extends State<ChatListScreen>
   }
 
   Widget _buildDefaultAvatar() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    // Shimmer efekti ile loading/error durumu göster
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFF5C6BC0),
+      highlightColor: const Color(0xFF7986CB),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
-      child: const Icon(
-        Icons.person_rounded,
-        color: Colors.white,
-        size: 32,
+        child: const Center(
+          child: Icon(
+            Icons.person_rounded,
+            color: Colors.white70,
+            size: 32,
+          ),
+        ),
       ),
     );
   }

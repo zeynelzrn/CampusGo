@@ -1,7 +1,10 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
+import '../utils/network_utils.dart';
 
 /// Swipe state
 class SwipeState {
@@ -97,10 +100,23 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
       // 3. Fetch initial batch of profiles
       await _fetchNextBatch();
-    } catch (e) {
+    } on SocketException {
       state = state.copyWith(
         isLoading: false,
-        error: 'Profiller yüklenirken bir hata oluştu',
+        error: 'İnternet bağlantınızı kontrol edin',
+      );
+    } on TimeoutException {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Bağlantı zaman aşımına uğradı',
+      );
+    } catch (e) {
+      final errorMsg = NetworkUtils.isNetworkError(e)
+          ? 'İnternet bağlantınızı kontrol edin'
+          : 'Profiller yüklenirken bir hata oluştu';
+      state = state.copyWith(
+        isLoading: false,
+        error: errorMsg,
       );
     }
   }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../repositories/profile_repository.dart';
+import '../models/user_profile.dart';
 
 /// App startup state
 enum AppStartupState {
@@ -194,9 +195,39 @@ final hasProfileProvider = FutureProvider<bool>((ref) async {
   return repository.hasProfile();
 });
 
-/// Current user profile provider
+/// Current user profile provider (Map format - legacy)
 final currentProfileProvider =
     FutureProvider<Map<String, dynamic>?>((ref) async {
   final repository = ref.watch(profileRepositoryProvider);
   return repository.getProfile();
 });
+
+/// Current user profile provider with Cache-First strategy
+/// Returns UserProfile object, loads from cache first then refreshes
+final currentUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
+  final repository = ref.watch(profileRepositoryProvider);
+  return repository.getUserProfile();
+});
+
+/// Cached profile provider - returns immediately from cache (no network)
+/// Use this for instant UI display, then use currentUserProfileProvider for fresh data
+final cachedUserProfileProvider = FutureProvider<UserProfile?>((ref) async {
+  final repository = ref.watch(profileRepositoryProvider);
+  return repository.getCachedUserProfile();
+});
+
+/// Stream provider for Cache-First profile loading
+/// Emits cached profile first, then fresh profile from Firestore
+/// Perfect for screens that need instant display + background refresh
+final userProfileStreamProvider = StreamProvider<UserProfile?>((ref) {
+  final repository = ref.watch(profileRepositoryProvider);
+  return repository.watchCurrentUserProfile();
+});
+
+/// Force refresh current user profile (invalidates cache)
+final refreshUserProfileProvider = FutureProvider.family<UserProfile?, bool>(
+  (ref, forceRefresh) async {
+    final repository = ref.watch(profileRepositoryProvider);
+    return repository.getUserProfile(forceRefresh: forceRefresh);
+  },
+);

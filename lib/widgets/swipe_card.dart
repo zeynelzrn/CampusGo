@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/user_profile.dart';
+import '../utils/image_helper.dart';
 
 /// Beautiful Tinder-style swipe card widget
 class SwipeCard extends StatefulWidget {
@@ -239,6 +240,7 @@ class _SwipeCardState extends State<SwipeCard> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        cacheManager: AppCacheManager.instance,
         placeholder: (context, url) => _buildShimmerPlaceholder(),
         errorWidget: (context, url, error) => _buildErrorWidget(),
       ),
@@ -277,33 +279,39 @@ class _SwipeCardState extends State<SwipeCard> {
   }
 
   Widget _buildErrorWidget() {
-    return Container(
-      color: const Color(0xFFFDF6F0),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+    // İnternet yokken veya hata durumunda shimmer efekti göster (yükleniyor gibi)
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        color: Colors.white,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.person,
+                  size: 60,
+                  color: Colors.grey[400],
+                ),
               ),
-              child: const Icon(
-                Icons.person,
-                size: 60,
-                color: Color(0xFF5C6BC0),
+              const SizedBox(height: 16),
+              Container(
+                width: 140,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Fotoğraf yüklenemedi',
-              style: GoogleFonts.poppins(
-                color: Colors.grey[600],
-                fontSize: 14,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1322,17 +1330,25 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
             ? CachedNetworkImage(
                 imageUrl: photoUrl,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                cacheManager: AppCacheManager.instance,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                  ),
                 ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey[200],
-                  child: Icon(
-                    Icons.person,
-                    size: 50,
-                    color:
-                        isCurrentUser ? const Color(0xFF667eea) : Colors.grey,
+                errorWidget: (context, url, error) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.person,
+                      size: 50,
+                      color: isCurrentUser ? const Color(0xFF667eea) : Colors.grey,
+                    ),
                   ),
                 ),
               )

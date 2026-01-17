@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 import '../widgets/app_notification.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../models/user_profile.dart';
 import '../widgets/modern_animated_dialog.dart';
 import '../providers/likes_provider.dart';
+import '../providers/connectivity_provider.dart';
+import '../utils/image_helper.dart';
 
 /// Screen to manage blocked users
 /// Accessible from Settings
@@ -78,7 +81,37 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
     }
   }
 
+  /// İnternet bağlantısını kontrol et
+  bool _checkConnectivity() {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      HapticFeedback.heavyImpact();
+      _showOfflineWarning();
+      return false;
+    }
+    return true;
+  }
+
+  /// Offline uyarı dialogu göster
+  void _showOfflineWarning() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.wifi_off_rounded,
+        title: 'Bağlantı Yok',
+        subtitle: 'İnternet bağlantınız olmadan bu işlemi yapamazsınız.\n\nLütfen bağlantınızı kontrol edip tekrar deneyin.',
+        confirmText: 'Tamam',
+        confirmButtonColor: const Color(0xFF5C6BC0),
+        onConfirm: () => Navigator.pop(dialogContext),
+      ),
+    );
+  }
+
   Future<void> _showUnblockDialog(UserProfile user) async {
+    // İnternet kontrolü - dialog açmadan önce
+    if (!_checkConnectivity()) return;
+
     final confirmed = await showModernDialog<bool>(
       context: context,
       builder: (dialogContext) => ModernAnimatedDialog(
@@ -154,6 +187,8 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -172,13 +207,49 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
           ),
         ),
       ),
-      body: _isLoading
-          ? _buildLoadingState()
-          : _error != null
-              ? _buildErrorState()
-              : _blockedUsers.isEmpty
-                  ? _buildEmptyState()
-                  : _buildBlockedUsersList(),
+      body: Column(
+        children: [
+          // Offline banner
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            height: isOnline ? 0 : 40,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 300),
+              opacity: isOnline ? 0 : 1,
+              child: Container(
+                color: Colors.orange[700],
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'İnternet bağlantınız yok',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Main content
+          Expanded(
+            child: _isLoading
+                ? _buildLoadingState()
+                : _error != null
+                    ? _buildErrorState()
+                    : _blockedUsers.isEmpty
+                        ? _buildEmptyState()
+                        : _buildBlockedUsersList(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -324,6 +395,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                   ? CachedNetworkImage(
                       imageUrl: user.photos.first,
                       fit: BoxFit.cover,
+                      cacheManager: AppCacheManager.instance,
                       placeholder: (context, url) => _buildDefaultAvatar(),
                       errorWidget: (context, url, error) => _buildDefaultAvatar(),
                     )
@@ -389,18 +461,24 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
   }
 
   Widget _buildDefaultAvatar() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.grey[400]!, Colors.grey[500]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.grey[400]!, Colors.grey[500]!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
-      ),
-      child: const Icon(
-        Icons.person_rounded,
-        color: Colors.white,
-        size: 28,
+        child: Center(
+          child: Icon(
+            Icons.person_rounded,
+            color: Colors.grey[400],
+            size: 28,
+          ),
+        ),
       ),
     );
   }

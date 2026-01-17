@@ -1,7 +1,11 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
+import '../utils/network_utils.dart';
 
 /// Service for user-related operations like blocking and reporting
 class UserService {
@@ -30,6 +34,23 @@ class UserService {
   CollectionReference<Map<String, dynamic>> get _chatsCollection =>
       _firestore.collection('chats');
 
+  // ==================== CONNECTIVITY CHECK ====================
+
+  /// İnternet bağlantısını kontrol et
+  /// Firestore yazma işlemlerinden önce çağrılmalı
+  Future<bool> _checkInternetConnection() async {
+    try {
+      final hasConnection = await InternetConnection().hasInternetAccess;
+      if (!hasConnection) {
+        debugPrint('UserService: İnternet bağlantısı yok!');
+      }
+      return hasConnection;
+    } catch (e) {
+      debugPrint('UserService: İnternet kontrolü hatası: $e');
+      return false;
+    }
+  }
+
   // ==================== BLOCK OPERATIONS ====================
 
   /// Block a user
@@ -51,6 +72,12 @@ class UserService {
     if (currentUid == targetUserId) {
       debugPrint('ERROR: Cannot block yourself');
       return false;
+    }
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('ERROR: İnternet bağlantısı yok - işlem iptal edildi');
+      throw const SocketException('İnternet bağlantısı yok');
     }
 
     try {
@@ -119,11 +146,26 @@ class UserService {
 
       debugPrint('========== BLOCK USER SUCCESS ==========');
       return true;
+    } on SocketException catch (e) {
+      debugPrint('========== BLOCK USER NETWORK ERROR ==========');
+      debugPrint('SocketException: $e');
+      debugPrint('>>> İnternet bağlantısı yok <<<');
+      return false;
+    } on TimeoutException catch (e) {
+      debugPrint('========== BLOCK USER TIMEOUT ==========');
+      debugPrint('TimeoutException: $e');
+      return false;
     } catch (e, stackTrace) {
       debugPrint('========== BLOCK USER ERROR ==========');
       debugPrint('Error Type: ${e.runtimeType}');
       debugPrint('Error Message: $e');
       debugPrint('Stack Trace: $stackTrace');
+
+      // Check for network errors first
+      if (NetworkUtils.isNetworkError(e)) {
+        debugPrint('>>> NETWORK ERROR DETECTED <<<');
+        return false;
+      }
 
       // Check for specific error types
       final errorStr = e.toString();
@@ -144,6 +186,12 @@ class UserService {
   Future<bool> unblockUser(String targetUserId) async {
     final currentUid = currentUserId;
     if (currentUid == null) return false;
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('UserService: İnternet bağlantısı yok - engel kaldırılamadı');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
 
     try {
       final batch = _firestore.batch();
@@ -434,6 +482,12 @@ class UserService {
       return false;
     }
 
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('UserService: İnternet bağlantısı yok - rapor gönderilemedi');
+      return false;
+    }
+
     try {
       // Create report document
       await _reportsCollection.add({
@@ -493,6 +547,12 @@ class UserService {
   /// NOT: Bu fonksiyon Firebase Auth hesabını SİLMEZ.
   /// Auth silme işlemi AuthService.deleteAccountWithData() içinde yapılır.
   Future<Map<String, dynamic>> deleteUserEntireData(String userId) async {
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('UserService: İnternet bağlantısı yok - hesap silinemedi');
+      throw const SocketException('İnternet bağlantısı yok');
+    }
+
     debugPrint('');
     debugPrint('╔══════════════════════════════════════════════════════════╗');
     debugPrint('║           HARD DELETE - DEEP CLEAN START                 ║');

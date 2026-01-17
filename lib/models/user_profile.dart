@@ -96,6 +96,55 @@ class UserProfile {
     };
   }
 
+  /// Convert to JSON for SharedPreferences caching
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'age': age,
+      'bio': bio,
+      'university': university,
+      'department': department,
+      'photos': photos,
+      'interests': interests,
+      'gender': gender,
+      'lookingFor': lookingFor,
+      'createdAt': createdAt?.toIso8601String(),
+      'grade': grade,
+      'clubs': clubs,
+      'socialLinks': socialLinks,
+      'intent': intent,
+      'isAdmin': isAdmin,
+      'isBanned': isBanned,
+      // Note: GeoPoint is not serialized to JSON cache
+    };
+  }
+
+  /// Create from JSON (SharedPreferences cache)
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'İsimsiz',
+      age: json['age'] as int? ?? 0,
+      bio: json['bio'] as String? ?? '',
+      university: json['university'] as String? ?? '',
+      department: json['department'] as String? ?? '',
+      photos: List<String>.from(json['photos'] ?? []),
+      interests: List<String>.from(json['interests'] ?? []),
+      gender: json['gender'] as String? ?? '',
+      lookingFor: json['lookingFor'] as String? ?? '',
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
+      grade: json['grade'] as String? ?? '',
+      clubs: List<String>.from(json['clubs'] ?? []),
+      socialLinks: Map<String, String>.from(json['socialLinks'] ?? {}),
+      intent: List<String>.from(json['intent'] ?? []),
+      isAdmin: json['isAdmin'] as bool? ?? false,
+      isBanned: json['isBanned'] as bool? ?? false,
+    );
+  }
+
   /// Get primary photo or placeholder
   String get primaryPhoto => photos.isNotEmpty
       ? photos.first

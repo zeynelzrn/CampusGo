@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shimmer/shimmer.dart';
 import '../providers/swipe_provider.dart';
 import '../providers/likes_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../models/user_profile.dart';
 import '../widgets/swipe_card.dart';
 import '../widgets/modern_animated_dialog.dart';
@@ -13,6 +15,7 @@ import '../services/seed_service.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
 import '../widgets/app_notification.dart';
+import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -34,21 +37,51 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 
   void _onLike() {
+    if (!_checkConnectivity()) return;
     HapticFeedback.mediumImpact();
     final notifier = ref.read(swipeProvider.notifier);
     notifier.swipeRight(0);
   }
 
   void _onDislike() {
+    if (!_checkConnectivity()) return;
     HapticFeedback.mediumImpact();
     final notifier = ref.read(swipeProvider.notifier);
     notifier.swipeLeft(0);
   }
 
   void _onSuperLike() {
+    if (!_checkConnectivity()) return;
     HapticFeedback.heavyImpact();
     final notifier = ref.read(swipeProvider.notifier);
     notifier.superLike(0);
+  }
+
+  /// İnternet bağlantısını kontrol et, yoksa uyarı göster
+  bool _checkConnectivity() {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      HapticFeedback.heavyImpact();
+      _showOfflineWarning();
+      return false;
+    }
+    return true;
+  }
+
+  /// Offline uyarı dialogu göster
+  void _showOfflineWarning() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.wifi_off_rounded,
+        title: 'Bağlantı Yok',
+        subtitle: 'İnternet bağlantınız olmadan bu işlemi yapamazsınız.\n\nLütfen bağlantınızı kontrol edip tekrar deneyin.',
+        confirmText: 'Tamam',
+        confirmButtonColor: const Color(0xFF5C6BC0),
+        onConfirm: () => Navigator.pop(dialogContext),
+      ),
+    );
   }
 
   /// Engelleme dialogunu göster
@@ -271,17 +304,26 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           child: CachedNetworkImage(
             imageUrl: profile.primaryPhoto,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF5C6BC0),
+            cacheManager: AppCacheManager.instance,
+            placeholder: (context, url) => Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: Icon(Icons.person, size: 80, color: Colors.grey),
                 ),
               ),
             ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey[200],
-              child: const Icon(Icons.person, size: 80, color: Colors.grey),
+            errorWidget: (context, url, error) => Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: Icon(Icons.person, size: 80, color: Colors.grey),
+                ),
+              ),
             ),
           ),
         ),
@@ -464,17 +506,26 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           child: CachedNetworkImage(
             imageUrl: photoUrl,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF5C6BC0),
+            cacheManager: AppCacheManager.instance,
+            placeholder: (context, url) => Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: Icon(Icons.image, size: 50, color: Colors.grey),
                 ),
               ),
             ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey[200],
-              child: const Icon(Icons.image, size: 50, color: Colors.grey),
+            errorWidget: (context, url, error) => Shimmer.fromColors(
+              baseColor: Colors.grey[300]!,
+              highlightColor: Colors.grey[100]!,
+              child: Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: Icon(Icons.image, size: 50, color: Colors.grey),
+                ),
+              ),
             ),
           ),
         ),
@@ -613,6 +664,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 
   Widget _buildActionButtons() {
+    final isOnline = ref.watch(isOnlineProvider);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(40, 40, 40, 20),
       decoration: const BoxDecoration(
@@ -630,32 +683,68 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       ),
       child: SafeArea(
         top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Dislike button
-            _buildActionButton(
-              icon: Icons.close_rounded,
-              color: const Color(0xFFFF4458),
-              size: 64,
-              iconSize: 32,
-              onTap: _onDislike,
-            ),
-            // Super like button
-            _buildActionButton(
-              icon: Icons.star_rounded,
-              color: const Color(0xFF00D4FF),
-              size: 52,
-              iconSize: 26,
-              onTap: _onSuperLike,
-            ),
-            // Like button
-            _buildActionButton(
-              icon: Icons.waving_hand_rounded,
-              color: const Color(0xFF00E676),
-              size: 64,
-              iconSize: 32,
-              onTap: _onLike,
+            // Offline indicator
+            if (!isOnline)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, size: 16, color: Colors.red),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Çevrimdışı - Etkileşim kısıtlı',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Action buttons - with opacity when offline
+            AnimatedOpacity(
+              opacity: isOnline ? 1.0 : 0.5,
+              duration: const Duration(milliseconds: 300),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Dislike button
+                  _buildActionButton(
+                    icon: Icons.close_rounded,
+                    color: const Color(0xFFFF4458),
+                    size: 64,
+                    iconSize: 32,
+                    onTap: _onDislike,
+                  ),
+                  // Super like button
+                  _buildActionButton(
+                    icon: Icons.star_rounded,
+                    color: const Color(0xFF00D4FF),
+                    size: 52,
+                    iconSize: 26,
+                    onTap: _onSuperLike,
+                  ),
+                  // Like button
+                  _buildActionButton(
+                    icon: Icons.waving_hand_rounded,
+                    color: const Color(0xFF00E676),
+                    size: 64,
+                    iconSize: 32,
+                    onTap: _onLike,
+                  ),
+                ],
+              ),
             ),
           ],
         ),

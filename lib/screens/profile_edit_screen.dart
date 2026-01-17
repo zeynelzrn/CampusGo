@@ -1,15 +1,21 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show setEquals, debugPrint;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart'; // ImageSource enum icin gerekli
+import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/app_notification.dart';
 import '../providers/swipe_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../utils/image_helper.dart';
+import '../widgets/modern_animated_dialog.dart';
 import 'user_profile_screen.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -245,6 +251,33 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   // Silinecek fotoğraf URL'leri (Kaydet'e basınca Storage'dan silinecek)
   final List<String> _urlsToDelete = [];
 
+  /// İnternet bağlantısını kontrol et
+  bool _checkConnectivity() {
+    final isOnline = ref.read(isOnlineProvider);
+    if (!isOnline) {
+      HapticFeedback.heavyImpact();
+      _showOfflineWarning();
+      return false;
+    }
+    return true;
+  }
+
+  /// Offline uyarı dialogu göster
+  void _showOfflineWarning() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.wifi_off_rounded,
+        title: 'Bağlantı Yok',
+        subtitle: 'İnternet bağlantınız olmadan bu işlemi yapamazsınız.\n\nLütfen bağlantınızı kontrol edip tekrar deneyin.',
+        confirmText: 'Tamam',
+        confirmButtonColor: const Color(0xFF5C6BC0),
+        onConfirm: () => Navigator.pop(dialogContext),
+      ),
+    );
+  }
+
   Future<void> _pickImage(int index) async {
     final bool hasPhoto = _photoUrls[index] != null || _localPhotos[index] != null;
     final bool isMainPhoto = index == 0;
@@ -401,6 +434,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Future<void> _saveProfile() async {
+    // İnternet kontrolü
+    if (!_checkConnectivity()) return;
+
     if (_nameController.text.isEmpty) {
       _showError('Lütfen adınızı girin');
       return;
@@ -538,6 +574,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   /// Navigate to UserProfileScreen to preview own profile as others see it
   /// Uses real-time form data (not saved to Firestore yet) for instant preview
   void _previewProfile() {
+    // Haptic feedback - kullanıcı butona bastığını hissetsin
+    HapticFeedback.mediumImpact();
+
     final currentUserId = _profileService.currentUserId;
     if (currentUserId == null) {
       _showWarning('Profil onizlemesi icin giris yapmis olmaniz gerekiyor');
@@ -580,27 +619,13 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       intent: List<String>.from(_selectedIntents),
     );
 
+    // CupertinoPageRoute - iOS style swipe-back gesture desteği
     Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            UserProfileScreen(
+      CupertinoPageRoute(
+        builder: (context) => UserProfileScreen(
           userId: currentUserId,
           previewProfile: previewProfile,
         ),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          // Scale + Fade transition for a premium feel
-          return FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.90, end: 1.0).animate(
-                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
-              ),
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 400),
-        reverseTransitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }
@@ -746,86 +771,127 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildPhotoGrid(),
-                  const SizedBox(height: 24),
-                  _buildSection('Hakkında', [
-                    _buildTextField(
-                      controller: _nameController,
-                      label: 'Ad',
-                      hint: 'Adınızı girin',
-                      icon: Icons.person,
+      body: Column(
+        children: [
+          // Offline banner
+          Consumer(
+            builder: (context, ref, child) {
+              final isOnline = ref.watch(isOnlineProvider);
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                height: isOnline ? 0 : 40,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 300),
+                  opacity: isOnline ? 0 : 1,
+                  child: Container(
+                    color: Colors.orange[700],
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'İnternet bağlantınız yok - Kaydetme devre dışı',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _ageController,
-                      label: 'Yaş',
-                      hint: '18',
-                      icon: Icons.cake,
-                      keyboardType: TextInputType.number,
+                  ),
+                ),
+              );
+            },
+          ),
+          // Main content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildPhotoGrid(),
+                        const SizedBox(height: 24),
+                        _buildSection('Hakkında', [
+                          _buildTextField(
+                            controller: _nameController,
+                            label: 'Ad',
+                            hint: 'Adınızı girin',
+                            icon: Icons.person,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _ageController,
+                            label: 'Yaş',
+                            hint: '18',
+                            icon: Icons.cake,
+                            keyboardType: TextInputType.number,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildTextField(
+                            controller: _bioController,
+                            label: 'Biyografi',
+                            hint: 'Kendinizden bahsedin...',
+                            icon: Icons.edit,
+                            maxLines: 3,
+                            maxLength: 500,
+                          ),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Cinsiyet', [
+                          _buildGenderSelector(),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Kiminle Tanışmak İstiyorsun?', [
+                          _buildLookingForSelector(),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Eğitim', [
+                          _buildAutocompleteField(
+                            controller: _universityController,
+                            label: 'Üniversite',
+                            hint: 'Üniversitenizi arayın',
+                            icon: Icons.school,
+                            suggestions: TurkishUniversities.universities,
+                          ),
+                          const SizedBox(height: 12),
+                          _buildAutocompleteField(
+                            controller: _departmentController,
+                            label: 'Bölüm',
+                            hint: 'Bölümünüzü arayın',
+                            icon: Icons.book,
+                            suggestions: TurkishUniversities.departments,
+                          ),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Sınıf Seviyesi', [
+                          _buildGradeSelector(),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Topluluklar / Kulüpler', [
+                          _buildClubsSelector(),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('Ne İçin Buradayım?', [
+                          _buildIntentSelector(),
+                        ]),
+                        const SizedBox(height: 24),
+                        _buildSection('İlgi Alanları', [
+                          _buildInterestsSelector(),
+                        ]),
+                        const SizedBox(height: 100),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    _buildTextField(
-                      controller: _bioController,
-                      label: 'Biyografi',
-                      hint: 'Kendinizden bahsedin...',
-                      icon: Icons.edit,
-                      maxLines: 3,
-                      maxLength: 500,
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Cinsiyet', [
-                    _buildGenderSelector(),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Kiminle Tanışmak İstiyorsun?', [
-                    _buildLookingForSelector(),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Eğitim', [
-                    _buildAutocompleteField(
-                      controller: _universityController,
-                      label: 'Üniversite',
-                      hint: 'Üniversitenizi arayın',
-                      icon: Icons.school,
-                      suggestions: TurkishUniversities.universities,
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAutocompleteField(
-                      controller: _departmentController,
-                      label: 'Bölüm',
-                      hint: 'Bölümünüzü arayın',
-                      icon: Icons.book,
-                      suggestions: TurkishUniversities.departments,
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Sınıf Seviyesi', [
-                    _buildGradeSelector(),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Topluluklar / Kulüpler', [
-                    _buildClubsSelector(),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('Ne İçin Buradayım?', [
-                    _buildIntentSelector(),
-                  ]),
-                  const SizedBox(height: 24),
-                  _buildSection('İlgi Alanları', [
-                    _buildInterestsSelector(),
-                  ]),
-                  const SizedBox(height: 100),
-                ],
-              ),
-            ),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -901,21 +967,30 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         _localPhotos[index]!,
                         fit: BoxFit.cover,
                       )
-                    : Image.network(
-                        _photoUrls[index]!,
+                    : CachedNetworkImage(
+                        imageUrl: _photoUrls[index]!,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Center(
-                            child: CircularProgressIndicator(
-                              value: loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                              strokeWidth: 2,
+                        cacheManager: AppCacheManager.highPriorityInstance,
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: Container(
+                            color: Colors.grey[200],
+                            child: Center(
+                              child: Icon(Icons.person, size: 32, color: Colors.grey[400]),
                             ),
-                          );
-                        },
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: Container(
+                            color: Colors.grey[200],
+                            child: Center(
+                              child: Icon(Icons.person, size: 32, color: Colors.grey[400]),
+                            ),
+                          ),
+                        ),
                       ),
               )
             else
