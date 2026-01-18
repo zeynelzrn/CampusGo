@@ -8,6 +8,7 @@ import '../widgets/app_notification.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
+import '../services/message_cache_service.dart';
 import '../providers/connectivity_provider.dart';
 import '../widgets/modern_animated_dialog.dart';
 import '../utils/image_helper.dart';
@@ -32,9 +33,10 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final ChatService _chatService = ChatService();
   final UserService _userService = UserService();
+  final MessageCacheService _cacheService = MessageCacheService();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
@@ -44,9 +46,24 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
   late AnimationController _sendButtonController;
   late Animation<double> _sendButtonAnimation;
 
+  /// Ekran aktif mi? (arka planda değilse)
+  bool _isScreenActive = true;
+
+  /// Son işlenen mesaj sayısı (yeni mesaj algılama için)
+  int _lastMessageCount = 0;
+
+  /// Önbellekten yüklenen mesajlar (anında gösterim için)
+  List<Message>? _cachedMessages;
+
+  /// Önbellek yüklendi mi?
+  bool _cacheLoaded = false;
+
   @override
   void initState() {
     super.initState();
+
+    // Lifecycle observer'ı kaydet
+    WidgetsBinding.instance.addObserver(this);
 
     _sendButtonController = AnimationController(
       duration: const Duration(milliseconds: 200),
@@ -57,17 +74,85 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
       CurvedAnimation(parent: _sendButtonController, curve: Curves.easeInOut),
     );
 
+    // Önce önbellekten yükle (anında gösterim)
+    _loadCachedMessages();
+
     // Mark chat as read when opened
-    _chatService.markChatAsRead(widget.chatId);
+    _markAllAsRead();
+  }
+
+  /// Önbellekten mesajları yükle (anında gösterim için)
+  Future<void> _loadCachedMessages() async {
+    final cached = await _cacheService.getCachedMessages(widget.chatId);
+    if (cached != null && cached.isNotEmpty && mounted) {
+      setState(() {
+        _cachedMessages = cached;
+        _cacheLoaded = true;
+      });
+      debugPrint('ChatDetailScreen: Loaded ${cached.length} messages from cache');
+    } else {
+      setState(() => _cacheLoaded = true);
+    }
+  }
+
+  /// Mesajları önbelleğe kaydet
+  void _updateCache(List<Message> messages) {
+    if (messages.isNotEmpty) {
+      _cacheService.cacheMessages(widget.chatId, messages);
+    }
   }
 
   @override
   void dispose() {
+    // Lifecycle observer'ı kaldır
+    WidgetsBinding.instance.removeObserver(this);
     _messageController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     _sendButtonController.dispose();
     super.dispose();
+  }
+
+  /// App lifecycle durumu değiştiğinde çağrılır
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      // Uygulama ön plana geldi - mesajları okundu olarak işaretle
+      debugPrint('ChatDetailScreen: App resumed - marking messages as read');
+      _isScreenActive = true;
+      _markAllAsRead();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      // Uygulama arka plana gitti
+      _isScreenActive = false;
+    }
+  }
+
+  /// Tüm okunmamış mesajları okundu olarak işaretle
+  Future<void> _markAllAsRead() async {
+    await _chatService.markChatAsRead(widget.chatId);
+  }
+
+  /// Yeni mesajlar geldiğinde okundu olarak işaretle
+  void _onNewMessagesReceived(List<Message> messages) {
+    if (!_isScreenActive || messages.isEmpty) return;
+
+    // Yeni mesaj var mı kontrol et
+    if (messages.length > _lastMessageCount) {
+      // Yeni mesajlar geldi - okundu olarak işaretle
+      final hasNewPeerMessages = messages
+          .skip(_lastMessageCount)
+          .any((m) => m.senderId != _chatService.currentUserId);
+
+      if (hasNewPeerMessages) {
+        debugPrint('ChatDetailScreen: New peer messages detected - marking as read');
+        _markAllAsRead();
+      }
+    }
+
+    _lastMessageCount = messages.length;
   }
 
   @override
@@ -81,13 +166,33 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
             child: StreamBuilder<List<Message>>(
               stream: _chatService.watchMessages(widget.chatId),
               builder: (context, snapshot) {
+                // Firebase'den veri gelene kadar önbellekten göster
                 if (snapshot.connectionState == ConnectionState.waiting) {
+                  // Önbellek varsa göster, yoksa loading
+                  if (_cacheLoaded && _cachedMessages != null && _cachedMessages!.isNotEmpty) {
+                    return _buildMessageList(_cachedMessages!);
+                  }
                   return _buildLoadingState();
                 }
 
                 final messages = snapshot.data ?? [];
 
+                // Firebase'den veri geldiğinde önbelleği güncelle
+                if (messages.isNotEmpty) {
+                  // Önbelleği arka planda güncelle
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _updateCache(messages);
+                    _onNewMessagesReceived(messages);
+                  });
+                }
+
+                // Mesaj yoksa ve önbellekte de yoksa boş state göster
                 if (messages.isEmpty) {
+                  if (_cachedMessages != null && _cachedMessages!.isNotEmpty) {
+                    // Firebase boş ama önbellek dolu - önbelleği temizle
+                    _cacheService.clearChatCache(widget.chatId);
+                    _cachedMessages = null;
+                  }
                   return _buildEmptyMessages();
                 }
 
@@ -135,6 +240,9 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
                         imageUrl: widget.peerImage!,
                         fit: BoxFit.cover,
                         cacheManager: AppCacheManager.instance,
+                        // RAM Optimizasyonu: Avatar için 100x100 yeterli
+                        memCacheHeight: 100,
+                        memCacheWidth: 100,
                         placeholder: (context, url) => _buildDefaultAvatar(),
                         errorWidget: (context, url, error) => _buildDefaultAvatar(),
                       )
@@ -142,28 +250,22 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
               ),
             ),
             const SizedBox(width: 12),
-            // Name - tıklanabilir
+            // Name - tıklanabilir, dikeyde ortalanmış
             Expanded(
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.peerName,
                     style: GoogleFonts.poppins(
-                      fontSize: 16,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                       color: Colors.grey[800],
+                      letterSpacing: 0.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'Cevrimici',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: Colors.green,
-                      fontWeight: FontWeight.w500,
-                    ),
                   ),
                 ],
               ),
@@ -309,28 +411,33 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
   }
 
   Widget _buildMessageList(List<Message> messages) {
+    // Mesajları ters çevir - en yeni mesaj index 0'da olacak (ListView reverse için)
+    final reversedMessages = messages.reversed.toList();
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: messages.length,
-      reverse: false,
+      itemCount: reversedMessages.length,
+      reverse: true, // En alttan başla (güncel mesajlar)
       itemBuilder: (context, index) {
-        final message = messages[index];
+        final message = reversedMessages[index];
         final isMe = message.isFromMe(_chatService.currentUserId ?? '');
 
-        // Check if we should show date separator
+        // Tarih ayırıcı kontrolü (reverse listede sonraki mesaja bak)
         bool showDateSeparator = false;
-        if (index == 0) {
+        if (index == reversedMessages.length - 1) {
+          // En eski mesaj - her zaman tarih göster
           showDateSeparator = true;
         } else {
-          final prevMessage = messages[index - 1];
-          if (!_isSameDay(message.timestamp, prevMessage.timestamp)) {
+          final nextMessage = reversedMessages[index + 1];
+          if (!_isSameDay(message.timestamp, nextMessage.timestamp)) {
             showDateSeparator = true;
           }
         }
 
         return Column(
           children: [
+            // Reverse listede tarih ayırıcı mesajın üstünde görünmeli
             if (showDateSeparator) _buildDateSeparator(message.timestamp),
             _buildMessageBubble(message, isMe, index),
           ],
@@ -347,14 +454,27 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
 
   Widget _buildDateSeparator(DateTime date) {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(date.year, date.month, date.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
     String dateText;
 
-    if (_isSameDay(date, now)) {
-      dateText = 'Bugun';
-    } else if (_isSameDay(date, now.subtract(const Duration(days: 1)))) {
-      dateText = 'Dun';
+    if (messageDate == today) {
+      dateText = 'Bugün';
+    } else if (messageDate == yesterday) {
+      dateText = 'Dün';
     } else {
-      dateText = '${date.day}/${date.month}/${date.year}';
+      // Gün adlarını ekle
+      final weekdays = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+      final months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+
+      // Son 7 gün içindeyse gün adını göster
+      if (today.difference(messageDate).inDays < 7) {
+        dateText = weekdays[date.weekday - 1];
+      } else {
+        dateText = '${date.day} ${months[date.month - 1]} ${date.year}';
+      }
     }
 
     return Container(
@@ -380,6 +500,25 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
   }
 
   Widget _buildMessageBubble(Message message, bool isMe, int index) {
+    // === Renk Tanımları (Accessibility: min 4.5:1 kontrast oranı) ===
+    const Color readTickColor = Color(0xFF34B7F1); // WhatsApp canlı mavi
+    const Color unreadTickColorSent = Color(0xB3FFFFFF); // Gradient üzerinde beyaz %70
+    const Color unreadTickColorReceived = Color(0xFFBDBDBD); // Beyaz arka plan üzerinde görünür gri
+    const Color timestampColorSent = Color(0xB3FFFFFF); // Gradient üzerinde
+    const Color timestampColorReceived = Color(0xFF9E9E9E); // Beyaz üzerinde koyu gri
+
+    // Dinamik renkler
+    final Color timestampColor = isMe ? timestampColorSent : timestampColorReceived;
+    final Color statusIconColor = message.isRead
+        ? readTickColor
+        : (isMe ? unreadTickColorSent : unreadTickColorReceived);
+    final IconData statusIcon = message.isRead
+        ? Icons.done_all_rounded
+        : Icons.done_rounded;
+
+    // Ekran genişliğinin %78'i maksimum baloncuk genişliği
+    final double maxBubbleWidth = MediaQuery.of(context).size.width * 0.78;
+
     return TweenAnimationBuilder<double>(
       duration: Duration(milliseconds: 200 + (index * 20).clamp(0, 200)),
       tween: Tween(begin: 0.0, end: 1.0),
@@ -394,18 +533,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
       },
       child: Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          margin: EdgeInsets.only(
-            bottom: 6,
-            left: isMe ? 60 : 0,
-            right: isMe ? 0 : 60,
-          ),
-          child: Column(
-            crossAxisAlignment:
-                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxBubbleWidth),
+            child: IntrinsicWidth(
+              child: Container(
+                padding: const EdgeInsets.only(
+                  left: 14,
+                  right: 12,
+                  top: 10,
+                  bottom: 8,
+                ),
                 decoration: BoxDecoration(
                   gradient: isMe
                       ? const LinearGradient(
@@ -415,58 +554,66 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen>
                         )
                       : null,
                   color: isMe ? null : Colors.white,
+                  // Modern BorderRadius: Gönderen sağ üst sivri, alıcı sol üst sivri
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(isMe ? 18 : 4),
-                    bottomRight: Radius.circular(isMe ? 4 : 18),
+                    topLeft: Radius.circular(isMe ? 20 : 4),
+                    topRight: Radius.circular(isMe ? 4 : 20),
+                    bottomLeft: const Radius.circular(20),
+                    bottomRight: const Radius.circular(20),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isMe
-                          ? const Color(0xFF5C6BC0).withValues(alpha: 0.25)
+                          ? const Color(0xFF5C6BC0).withValues(alpha: 0.2)
                           : Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 8,
+                      blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-                child: Text(
-                  message.text,
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    color: isMe ? Colors.white : Colors.grey[800],
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Row(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Mesaj metni
                     Text(
-                      message.formattedTime,
+                      message.text,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: Colors.grey[500],
+                        fontSize: 15,
+                        color: isMe ? Colors.white : Colors.grey[850],
+                        height: 1.4,
                       ),
                     ),
-                    if (isMe) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.done_all_rounded,
-                        size: 14,
-                        color: message.isRead
-                            ? const Color(0xFF5C6BC0)
-                            : Colors.grey[400],
-                      ),
-                    ],
+                    const SizedBox(height: 4),
+                    // Saat ve tik - sağ alt köşe, satırın sonunda
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        const Spacer(),
+                        Text(
+                          message.formattedTime,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w400,
+                            color: timestampColor,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                        if (isMe) ...[
+                          const SizedBox(width: 3),
+                          Icon(
+                            statusIcon,
+                            size: 15,
+                            color: statusIconColor,
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

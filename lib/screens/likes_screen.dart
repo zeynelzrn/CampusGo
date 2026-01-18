@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/user_profile.dart';
 import '../widgets/app_notification.dart';
@@ -27,6 +28,9 @@ class LikesScreen extends ConsumerStatefulWidget {
 
 class _LikesScreenState extends ConsumerState<LikesScreen>
     with AutoRefreshMixin {
+  /// Admin durumu (Firestore'dan yüklenir)
+  bool _isAdmin = false;
+
   @override
   List<ProviderOrFamily> get providersToRefresh => [receivedLikesProvider];
 
@@ -35,6 +39,30 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
     super.initState();
     // Initialize eliminated IDs from repository
     _initializeEliminatedIds();
+    // Admin durumunu kontrol et
+    _checkAdminStatus();
+  }
+
+  /// Kullanıcının admin olup olmadığını kontrol et
+  Future<void> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _isAdmin = data?['isAdmin'] as bool? ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking admin status: $e');
+    }
   }
 
   Future<void> _initializeEliminatedIds() async {
@@ -508,47 +536,50 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
               ),
             ),
             const SizedBox(height: 32),
-            // Demo veri ekleme butonu (test icin)
-            GestureDetector(
-              onTap: _seedDemoLikes,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
-                      blurRadius: 15,
-                      offset: const Offset(0, 5),
+            // Demo veri ekleme butonu - sadece adminler için
+            if (_isAdmin) ...[
+              GestureDetector(
+                onTap: _seedDemoLikes,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.auto_awesome,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Demo Istek Ekle',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.auto_awesome,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Demo Istek Ekle',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
+            // İpucu kutusu - tüm kullanıcılar için
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
@@ -714,6 +745,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                                 imageUrl: user.photos.first,
                                 fit: BoxFit.cover,
                                 cacheManager: AppCacheManager.instance,
+                                // RAM Optimizasyonu: Grid kartlar için 300x400 yeterli
+                                memCacheHeight: 400,
+                                memCacheWidth: 300,
                                 placeholder: (context, url) => Shimmer.fromColors(
                                   baseColor: Colors.grey[300]!,
                                   highlightColor: Colors.grey[100]!,

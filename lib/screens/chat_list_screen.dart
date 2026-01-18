@@ -582,6 +582,9 @@ class _ChatListScreenState extends State<ChatListScreen>
                 imageUrl: chat.peerImage!,
                 fit: BoxFit.cover,
                 cacheManager: AppCacheManager.instance,
+                // RAM Optimizasyonu: Avatar için 120x120 yeterli
+                memCacheHeight: 120,
+                memCacheWidth: 120,
                 placeholder: (context, url) => _buildDefaultAvatar(),
                 errorWidget: (context, url, error) => _buildDefaultAvatar(),
               )

@@ -360,6 +360,9 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                       imageUrl: user.photos.first,
                       fit: BoxFit.cover,
                       cacheManager: AppCacheManager.instance,
+                      // RAM Optimizasyonu: Avatar için 100x100 yeterli
+                      memCacheHeight: 100,
+                      memCacheWidth: 100,
                       placeholder: (context, url) => _buildDefaultAvatar(),
                       errorWidget: (context, url, error) => _buildDefaultAvatar(),
                     )

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shimmer/shimmer.dart';
 import '../providers/swipe_provider.dart';
 import '../providers/likes_provider.dart';
@@ -31,8 +32,62 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService();
 
+  /// Admin durumu (Firestore'dan yüklenir)
+  bool _isAdmin = false;
+
+  /// Yenileme durumu (loading indicator için)
+  bool _isRefreshing = false;
+
   @override
   List<ProviderOrFamily> get providersToRefresh => [swipeProvider];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAdminStatus();
+  }
+
+  /// Kullanıcının admin olup olmadığını kontrol et
+  Future<void> _checkAdminStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && mounted) {
+        final data = doc.data();
+        setState(() {
+          _isAdmin = data?['isAdmin'] as bool? ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking admin status: $e');
+    }
+  }
+
+  /// Profil listesini yenile (loading indicator ile)
+  Future<void> _refreshProfiles() async {
+    if (_isRefreshing) return;
+
+    setState(() => _isRefreshing = true);
+    HapticFeedback.mediumImpact();
+
+    try {
+      // Provider'ı yenile - bu Firestore sorgusunu tekrar tetikler
+      ref.invalidate(swipeProvider);
+
+      // Kısa bir gecikme ile loading göster
+      await Future.delayed(const Duration(milliseconds: 800));
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -934,47 +989,68 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
               ),
             ),
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => ref.read(swipeProvider.notifier).refresh(),
-                  icon: const Icon(Icons.refresh),
-                  label: Text(
-                    'Yenile',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5C6BC0),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+            // Admin için: Row içinde iki buton
+            // Normal kullanıcı için: Ortalanmış tek Yenile butonu
+            if (_isAdmin)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildRefreshButton(),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: _seedTestProfiles,
+                    icon: const Icon(Icons.people),
+                    label: Text(
+                      'Test Ekle',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: _seedTestProfiles,
-                  icon: const Icon(Icons.people),
-                  label: Text(
-                    'Test Ekle',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              )
+            else
+              // Normal kullanıcı - ortalanmış Yenile butonu
+              Center(child: _buildRefreshButton()),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Yenile butonu - loading indicator ile
+  Widget _buildRefreshButton() {
+    return ElevatedButton.icon(
+      onPressed: _isRefreshing ? null : _refreshProfiles,
+      icon: _isRefreshing
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : const Icon(Icons.refresh),
+      label: Text(
+        _isRefreshing ? 'Yenileniyor...' : 'Yenile',
+        style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF5C6BC0),
+        foregroundColor: Colors.white,
+        disabledBackgroundColor: const Color(0xFF5C6BC0).withValues(alpha: 0.7),
+        disabledForegroundColor: Colors.white70,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:internet_connection_checker_plus/internet_connection_checker_plu
 import 'notification_service.dart';
 import 'user_service.dart';
 import 'profile_cache_service.dart';
+import 'message_cache_service.dart';
 import '../repositories/likes_repository.dart';
 
 class AuthService {
@@ -155,9 +156,10 @@ class AuthService {
 
     // Clear all caches on logout
     await ProfileCacheService.instance.clearCache();
+    await MessageCacheService().clearAllCache(); // Hive mesaj cache'ini temizle
     LikesRepository.clearCache();
 
-    debugPrint('AuthService: Çıkış yapıldı - tüm cache temizlendi');
+    debugPrint('AuthService: Çıkış yapıldı - tüm cache temizlendi (Profil, Mesaj, Likes)');
 
     await _auth.signOut();
   }

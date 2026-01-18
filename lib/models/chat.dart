@@ -154,6 +154,7 @@ class Message {
   final DateTime timestamp;
   final MessageType type;
   final bool isRead;
+  final DateTime? readAt;
 
   Message({
     required this.id,
@@ -162,6 +163,7 @@ class Message {
     required this.timestamp,
     this.type = MessageType.text,
     this.isRead = false,
+    this.readAt,
   });
 
   /// Create from Firestore document
@@ -175,6 +177,11 @@ class Message {
       timestamp = DateTime.now();
     }
 
+    DateTime? readAt;
+    if (data['readAt'] != null && data['readAt'] is Timestamp) {
+      readAt = (data['readAt'] as Timestamp).toDate();
+    }
+
     return Message(
       id: doc.id,
       senderId: data['senderId'] ?? '',
@@ -185,6 +192,7 @@ class Message {
         orElse: () => MessageType.text,
       ),
       isRead: data['isRead'] ?? false,
+      readAt: readAt,
     );
   }
 
@@ -196,7 +204,29 @@ class Message {
       'timestamp': FieldValue.serverTimestamp(),
       'type': type.name,
       'isRead': isRead,
+      if (readAt != null) 'readAt': Timestamp.fromDate(readAt!),
     };
+  }
+
+  /// Copy with updated fields
+  Message copyWith({
+    String? id,
+    String? senderId,
+    String? text,
+    DateTime? timestamp,
+    MessageType? type,
+    bool? isRead,
+    DateTime? readAt,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      senderId: senderId ?? this.senderId,
+      text: text ?? this.text,
+      timestamp: timestamp ?? this.timestamp,
+      type: type ?? this.type,
+      isRead: isRead ?? this.isRead,
+      readAt: readAt ?? this.readAt,
+    );
   }
 
   /// Format time for display

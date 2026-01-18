@@ -329,8 +329,48 @@ class ChatService {
       await _chatsCollection.doc(chatId).update({
         'readBy': FieldValue.arrayUnion([userId]),
       });
+
+      // Ayrıca mesajları da okundu olarak işaretle
+      await markMessagesAsRead(chatId);
     } catch (e) {
       print('Error marking chat as read: $e');
+    }
+  }
+
+  /// Mark all unread messages from peer as read (batch update)
+  /// Bu metod verimli bir batch update kullanarak database maliyetini optimize eder
+  Future<void> markMessagesAsRead(String chatId) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    try {
+      // Karşı taraftan gelen ve henüz okunmamış mesajları bul
+      final unreadMessages = await _chatsCollection
+          .doc(chatId)
+          .collection('messages')
+          .where('senderId', isNotEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      if (unreadMessages.docs.isEmpty) return;
+
+      debugPrint('ChatService: ${unreadMessages.docs.length} mesaj okundu olarak işaretleniyor');
+
+      // Batch update ile tüm mesajları güncelle (daha verimli)
+      final batch = _firestore.batch();
+      final now = Timestamp.now();
+
+      for (final doc in unreadMessages.docs) {
+        batch.update(doc.reference, {
+          'isRead': true,
+          'readAt': now,
+        });
+      }
+
+      await batch.commit();
+      debugPrint('ChatService: Mesajlar başarıyla okundu olarak işaretlendi');
+    } catch (e) {
+      debugPrint('ChatService: Mesaj okundu işaretleme hatası: $e');
     }
   }
 

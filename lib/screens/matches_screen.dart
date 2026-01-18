@@ -271,6 +271,9 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                             imageUrl: match.photoUrl!,
                             fit: BoxFit.cover,
                             cacheManager: AppCacheManager.instance,
+                            // RAM Optimizasyonu: Avatar için 120x120 yeterli
+                            memCacheHeight: 120,
+                            memCacheWidth: 120,
                             placeholder: (context, url) => Shimmer.fromColors(
                               baseColor: Colors.grey[300]!,
                               highlightColor: Colors.grey[100]!,
@@ -296,23 +299,6 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                           ),
                   ),
                 ),
-                if (match.isOnline)
-                  Positioned(
-                    bottom: 2,
-                    right: 2,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(width: 12),
@@ -405,7 +391,6 @@ class MatchedUser {
   final String? lastMessage;
   final String? lastMessageTime;
   final bool hasUnreadMessage;
-  final bool isOnline;
 
   MatchedUser({
     required this.id,
@@ -414,6 +399,5 @@ class MatchedUser {
     this.lastMessage,
     this.lastMessageTime,
     this.hasUnreadMessage = false,
-    this.isOnline = false,
   });
 }

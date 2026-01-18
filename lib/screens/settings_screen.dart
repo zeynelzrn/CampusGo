@@ -26,7 +26,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final AuthService _authService = AuthService();
   final DebugService _debugService = DebugService();
   bool _notificationsEnabled = true;
-  bool _showOnlineStatus = true;
   bool _showDistance = true;
   // ignore: unused_field - Used in debug functions for loading state
   bool _isDebugLoading = false;
@@ -93,17 +92,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const SizedBox(height: 24),
                     _buildSectionTitle('Gizlilik'),
                     _buildSettingsCard([
-                      _buildSwitchTile(
-                        icon: Icons.visibility_rounded,
-                        iconColor: Colors.green,
-                        title: 'Cevrimici durumu',
-                        subtitle: 'Diger kullanicilar gorebilsin',
-                        value: _showOnlineStatus,
-                        onChanged: (value) {
-                          setState(() => _showOnlineStatus = value);
-                        },
-                      ),
-                      const Divider(height: 1),
                       _buildSwitchTile(
                         icon: Icons.location_on_rounded,
                         iconColor: Colors.orange,

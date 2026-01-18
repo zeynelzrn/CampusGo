@@ -43,6 +43,9 @@ dependencies:
   rxdart: ^0.28.0
   connectivity_plus: ^7.0.0
   internet_connection_checker_plus: ^2.9.1+2
+  # Local NoSQL Database (High Performance Cache)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:
