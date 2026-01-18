@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 import 'package:path/path.dart' as path;
@@ -8,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:shimmer/shimmer.dart';
+import '../providers/connectivity_provider.dart';
 
 // ==================== GLOBAL CACHE MANAGER ====================
 
@@ -52,11 +55,249 @@ class AppCacheManager {
     await _instance?.emptyCache();
     await _highPriorityInstance?.emptyCache();
   }
+
+  /// Görsel önbellekte var mı kontrol et (senkron - sadece metadata)
+  static Future<bool> isImageCached(String url, {bool highPriority = false}) async {
+    try {
+      final manager = highPriority ? highPriorityInstance : instance;
+      final fileInfo = await manager.getFileFromCache(url);
+      return fileInfo != null;
+    } catch (e) {
+      debugPrint('AppCacheManager: Cache check error: $e');
+      return false;
+    }
+  }
+
+  /// Önbellekten görseli al (varsa)
+  static Future<File?> getCachedFile(String url, {bool highPriority = false}) async {
+    try {
+      final manager = highPriority ? highPriorityInstance : instance;
+      final fileInfo = await manager.getFileFromCache(url);
+      return fileInfo?.file;
+    } catch (e) {
+      debugPrint('AppCacheManager: Get cached file error: $e');
+      return null;
+    }
+  }
 }
 
-// ==================== CACHED IMAGE WIDGET BUILDERS ====================
+// ==================== SMART CACHED IMAGE WIDGET ====================
 
-/// Standart önbellekli görsel widget'ı (Shimmer placeholder ile)
+/// Akıllı önbellekli görsel widget'ı
+///
+/// Cache-First mantığı:
+/// 1. Görsel önbellekte varsa → anında göster (internet durumundan bağımsız)
+/// 2. Görsel önbellekte yoksa + internet varsa → shimmer göster, yükle
+/// 3. Görsel önbellekte yoksa + internet yoksa → shimmer göster, internet gelince otomatik yükle
+class SmartCachedImage extends ConsumerStatefulWidget {
+  final String imageUrl;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+  final BorderRadius? borderRadius;
+  final bool highPriority;
+  final Color shimmerBaseColor;
+  final Color shimmerHighlightColor;
+  final IconData placeholderIcon;
+  final double iconSize;
+  final Widget? customErrorWidget;
+  final Widget? customPlaceholder;
+
+  const SmartCachedImage({
+    super.key,
+    required this.imageUrl,
+    this.fit = BoxFit.cover,
+    this.width,
+    this.height,
+    this.borderRadius,
+    this.highPriority = false,
+    this.shimmerBaseColor = const Color(0xFFE0E0E0),
+    this.shimmerHighlightColor = const Color(0xFFF5F5F5),
+    this.placeholderIcon = Icons.person,
+    this.iconSize = 60,
+    this.customErrorWidget,
+    this.customPlaceholder,
+  });
+
+  @override
+  ConsumerState<SmartCachedImage> createState() => _SmartCachedImageState();
+}
+
+class _SmartCachedImageState extends ConsumerState<SmartCachedImage> {
+  bool _isCached = false;
+  bool _cacheChecked = false;
+  bool _hasError = false;
+  int _lastRefreshKey = 0; // Son bilinen refresh key
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCache();
+  }
+
+  @override
+  void didUpdateWidget(SmartCachedImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _cacheChecked = false;
+      _hasError = false;
+      _checkCache();
+    }
+  }
+
+  /// Önbellekte görsel var mı kontrol et
+  Future<void> _checkCache() async {
+    final cached = await AppCacheManager.isImageCached(
+      widget.imageUrl,
+      highPriority: widget.highPriority,
+    );
+    if (mounted) {
+      setState(() {
+        _isCached = cached;
+        _cacheChecked = true;
+      });
+    }
+  }
+
+  CacheManager get _cacheManager => widget.highPriority
+      ? AppCacheManager.highPriorityInstance
+      : AppCacheManager.instance;
+
+  Widget _buildShimmer() {
+    return Shimmer.fromColors(
+      baseColor: widget.shimmerBaseColor,
+      highlightColor: widget.shimmerHighlightColor,
+      child: Container(
+        width: widget.width,
+        height: widget.height,
+        color: widget.shimmerBaseColor,
+        child: Center(
+          child: Icon(
+            widget.placeholderIcon,
+            size: widget.iconSize,
+            color: widget.shimmerHighlightColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfflineShimmer() {
+    // Offline durumda shimmer + küçük wifi-off ikonu
+    return Stack(
+      children: [
+        _buildShimmer(),
+        Positioned(
+          right: 8,
+          bottom: 8,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.wifi_off,
+              size: 16,
+              color: Colors.white70,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Global image loading state (online + refresh key)
+    final imageState = ref.watch(imageLoadingStateProvider);
+    final isOnline = imageState.isOnline;
+    final refreshKey = imageState.refreshKey;
+
+    // Refresh key değiştiyse hata durumunu sıfırla (internet geri geldi)
+    if (refreshKey != _lastRefreshKey) {
+      _lastRefreshKey = refreshKey;
+      if (_hasError) {
+        // Post frame callback ile state güncelle
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() => _hasError = false);
+          }
+        });
+      }
+    }
+
+    // Henüz cache kontrolü yapılmadıysa, kısa süre bekle
+    if (!_cacheChecked) {
+      return widget.customPlaceholder ?? _buildShimmer();
+    }
+
+    // Custom placeholder varsa kullan
+    Widget placeholder(BuildContext ctx, String url) {
+      if (widget.customPlaceholder != null) return widget.customPlaceholder!;
+
+      // Önbellekteyse yükleme gösterme (anında görünecek)
+      if (_isCached) return const SizedBox.shrink();
+
+      // Online ise normal shimmer
+      if (isOnline) return _buildShimmer();
+
+      // Offline ise wifi-off ikonlu shimmer
+      return _buildOfflineShimmer();
+    }
+
+    Widget errorWidget(BuildContext ctx, String url, dynamic error) {
+      // Hata state'ini güncelle (internet gelince retry için)
+      if (!_hasError) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _hasError = true);
+        });
+      }
+
+      if (widget.customErrorWidget != null) return widget.customErrorWidget!;
+
+      // Offline ise özel shimmer göster
+      if (!isOnline) return _buildOfflineShimmer();
+
+      // Online ama hata varsa normal shimmer
+      return _buildShimmer();
+    }
+
+    // Global refresh key kullanarak CachedNetworkImage'ı yeniden oluştur
+    // Bu sayede internet geldiğinde tüm görseller aynı anda yenilenir
+    Widget image = CachedNetworkImage(
+      key: ValueKey('${widget.imageUrl}_v$refreshKey'),
+      imageUrl: widget.imageUrl,
+      fit: widget.fit,
+      width: widget.width,
+      height: widget.height,
+      cacheManager: _cacheManager,
+      placeholder: placeholder,
+      errorWidget: errorWidget,
+      // Hızlı geçiş için fade süreleri düşürüldü
+      fadeInDuration: _isCached
+          ? Duration.zero // Önbellekten geliyorsa fade yok
+          : const Duration(milliseconds: 100), // Hızlı fade-in
+      fadeOutDuration: const Duration(milliseconds: 50), // Çok hızlı fade-out
+      // Memory cache kullan (daha hızlı)
+      memCacheWidth: widget.width?.toInt(),
+      memCacheHeight: widget.height?.toInt(),
+    );
+
+    if (widget.borderRadius != null) {
+      return ClipRRect(
+        borderRadius: widget.borderRadius!,
+        child: image,
+      );
+    }
+
+    return image;
+  }
+}
+
+// ==================== BACKWARD COMPATIBLE BUILDERS ====================
+
+/// Standart önbellekli görsel widget'ı (SmartCachedImage wrapper)
 /// Tüm uygulama genelinde kullanılacak
 Widget buildCachedImage({
   required String imageUrl,
@@ -70,49 +311,18 @@ Widget buildCachedImage({
   IconData placeholderIcon = Icons.person,
   double iconSize = 60,
 }) {
-  final cacheManager = highPriority
-      ? AppCacheManager.highPriorityInstance
-      : AppCacheManager.instance;
-
-  Widget shimmerPlaceholder() {
-    return Shimmer.fromColors(
-      baseColor: shimmerBaseColor,
-      highlightColor: shimmerHighlightColor,
-      child: Container(
-        width: width,
-        height: height,
-        color: shimmerBaseColor,
-        child: Center(
-          child: Icon(
-            placeholderIcon,
-            size: iconSize,
-            color: shimmerHighlightColor,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget image = CachedNetworkImage(
+  return SmartCachedImage(
     imageUrl: imageUrl,
     fit: fit,
     width: width,
     height: height,
-    cacheManager: cacheManager,
-    placeholder: (context, url) => shimmerPlaceholder(),
-    errorWidget: (context, url, error) => shimmerPlaceholder(),
-    fadeInDuration: const Duration(milliseconds: 300),
-    fadeOutDuration: const Duration(milliseconds: 300),
+    borderRadius: borderRadius,
+    highPriority: highPriority,
+    shimmerBaseColor: shimmerBaseColor,
+    shimmerHighlightColor: shimmerHighlightColor,
+    placeholderIcon: placeholderIcon,
+    iconSize: iconSize,
   );
-
-  if (borderRadius != null) {
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: image,
-    );
-  }
-
-  return image;
 }
 
 /// Profil fotoğrafı için özel widget (yüksek öncelikli önbellekleme)

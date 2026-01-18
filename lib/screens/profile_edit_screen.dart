@@ -771,45 +771,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Offline banner
-          Consumer(
-            builder: (context, ref, child) {
-              final isOnline = ref.watch(isOnlineProvider);
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: isOnline ? 0 : 40,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 300),
-                  opacity: isOnline ? 0 : 1,
-                  child: Container(
-                    color: Colors.orange[700],
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.wifi_off, color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'İnternet bağlantınız yok - Kaydetme devre dışı',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          // Main content
-          Expanded(
-            child: _isLoading
+      // Global ConnectivityBanner handles offline state
+      body: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
@@ -889,9 +852,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       ],
                     ),
                   ),
-          ),
-        ],
-      ),
     );
   }
 

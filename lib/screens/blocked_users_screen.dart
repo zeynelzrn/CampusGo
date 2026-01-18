@@ -187,7 +187,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isOnline = ref.watch(isOnlineProvider);
+    // Global ConnectivityBanner handles offline state - no need for per-screen banner
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -207,49 +207,13 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // Offline banner
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            height: isOnline ? 0 : 40,
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 300),
-              opacity: isOnline ? 0 : 1,
-              child: Container(
-                color: Colors.orange[700],
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'İnternet bağlantınız yok',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Main content
-          Expanded(
-            child: _isLoading
-                ? _buildLoadingState()
-                : _error != null
-                    ? _buildErrorState()
-                    : _blockedUsers.isEmpty
-                        ? _buildEmptyState()
-                        : _buildBlockedUsersList(),
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? _buildLoadingState()
+          : _error != null
+              ? _buildErrorState()
+              : _blockedUsers.isEmpty
+                  ? _buildEmptyState()
+                  : _buildBlockedUsersList(),
     );
   }
 

@@ -25,10 +25,14 @@ class DiscoverScreen extends ConsumerStatefulWidget {
   ConsumerState<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
+class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
+    with AutoRefreshMixin {
   final PageController _pageController = PageController();
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService();
+
+  @override
+  List<ProviderOrFamily> get providersToRefresh => [swipeProvider];
 
   @override
   void dispose() {

@@ -25,7 +25,11 @@ class LikesScreen extends ConsumerStatefulWidget {
   ConsumerState<LikesScreen> createState() => _LikesScreenState();
 }
 
-class _LikesScreenState extends ConsumerState<LikesScreen> {
+class _LikesScreenState extends ConsumerState<LikesScreen>
+    with AutoRefreshMixin {
+  @override
+  List<ProviderOrFamily> get providersToRefresh => [receivedLikesProvider];
+
   @override
   void initState() {
     super.initState();
@@ -243,42 +247,13 @@ class _LikesScreenState extends ConsumerState<LikesScreen> {
     // Watch the stream of received likes
     final likesAsync = ref.watch(receivedLikesProvider);
     final uiState = ref.watch(likesUIProvider);
-    final isOnline = ref.watch(isOnlineProvider);
+    // Global ConnectivityBanner handles offline state
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
-            // Offline banner
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              height: isOnline ? 0 : 40,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 300),
-                opacity: isOnline ? 0 : 1,
-                child: Container(
-                  color: Colors.orange[700],
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.wifi_off, color: Colors.white, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'İnternet bağlantınız yok - İşlemler devre dışı',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             _buildHeader(likesAsync),
             Expanded(
               child: likesAsync.when(
