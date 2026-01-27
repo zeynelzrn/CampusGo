@@ -131,26 +131,43 @@ class ProfileCreationNotifier extends StateNotifier<ProfileCreationState> {
   ProfileCreationNotifier(this._repository)
       : super(const ProfileCreationState());
 
-  Future<bool> createProfile({
+  /// Create profile with multiple photos (new method)
+  /// [imageFiles] - List of image files (min 1, max 6)
+  Future<bool> createProfileWithPhotos({
     required ProfileData profileData,
-    required File imageFile,
+    required List<File> imageFiles,
   }) async {
+    if (imageFiles.isEmpty) {
+      state = state.copyWith(
+        status: ProfileCreationStatus.error,
+        error: 'En az bir fotoğraf gerekli',
+      );
+      return false;
+    }
+
     state = state.copyWith(
       status: ProfileCreationStatus.uploadingImage,
+      uploadProgress: 0.0,
       clearError: true,
     );
 
     try {
-      // Step 1: Upload image
-      final imageUrl = await _repository.uploadProfileImage(imageFile);
-
-      state = state.copyWith(status: ProfileCreationStatus.savingProfile);
-
-      // Step 2: Save profile
-      await _repository.saveProfile(
+      // Step 1: Upload all images with progress tracking
+      await _repository.createProfileWithPhotos(
         profileData: profileData,
-        imageUrl: imageUrl,
+        imageFiles: imageFiles,
+        onProgress: (progress) {
+          state = state.copyWith(uploadProgress: progress);
+        },
       );
+
+      state = state.copyWith(
+        status: ProfileCreationStatus.savingProfile,
+        uploadProgress: 1.0,
+      );
+
+      // Small delay for UI feedback
+      await Future.delayed(const Duration(milliseconds: 200));
 
       state = state.copyWith(status: ProfileCreationStatus.success);
       return true;
@@ -161,6 +178,17 @@ class ProfileCreationNotifier extends StateNotifier<ProfileCreationState> {
       );
       return false;
     }
+  }
+
+  /// Legacy: Create profile with single image (backward compatibility)
+  Future<bool> createProfile({
+    required ProfileData profileData,
+    required File imageFile,
+  }) async {
+    return createProfileWithPhotos(
+      profileData: profileData,
+      imageFiles: [imageFile],
+    );
   }
 
   void reset() {

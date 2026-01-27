@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_card_swiper/flutter_card_swiper.dart';
 import '../services/auth_service.dart';
 import '../services/seed_service.dart';
+import '../services/user_service.dart';
 import '../providers/swipe_provider.dart';
 import '../widgets/swipe_card.dart';
 import '../widgets/app_notification.dart';
+import '../widgets/modern_animated_dialog.dart';
 import '../models/user_profile.dart';
 import 'login_screen.dart';
 import 'profile_edit_screen.dart';
@@ -21,6 +24,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
   late CardSwiperController _cardSwiperController;
 
   @override
@@ -46,6 +50,123 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         MaterialPageRoute(builder: (context) => LoginScreen()),
       );
     }
+  }
+
+  /// Kullanıcıyı keşfet kartından raporla (Apple UGC compliance)
+  Future<void> _reportUserFromCard(
+    UserProfile profile,
+    String reason,
+    String description,
+  ) async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Sikayet gonderiliyor...',
+          color: Colors.orange,
+        ),
+      ),
+    );
+
+    final result = await _userService.reportAndBlockUser(
+      targetUserId: profile.id,
+      reason: reason,
+      description: description.isNotEmpty ? description : null,
+    );
+
+    if (mounted) {
+      Navigator.pop(context); // Loading'i kapat
+
+      if (result.success) {
+        // Kartı kaldır
+        _removeCardFromStack(profile.id);
+
+        AppNotification.success(
+          title: 'Sikayetiniz Alindi',
+          subtitle: '24 saat icinde incelenecektir. ${profile.name} engellendi.',
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        AppNotification.error(
+          title: 'Hata Olustu',
+          subtitle: 'Sikayet gonderilemedi. Lutfen tekrar deneyin.',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
+  }
+
+  /// Engelleme onay dialogu göster
+  void _showBlockConfirmDialog(UserProfile profile) {
+    HapticFeedback.mediumImpact();
+
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.danger,
+        icon: Icons.block_rounded,
+        title: 'Kullaniciyi Engelle',
+        subtitle: '${profile.name} adli kullaniciyi engellemek istediginize emin misiniz?',
+        content: const DialogInfoBox(
+          icon: Icons.warning_amber_rounded,
+          text: 'Bu kisi size mesaj atamaz ve profilinizi goremez.',
+          color: Colors.orange,
+        ),
+        cancelText: 'Iptal',
+        confirmText: 'Engelle',
+        onConfirm: () async {
+          HapticFeedback.mediumImpact();
+          Navigator.pop(dialogContext);
+          await _blockUserFromCard(profile);
+        },
+      ),
+    );
+  }
+
+  /// Kullanıcıyı keşfet kartından engelle
+  Future<void> _blockUserFromCard(UserProfile profile) async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Engelleniyor...',
+          color: Colors.red,
+        ),
+      ),
+    );
+
+    final success = await _userService.blockUser(profile.id);
+
+    if (mounted) {
+      Navigator.pop(context); // Loading'i kapat
+
+      if (success) {
+        // Kartı kaldır
+        _removeCardFromStack(profile.id);
+
+        AppNotification.blocked(
+          title: 'Kullanici Engellendi',
+          subtitle: '${profile.name} artik size ulasamaz',
+        );
+      } else {
+        AppNotification.error(
+          title: 'Engelleme basarisiz oldu',
+          subtitle: 'Lutfen tekrar deneyin',
+        );
+      }
+    }
+  }
+
+  /// Kartı yığından kaldır
+  void _removeCardFromStack(String userId) {
+    final notifier = ref.read(swipeProvider.notifier);
+    notifier.removeBlockedUser(userId);
   }
 
   bool _onSwipe(
@@ -249,6 +370,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             profile: profile,
             horizontalOffset: horizontalOffsetPercentage.toDouble(),
             verticalOffset: verticalOffsetPercentage.toDouble(),
+            // Modern seçenekler menüsü callback'leri
+            onReport: (reason, description) => _reportUserFromCard(profile, reason, description),
+            onBlock: () => _showBlockConfirmDialog(profile),
           );
         },
       ),

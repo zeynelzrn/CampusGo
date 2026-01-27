@@ -9,7 +9,7 @@ import '../services/profile_cache_service.dart';
 /// Profile data model for creating/updating profiles
 class ProfileData {
   final String name;
-  final int age;
+  final DateTime birthDate; // Doğum tarihi - yaş otomatik hesaplanır
   final String university;
   final String department;
   final String bio;
@@ -19,7 +19,7 @@ class ProfileData {
 
   const ProfileData({
     required this.name,
-    required this.age,
+    required this.birthDate,
     required this.university,
     required this.department,
     required this.bio,
@@ -28,10 +28,22 @@ class ProfileData {
     this.interests = const [],
   });
 
+  /// Doğum tarihinden yaş hesapla
+  int get age {
+    final now = DateTime.now();
+    int calculatedAge = now.year - birthDate.year;
+    if (now.month < birthDate.month ||
+        (now.month == birthDate.month && now.day < birthDate.day)) {
+      calculatedAge--;
+    }
+    return calculatedAge;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'age': age,
+      'birthDate': Timestamp.fromDate(birthDate), // Doğum tarihi kaydet
+      'age': age, // Hesaplanan yaşı da kaydet (geriye uyumluluk + hızlı sorgular)
       'university': university,
       'department': department,
       'bio': bio,
@@ -102,25 +114,31 @@ class ProfileRepository {
     }
   }
 
-  /// Upload profile image to Firebase Storage
+  /// Upload single profile image to Firebase Storage
+  /// Standardized path: user_photos/{userId}/{timestamp}.jpg
   /// Returns the download URL
-  Future<String> uploadProfileImage(File imageFile) async {
+  Future<String> uploadProfileImage(File imageFile, {int slotIndex = 0}) async {
     final userId = currentUserId;
     if (userId == null) {
       throw Exception('Kullanıcı oturumu bulunamadı');
     }
 
     try {
-      // Create unique filename with timestamp
+      // Create unique filename with timestamp and slot index
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final ref = _storage.ref().child('profile_images/$userId/$timestamp.jpg');
+      // Standardized path: user_photos/{userId}/{timestamp}_{slot}.jpg
+      final ref = _storage.ref().child('user_photos/$userId/${timestamp}_$slotIndex.jpg');
 
       // Upload file with metadata
       final uploadTask = ref.putFile(
         imageFile,
         SettableMetadata(
           contentType: 'image/jpeg',
-          customMetadata: {'userId': userId},
+          customMetadata: {
+            'userId': userId,
+            'slotIndex': slotIndex.toString(),
+            'uploadedAt': DateTime.now().toIso8601String(),
+          },
         ),
       );
 
@@ -129,26 +147,64 @@ class ProfileRepository {
 
       // Get download URL
       final downloadUrl = await snapshot.ref.getDownloadURL();
+      debugPrint('ProfileRepository: Foto yüklendi -> user_photos/$userId/${timestamp}_$slotIndex.jpg');
       return downloadUrl;
     } on FirebaseException catch (e) {
       throw Exception('Fotoğraf yüklenirken hata: ${e.message}');
     }
   }
 
-  /// Save profile data to Firestore
-  Future<void> saveProfile({
-    required ProfileData profileData,
-    required String imageUrl,
+  /// Upload multiple profile images to Firebase Storage
+  /// Returns list of download URLs in the same order
+  /// Emits progress via onProgress callback (0.0 - 1.0)
+  Future<List<String>> uploadMultipleImages(
+    List<File> imageFiles, {
+    void Function(double progress)? onProgress,
   }) async {
     final userId = currentUserId;
     if (userId == null) {
       throw Exception('Kullanıcı oturumu bulunamadı');
     }
 
+    if (imageFiles.isEmpty) {
+      throw Exception('En az bir fotoğraf gerekli');
+    }
+
+    final List<String> downloadUrls = [];
+    final total = imageFiles.length;
+
+    for (int i = 0; i < total; i++) {
+      final url = await uploadProfileImage(imageFiles[i], slotIndex: i);
+      downloadUrls.add(url);
+
+      // Report progress
+      if (onProgress != null) {
+        onProgress((i + 1) / total);
+      }
+    }
+
+    return downloadUrls;
+  }
+
+  /// Save profile data to Firestore (supports multiple photos)
+  Future<void> saveProfile({
+    required ProfileData profileData,
+    required List<String> photoUrls,
+  }) async {
+    final userId = currentUserId;
+    if (userId == null) {
+      throw Exception('Kullanıcı oturumu bulunamadı');
+    }
+
+    if (photoUrls.isEmpty) {
+      throw Exception('En az bir fotoğraf gerekli');
+    }
+
     try {
       final data = {
         ...profileData.toMap(),
-        'photos': [imageUrl],
+        'photos': photoUrls, // All photo URLs
+        'photoUrl': photoUrls.first, // Primary photo for avatar usage
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -157,23 +213,42 @@ class ProfileRepository {
             data,
             SetOptions(merge: true),
           );
+
+      debugPrint('ProfileRepository: Profil kaydedildi (${photoUrls.length} fotoğraf)');
     } on FirebaseException catch (e) {
       throw Exception('Profil kaydedilirken hata: ${e.message}');
     }
   }
 
-  /// Create profile with image upload in one operation
+  /// Create profile with multiple images upload
+  /// [imageFiles] - List of image files (min 1, max 6)
+  /// [onProgress] - Progress callback (0.0 - 1.0)
+  Future<void> createProfileWithPhotos({
+    required ProfileData profileData,
+    required List<File> imageFiles,
+    void Function(double progress)? onProgress,
+  }) async {
+    // Step 1: Upload all images
+    final photoUrls = await uploadMultipleImages(
+      imageFiles,
+      onProgress: onProgress,
+    );
+
+    // Step 2: Save profile data with all photo URLs
+    await saveProfile(
+      profileData: profileData,
+      photoUrls: photoUrls,
+    );
+  }
+
+  /// Legacy: Create profile with single image (backward compatibility)
   Future<void> createProfile({
     required ProfileData profileData,
     required File imageFile,
   }) async {
-    // Step 1: Upload image
-    final imageUrl = await uploadProfileImage(imageFile);
-
-    // Step 2: Save profile data
-    await saveProfile(
+    await createProfileWithPhotos(
       profileData: profileData,
-      imageUrl: imageUrl,
+      imageFiles: [imageFile],
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../widgets/app_notification.dart';
+import '../widgets/report_sheet.dart';
 import '../services/chat_service.dart';
 import '../services/user_service.dart';
 import '../models/user_profile.dart';
@@ -456,6 +457,67 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
   }
 
+  /// Modern raporlama bottom sheet göster (Apple App Store UGC compliance)
+  void _showModernReportSheet() {
+    ReportBottomSheet.show(
+      context: context,
+      userName: _profile?.name ?? 'Kullanici',
+      onSubmit: (reason, description) => _submitReport(reason, description),
+    );
+  }
+
+  /// Raporu gönder ve otomatik engelle (Apple UGC compliance)
+  Future<void> _submitReport(String reason, String description) async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Sikayet gonderiliyor...',
+          color: Colors.orange,
+        ),
+      ),
+    );
+
+    final result = await _userService.reportAndBlockUser(
+      targetUserId: widget.userId,
+      reason: reason,
+      description: description.isNotEmpty ? description : null,
+    );
+
+    if (mounted) {
+      // Loading'i kapat
+      Navigator.pop(context);
+
+      if (result.success) {
+        // Apple UGC mesajı: 24 saat içinde incelenecek + otomatik engelleme bildirimi
+        AppNotification.success(
+          title: 'Sikayetiniz Alindi',
+          subtitle: '24 saat icinde incelenecektir. Guvenliginiz icin bu kullanici engellendi.',
+          duration: const Duration(seconds: 5),
+        );
+
+        // Profil ekranından çık (kullanıcı engellendi)
+        if (mounted) {
+          // Callback varsa çağır
+          if (widget.onUserBlocked != null) {
+            widget.onUserBlocked!(widget.userId);
+          } else {
+            Navigator.pop(context);
+          }
+        }
+      } else {
+        AppNotification.error(
+          title: 'Hata Olustu',
+          subtitle: 'Sikayet gonderilemedi. Lutfen tekrar deneyin.',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
+  }
+
   /// Kullanıcıyı engelleme dialogu göster
   void _showBlockUserDialog() {
     HapticFeedback.mediumImpact();
@@ -659,25 +721,17 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             ),
           ),
         ),
-        // Engelleme butonu (sadece başka birinin profiline bakılıyorsa) - Premium haptic
+        // Seçenekler butonu (sadece başka birinin profiline bakılıyorsa)
+        // Modern Bottom Sheet - Şikayet Et + Engelle (Apple App Store UGC compliance)
         if (!_isOwnProfile)
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             right: 16,
-            child: _PremiumHapticButton(
-              onTap: _showBlockUserDialog,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.block_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
+            child: UserOptionsMenu(
+              backgroundColor: Colors.black.withValues(alpha: 0.4),
+              iconColor: Colors.white,
+              onReport: _showModernReportSheet,
+              onBlock: _showBlockUserDialog,
             ),
           ),
         // Like/Dislike butonları (Likes ekranından gelindiyse)

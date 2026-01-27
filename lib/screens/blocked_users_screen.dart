@@ -354,20 +354,25 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                 width: 2,
               ),
             ),
-            child: ClipOval(
-              child: user.photos.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: user.photos.first,
-                      fit: BoxFit.cover,
-                      cacheManager: AppCacheManager.instance,
-                      // RAM Optimizasyonu: Avatar için 100x100 yeterli
-                      memCacheHeight: 100,
-                      memCacheWidth: 100,
-                      placeholder: (context, url) => _buildDefaultAvatar(),
-                      errorWidget: (context, url, error) => _buildDefaultAvatar(),
-                    )
-                  : _buildDefaultAvatar(),
-            ),
+            child: user.photos.isNotEmpty
+                ? CachedNetworkImage(
+                    imageUrl: user.photos.first,
+                    width: 56,
+                    height: 56,
+                    cacheManager: AppCacheManager.instance,
+                    imageBuilder: (context, imageProvider) => Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: imageProvider,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    placeholder: (context, url) => _buildDefaultAvatar(),
+                    errorWidget: (context, url, error) => _buildDefaultAvatar(),
+                  )
+                : _buildDefaultAvatar(),
           ),
           const SizedBox(width: 12),
 

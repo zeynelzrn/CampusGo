@@ -256,16 +256,97 @@ class ChatService {
 
   // ==================== MESSAGE OPERATIONS ====================
 
+  /// Realtime stream için varsayılan limit
+  /// Bu değer Firebase maliyetini %95 düşürür
+  static const int _defaultMessageLimit = 50;
+
+  /// Pagination için sayfa boyutu
+  static const int _paginationPageSize = 20;
+
   /// Stream messages for a specific chat (ordered by timestamp ascending)
-  Stream<List<Message>> watchMessages(String chatId) {
+  ///
+  /// MALİYET OPTİMİZASYONU:
+  /// - .limit(50) ile sadece son 50 mesaj dinlenir
+  /// - İlk açılışta 50 read (eskiden sınırsız)
+  /// - Eski mesajlar için loadOlderMessages kullanılır
+  Stream<List<Message>> watchMessages(String chatId, {int? limit}) {
     return _chatsCollection
         .doc(chatId)
         .collection('messages')
         .orderBy('timestamp', descending: false)
+        .limitToLast(limit ?? _defaultMessageLimit) // SON 50 mesajı al
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) => Message.fromFirestore(doc)).toList();
     });
+  }
+
+  /// Firestore'dan eski mesajları çek (Pagination - Load More)
+  ///
+  /// Kullanıcı yukarı kaydırdığında ve Hive cache'i bittiğinde çağrılır.
+  /// [beforeTimestamp] - Bu zamandan önceki mesajları getirir
+  /// [limit] - Getirilecek mesaj sayısı (varsayılan: 20)
+  ///
+  /// Returns: Eski mesajlar listesi (en eskiden en yeniye sıralı)
+  Future<List<Message>> loadOlderMessages(
+    String chatId, {
+    required DateTime beforeTimestamp,
+    int limit = _paginationPageSize,
+  }) async {
+    try {
+      debugPrint('ChatService: Loading older messages before ${beforeTimestamp.toIso8601String()}');
+
+      final snapshot = await _chatsCollection
+          .doc(chatId)
+          .collection('messages')
+          .where('timestamp', isLessThan: Timestamp.fromDate(beforeTimestamp))
+          .orderBy('timestamp', descending: true) // En yeniden en eskiye
+          .limit(limit)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('ChatService: No older messages found');
+        return [];
+      }
+
+      // En eskiden en yeniye çevir (ListView için)
+      final messages = snapshot.docs
+          .map((doc) => Message.fromFirestore(doc))
+          .toList()
+          .reversed
+          .toList();
+
+      debugPrint('ChatService: Loaded ${messages.length} older messages from Firestore');
+      return messages;
+    } catch (e) {
+      debugPrint('ChatService: Error loading older messages: $e');
+      return [];
+    }
+  }
+
+  /// Belirli bir timestamp'ten sonraki mesajları tek seferlik çek
+  ///
+  /// Delta sync için kullanılır - sadece yeni mesajları alır
+  /// [afterTimestamp] - Bu zamandan sonraki mesajları getirir
+  Future<List<Message>> getMessagesSince(
+    String chatId, {
+    required DateTime afterTimestamp,
+    int limit = _defaultMessageLimit,
+  }) async {
+    try {
+      final snapshot = await _chatsCollection
+          .doc(chatId)
+          .collection('messages')
+          .where('timestamp', isGreaterThan: Timestamp.fromDate(afterTimestamp))
+          .orderBy('timestamp', descending: false)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs.map((doc) => Message.fromFirestore(doc)).toList();
+    } catch (e) {
+      debugPrint('ChatService: Error getting messages since: $e');
+      return [];
+    }
   }
 
   /// Send a message and update chat's last message

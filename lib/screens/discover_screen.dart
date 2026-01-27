@@ -12,6 +12,7 @@ import '../providers/connectivity_provider.dart';
 import '../models/user_profile.dart';
 import '../widgets/swipe_card.dart';
 import '../widgets/modern_animated_dialog.dart';
+import '../widgets/report_sheet.dart';
 import '../services/seed_service.dart';
 import '../services/user_service.dart';
 import '../services/chat_service.dart';
@@ -141,6 +142,59 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
         onConfirm: () => Navigator.pop(dialogContext),
       ),
     );
+  }
+
+  /// Modern raporlama bottom sheet göster (Apple App Store UGC compliance)
+  void _showReportSheet(UserProfile profile) {
+    ReportBottomSheet.show(
+      context: context,
+      userName: profile.name,
+      onSubmit: (reason, description) => _submitReport(profile, reason, description),
+    );
+  }
+
+  /// Raporu gönder ve otomatik engelle (Apple UGC compliance)
+  Future<void> _submitReport(UserProfile profile, String reason, String description) async {
+    // Loading göster
+    showModernDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: ModernLoadingDialog(
+          message: 'Sikayet gonderiliyor...',
+          color: Colors.orange,
+        ),
+      ),
+    );
+
+    final result = await _userService.reportAndBlockUser(
+      targetUserId: profile.id,
+      reason: reason,
+      description: description.isNotEmpty ? description : null,
+    );
+
+    if (mounted) {
+      Navigator.pop(context); // Loading'i kapat
+
+      if (result.success) {
+        // Kullanıcıyı listeden kaldır
+        ref.read(swipeProvider.notifier).removeBlockedUser(profile.id);
+        ref.read(likesUIProvider.notifier).removeUser(profile.id);
+
+        AppNotification.success(
+          title: 'Sikayetiniz Alindi',
+          subtitle: '24 saat icinde incelenecektir. ${profile.name} engellendi.',
+          duration: const Duration(seconds: 5),
+        );
+      } else {
+        AppNotification.error(
+          title: 'Hata Olustu',
+          subtitle: 'Sikayet gonderilemedi. Lutfen tekrar deneyin.',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
   }
 
   /// Engelleme dialogunu göster
@@ -316,31 +370,16 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
             ),
           ],
         ),
-        // Engelleme butonu - sağ üst köşe (Premium haptic)
+        // Seçenekler menüsü - sağ üst köşe (Üç Nokta)
+        // Modern Bottom Sheet: Şikayet Et + Engelle (Apple App Store UGC compliance)
         Positioned(
           top: MediaQuery.of(context).padding.top + 12,
           right: 16,
-          child: _PremiumHapticButton(
-            onTap: () => _showBlockDialog(profile),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.4),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.block_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
+          child: UserOptionsMenu(
+            backgroundColor: Colors.black.withValues(alpha: 0.4),
+            iconColor: Colors.white,
+            onReport: () => _showReportSheet(profile),
+            onBlock: () => _showBlockDialog(profile),
           ),
         ),
         // Fixed action buttons at bottom

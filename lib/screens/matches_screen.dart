@@ -15,22 +15,47 @@ class MatchesScreen extends ConsumerStatefulWidget {
 class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   // TODO: Replace with actual matches from provider
   final List<MatchedUser> _matches = [];
-  final bool _isLoading = false;
+  bool _isLoading = false;
+
+  // Refresh key - değiştiğinde StreamBuilder yeniden çalışır
+  int _refreshKey = 0;
+
+  /// Pull-to-refresh fonksiyonu
+  Future<void> _handleRefresh() async {
+    // Kısa bir delay ekle (UX için)
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // setState ile widget'ı rebuild et
+    // Bu, StreamBuilder veya veri çekme işlemini yeniden başlatır
+    if (mounted) {
+      setState(() {
+        _refreshKey++;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: ValueKey(_refreshKey), // Refresh key ile rebuild
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
             Expanded(
-              child: _isLoading
-                  ? _buildLoadingState()
-                  : _matches.isEmpty
-                      ? _buildEmptyState()
-                      : _buildMatchesList(),
+              child: RefreshIndicator(
+                onRefresh: _handleRefresh,
+                color: const Color(0xFF5C6BC0),
+                backgroundColor: Colors.white,
+                strokeWidth: 2.5,
+                displacement: 40,
+                child: _isLoading
+                    ? _buildLoadingState()
+                    : _matches.isEmpty
+                        ? _buildEmptyState()
+                        : _buildMatchesList(),
+              ),
             ),
           ],
         ),
@@ -96,123 +121,155 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+    // Loading durumunda da scroll yapılabilir olmalı
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sohbetler yukleniyor...',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Sohbetler yukleniyor...',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.chat_bubble_outline_rounded,
-                size: 80,
-                color: Color(0xFF5C6BC0),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Henuz arkadasin yok',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Kesif sayfasindan yeni kisilerle\ntanismaya basla!',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.grey[600],
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                    const Color(0xFF7986CB).withValues(alpha: 0.1),
+    // SingleChildScrollView + AlwaysScrollableScrollPhysics
+    // Boş ekranda da pull-to-refresh çalışması için gerekli
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        // Ekran yüksekliğini kaplayarak kaydırma alanı oluştur
+        height: MediaQuery.of(context).size.height - 200,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 80,
+                    color: Color(0xFF5C6BC0),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Henuz arkadasin yok',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Kesif sayfasindan yeni kisilerle\ntanismaya basla!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                // Pull-to-refresh ipucu
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.arrow_downward, size: 14, color: Colors.grey[400]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Yenilemek için aşağı çek',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[400],
+                      ),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                children: [
-                  Row(
+                const SizedBox(height: 24),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                        const Color(0xFF7986CB).withValues(alpha: 0.1),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.handshake_rounded,
-                          color: Color(0xFF5C6BC0),
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Nasil calisir?',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[800],
-                              ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Iki kisi birbirini selam gonderince baglanti kurulur ve sohbet edebilirsiniz!',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: Colors.grey[600],
-                                height: 1.4,
-                              ),
+                            child: const Icon(
+                              Icons.handshake_rounded,
+                              color: Color(0xFF5C6BC0),
+                              size: 28,
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Nasil calisir?',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[800],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Iki kisi birbirini selam gonderince baglanti kurulur ve sohbet edebilirsiniz!',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -220,6 +277,8 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
 
   Widget _buildMatchesList() {
     return ListView.builder(
+      // Pull-to-refresh için her zaman kaydırılabilir olmalı
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: _matches.length,
       itemBuilder: (context, index) {
@@ -265,39 +324,57 @@ class _MatchesScreenState extends ConsumerState<MatchesScreen> {
                       width: 2,
                     ),
                   ),
-                  child: ClipOval(
-                    child: match.photoUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: match.photoUrl!,
-                            fit: BoxFit.cover,
-                            cacheManager: AppCacheManager.instance,
-                            // RAM Optimizasyonu: Avatar için 120x120 yeterli
-                            memCacheHeight: 120,
-                            memCacheWidth: 120,
-                            placeholder: (context, url) => Shimmer.fromColors(
-                              baseColor: Colors.grey[300]!,
-                              highlightColor: Colors.grey[100]!,
-                              child: Container(color: Colors.grey[200]),
-                            ),
-                            errorWidget: (context, url, error) => Shimmer.fromColors(
-                              baseColor: Colors.grey[300]!,
-                              highlightColor: Colors.grey[100]!,
-                              child: Container(
-                                color: Colors.grey[200],
-                                child: Center(
-                                  child: Icon(Icons.person, color: Colors.grey[400]),
-                                ),
+                  child: match.photoUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: match.photoUrl!,
+                          width: 60,
+                          height: 60,
+                          cacheManager: AppCacheManager.instance,
+                          imageBuilder: (context, imageProvider) => Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              image: DecorationImage(
+                                image: imageProvider,
+                                fit: BoxFit.cover,
                               ),
                             ),
-                          )
-                        : Container(
-                            color: Colors.grey[200],
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.grey[400],
+                          ),
+                          placeholder: (context, url) => Shimmer.fromColors(
+                            baseColor: Colors.grey[300]!,
+                            highlightColor: Colors.grey[100]!,
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.grey,
+                              ),
                             ),
                           ),
-                  ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey[200],
+                            ),
+                            child: Center(
+                              child: Icon(Icons.person, color: Colors.grey[400]),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey[200],
+                          ),
+                          child: Icon(
+                            Icons.person,
+                            color: Colors.grey[400],
+                          ),
+                        ),
                 ),
               ],
             ),

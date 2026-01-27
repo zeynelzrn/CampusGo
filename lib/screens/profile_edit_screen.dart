@@ -29,11 +29,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final ProfileService _profileService = ProfileService();
 
   final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
   final _bioController = TextEditingController();
   final _universityController = TextEditingController();
   final _departmentController = TextEditingController();
   final _clubsController = TextEditingController(); // Kullanıcı kendi topluluk/kulüplerini yazar
+
+  // Doğum tarihi ve yaş - READ ONLY (değiştirilemez)
+  DateTime? _birthDate;
+  int _displayAge = 0; // Gösterim için hesaplanan yaş
 
   String _selectedGender = 'Erkek';
   String _lookingFor = 'Kadın';
@@ -72,7 +75,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   // Initial values for change detection
   String _initialName = '';
-  String _initialAge = '';
+  // NOT: Doğum tarihi/yaş değiştirilemez, bu yüzden initial değer tutmuyoruz
   String _initialBio = '';
   String _initialUniversity = '';
   String _initialDepartment = '';
@@ -116,7 +119,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   void _addListeners() {
     _nameController.addListener(_checkForChanges);
-    _ageController.addListener(_checkForChanges);
+    // NOT: Yaş değiştirilemez, listener yok
     _bioController.addListener(_checkForChanges);
     _universityController.addListener(_checkForChanges);
     _departmentController.addListener(_checkForChanges);
@@ -129,8 +132,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     final hasChanges =
         // String comparisons with trim()
+        // NOT: Yaş değiştirilemez, karşılaştırma yok
         _nameController.text.trim() != _initialName.trim() ||
-        _ageController.text.trim() != _initialAge.trim() ||
         _bioController.text.trim() != _initialBio.trim() ||
         _universityController.text.trim() != _initialUniversity.trim() ||
         _departmentController.text.trim() != _initialDepartment.trim() ||
@@ -166,13 +169,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   @override
   void dispose() {
     _nameController.removeListener(_checkForChanges);
-    _ageController.removeListener(_checkForChanges);
     _bioController.removeListener(_checkForChanges);
     _universityController.removeListener(_checkForChanges);
     _departmentController.removeListener(_checkForChanges);
     _clubsController.removeListener(_checkForChanges);
     _nameController.dispose();
-    _ageController.dispose();
     _bioController.dispose();
     _universityController.dispose();
     _departmentController.dispose();
@@ -187,7 +188,22 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
     if (profile != null) {
       _nameController.text = profile['name'] ?? '';
-      _ageController.text = (profile['age'] ?? '').toString();
+
+      // Doğum tarihi ve yaş yükle (READ ONLY)
+      if (profile['birthDate'] != null) {
+        _birthDate = (profile['birthDate'] as dynamic).toDate();
+        // Yaşı doğum tarihinden hesapla
+        final now = DateTime.now();
+        _displayAge = now.year - _birthDate!.year;
+        if (now.month < _birthDate!.month ||
+            (now.month == _birthDate!.month && now.day < _birthDate!.day)) {
+          _displayAge--;
+        }
+      } else {
+        // Eski kayıtlar için sadece age varsa onu kullan
+        _displayAge = profile['age'] ?? 0;
+      }
+
       _bioController.text = profile['bio'] ?? '';
       _universityController.text = profile['university'] ?? '';
       _departmentController.text = profile['department'] ?? '';
@@ -235,7 +251,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   void _saveInitialValues() {
     _initialName = _nameController.text;
-    _initialAge = _ageController.text;
+    // NOT: Yaş değiştirilemez, initial değer kaydetmiyoruz
     _initialBio = _bioController.text;
     _initialUniversity = _universityController.text;
     _initialDepartment = _departmentController.text;
@@ -438,25 +454,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     if (!_checkConnectivity()) return;
 
     if (_nameController.text.isEmpty) {
-      _showError('Lütfen adınızı girin');
+      _showError('Lutfen adinizi girin');
       return;
     }
 
-    if (_ageController.text.isEmpty) {
-      _showError('Lütfen yaşınızı girin');
-      return;
-    }
-
-    int? age = int.tryParse(_ageController.text);
-    if (age == null || age < 18 || age > 99) {
-      _showError('Geçerli bir yaş girin (18-99)');
-      return;
-    }
+    // NOT: Yaş kontrol edilmiyor - değiştirilemez
 
     // Ana fotoğraf kontrolü - en az 1 fotoğraf olmalı
     final bool hasMainPhoto = _photoUrls[0] != null || _localPhotos[0] != null;
     if (!hasMainPhoto) {
-      _showError('Ana fotoğraf (ilk slot) zorunludur');
+      _showError('Ana fotograf (ilk slot) zorunludur');
       return;
     }
 
@@ -490,10 +497,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ? <String>[]
           : _clubsController.text.split(',').map((c) => c.trim()).where((c) => c.isNotEmpty).toList();
 
-      // 3. Profili kaydet
+      // 3. Profili kaydet (yaş değiştirilemez - mevcut değeri gönder)
       bool success = await _profileService.saveProfile(
         name: _nameController.text.trim(),
-        age: age,
+        age: _displayAge, // Yaş değiştirilemez
         bio: _bioController.text.trim(),
         university: _universityController.text.trim(),
         department: _departmentController.text.trim(),
@@ -603,9 +610,10 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     final previewProfile = UserProfile(
       id: currentUserId,
       name: _nameController.text.trim().isEmpty
-          ? 'İsimsiz'
+          ? 'Isimsiz'
           : _nameController.text.trim(),
-      age: int.tryParse(_ageController.text) ?? 0,
+      birthDate: _birthDate, // Doğum tarihi (varsa)
+      legacyAge: _displayAge, // Eski kayıtlar için yaş
       bio: _bioController.text.trim(),
       university: _universityController.text.trim(),
       department: _departmentController.text.trim(),
@@ -789,13 +797,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                             icon: Icons.person,
                           ),
                           const SizedBox(height: 12),
-                          _buildTextField(
-                            controller: _ageController,
-                            label: 'Yaş',
-                            hint: '18',
-                            icon: Icons.cake,
-                            keyboardType: TextInputType.number,
-                          ),
+                          _buildReadOnlyAgeField(),
                           const SizedBox(height: 12),
                           _buildTextField(
                             controller: _bioController,
@@ -1032,6 +1034,93 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
           const SizedBox(height: 16),
           ...children,
+        ],
+      ),
+    );
+  }
+
+  /// Yaş alanı - READ ONLY (değiştirilemez)
+  /// Doğum tarihi profil oluşturulurken belirlenir ve sonra değiştirilemez
+  Widget _buildReadOnlyAgeField() {
+    // Türkçe ay isimleri
+    const turkishMonths = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+
+    String birthDateText = 'Belirtilmemiş';
+    if (_birthDate != null) {
+      final day = _birthDate!.day;
+      final month = turkishMonths[_birthDate!.month - 1];
+      final year = _birthDate!.year;
+      birthDateText = '$day $month $year';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cake, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Yaş',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$_displayAge yaşında',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                if (_birthDate != null)
+                  Text(
+                    birthDateText,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange[200]!),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline, size: 14, color: Colors.orange[700]),
+                const SizedBox(width: 4),
+                Text(
+                  'Değiştirilemez',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.orange[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

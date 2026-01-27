@@ -398,7 +398,50 @@ class _ChatListScreenState extends State<ChatListScreen>
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            // Keşfete Git butonu
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.lightImpact();
+                MainScreen.currentTabNotifier.value = 2; // Keşif tab'ına git
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                  ),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.explore_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Kesfete Git',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
             _buildHowItWorksCard(),
           ],
         ),
@@ -576,20 +619,25 @@ class _ChatListScreenState extends State<ChatListScreen>
           ),
         ],
       ),
-      child: ClipOval(
-        child: chat.peerImage != null && chat.peerImage!.isNotEmpty
-            ? CachedNetworkImage(
-                imageUrl: chat.peerImage!,
-                fit: BoxFit.cover,
-                cacheManager: AppCacheManager.instance,
-                // RAM Optimizasyonu: Avatar için 120x120 yeterli
-                memCacheHeight: 120,
-                memCacheWidth: 120,
-                placeholder: (context, url) => _buildDefaultAvatar(),
-                errorWidget: (context, url, error) => _buildDefaultAvatar(),
-              )
-            : _buildDefaultAvatar(),
-      ),
+      child: chat.peerImage != null && chat.peerImage!.isNotEmpty
+          ? CachedNetworkImage(
+              imageUrl: chat.peerImage!,
+              width: 60,
+              height: 60,
+              cacheManager: AppCacheManager.instance,
+              imageBuilder: (context, imageProvider) => Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: imageProvider,
+                    fit: BoxFit.cover, // Oranı bozmadan kırpar
+                  ),
+                ),
+              ),
+              placeholder: (context, url) => _buildDefaultAvatar(),
+              errorWidget: (context, url, error) => _buildDefaultAvatar(),
+            )
+          : _buildDefaultAvatar(),
     );
   }
 

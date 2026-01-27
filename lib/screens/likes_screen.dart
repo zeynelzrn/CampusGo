@@ -18,6 +18,7 @@ import '../providers/connectivity_provider.dart';
 import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
 import 'user_profile_screen.dart';
+import 'main_screen.dart';
 
 class LikesScreen extends ConsumerStatefulWidget {
   const LikesScreen({super.key});
@@ -30,6 +31,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
     with AutoRefreshMixin {
   /// Admin durumu (Firestore'dan yüklenir)
   bool _isAdmin = false;
+
+  /// Manuel yenileme durumu (sağ üst buton için)
+  bool _isManualRefreshing = false;
 
   @override
   List<ProviderOrFamily> get providersToRefresh => [receivedLikesProvider];
@@ -68,6 +72,38 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
   Future<void> _initializeEliminatedIds() async {
     final eliminatedIds = await ref.read(likesRepositoryProvider).getEliminatedUserIds();
     ref.read(likesUIProvider.notifier).initializeEliminatedIds(eliminatedIds);
+  }
+
+  /// Pull-to-refresh veya manuel yenileme fonksiyonu
+  /// Haptic feedback verir ve veriyi yeniler
+  Future<void> _handleRefresh() async {
+    // Haptic feedback - yenileme başladığında titreşim
+    HapticFeedback.mediumImpact();
+
+    // Provider'ı invalidate et
+    ref.invalidate(receivedLikesProvider);
+
+    // Kısa bir bekleme (UX için)
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  /// Manuel yenileme butonu için (sağ üst)
+  Future<void> _handleManualRefresh() async {
+    if (_isManualRefreshing) return;
+
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
+
+    // Loading state'i başlat
+    setState(() => _isManualRefreshing = true);
+
+    // Veriyi yenile
+    await _handleRefresh();
+
+    // Loading state'i bitir
+    if (mounted) {
+      setState(() => _isManualRefreshing = false);
+    }
   }
 
   /// İnternet bağlantısını kontrol et
@@ -436,36 +472,57 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
               ],
             ),
           ),
-          // Refresh button (manual refresh still available)
-          IconButton(
-            onPressed: () => ref.invalidate(receivedLikesProvider),
-            icon: Icon(
-              Icons.refresh_rounded,
-              color: Colors.grey[600],
-            ),
-          ),
+          // Refresh button (manual refresh with loading state)
+          _isManualRefreshing
+              ? Container(
+                  width: 48,
+                  height: 48,
+                  padding: const EdgeInsets.all(12),
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+                  ),
+                )
+              : IconButton(
+                  onPressed: _handleManualRefresh,
+                  icon: Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.grey[600],
+                  ),
+                  tooltip: 'Yenile',
+                ),
         ],
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+    // Bouncing scroll physics ile kaydırılabilir
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+                strokeWidth: 3.0,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Istekler yukleniyor...',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Istekler yukleniyor...',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -498,118 +555,188 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.waving_hand_outlined,
-                size: 80,
-                color: Color(0xFF5C6BC0),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Henuz istek yok',
-              style: GoogleFonts.poppins(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Profilini guncelle ve daha fazla kisi\ntarafindan kesfedil!',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                color: Colors.grey[600],
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            // Demo veri ekleme butonu - sadece adminler için
-            if (_isAdmin) ...[
-              GestureDetector(
-                onTap: _seedDemoLikes,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    // Bouncing scroll physics ile kaydırılabilir - pull-to-refresh için gerekli
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height - 200,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // El sallama ikonu
+                Container(
+                  padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.waving_hand_outlined,
+                    size: 80,
+                    color: Color(0xFF5C6BC0),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Başlık
+                Text(
+                  'Henuz istek yok',
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Alt başlık
+                Text(
+                  'Profilini guncelle ve daha fazla kisi\ntarafindan kesfedil!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                // Pull-to-refresh ipucu
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.arrow_downward, size: 14, color: Colors.grey[400]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Yenilemek için aşağı çek',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.grey[400],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Demo veri ekleme butonu - sadece adminler için
+                if (_isAdmin) ...[
+                  GestureDetector(
+                    onTap: _seedDemoLikes,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Demo Istek Ekle',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                // Keşfete Git butonu
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    MainScreen.currentTabNotifier.value = 2;
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                      ),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.explore_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Kesfete Git',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // İpucu kutusu
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
+                        Icons.lightbulb_outline_rounded,
+                        color: Colors.amber,
                         size: 24,
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Demo Istek Ekle',
+                        'Ipucu: Daha fazla fotograf ekle!',
                         style: GoogleFonts.poppins(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.amber[800],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            // İpucu kutusu - tüm kullanıcılar için
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.amber.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.amber.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.lightbulb_outline_rounded,
-                    color: Colors.amber,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Ipucu: Daha fazla fotograf ekle!',
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.amber[800],
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -627,9 +754,16 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(receivedLikesProvider),
+      onRefresh: _handleRefresh,
       color: const Color(0xFF5C6BC0),
+      backgroundColor: Colors.white,
+      strokeWidth: 3.0,
+      displacement: 50.0,
       child: GridView.builder(
+        // Bouncing scroll physics - esneme efekti
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: const EdgeInsets.all(16),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
@@ -745,8 +879,8 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                                 imageUrl: user.photos.first,
                                 fit: BoxFit.cover,
                                 cacheManager: AppCacheManager.instance,
-                                // RAM Optimizasyonu: Grid kartlar için 300x400 yeterli
-                                memCacheHeight: 400,
+                                // RAM Optimizasyonu: Sadece genişlik belirle, yükseklik otomatik
+                                // (orijinal oran korunur, ezilme önlenir)
                                 memCacheWidth: 300,
                                 placeholder: (context, url) => Shimmer.fromColors(
                                   baseColor: Colors.grey[300]!,

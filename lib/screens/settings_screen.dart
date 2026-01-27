@@ -1227,6 +1227,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   void _showDeleteDemoUsersDialog() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final userEmail = currentUser?.email ?? 'Bilinmeyen';
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1239,23 +1242,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
-                Icons.warning_rounded,
-                color: Colors.red,
+                Icons.cleaning_services_rounded,
+                color: Colors.orange,
                 size: 28,
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'UID WHITELIST',
+                'Demo Hesap Temizligi',
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                  fontSize: 18,
+                  color: Colors.grey[800],
+                  fontSize: 17,
                 ),
               ),
             ),
@@ -1265,12 +1268,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Protected UIDs
+            // Korunan Hesaplar
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               ),
               child: Column(
@@ -1278,10 +1281,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.shield, color: Colors.green, size: 20),
+                      const Icon(Icons.shield_rounded, color: Colors.green, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        'KORUNAN 2 UID:',
+                        'KORUNAN HESAPLAR',
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           color: Colors.green[700],
@@ -1290,19 +1293,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  _buildProtectedItem('BA1pWo... (PC - Gmail)'),
-                  _buildProtectedItem('KhpezrxgS... (Tel - Okul)'),
+                  const SizedBox(height: 12),
+                  _buildProtectedItem('Mevcut oturumunuz ($userEmail)'),
+                  _buildProtectedItem('Tum gercek kullanicilar (isDemoUser ≠ true)'),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            // Delete warning
+            const SizedBox(height: 14),
+            // Silinecekler
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
               ),
               child: Column(
@@ -1310,10 +1313,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.delete_forever, color: Colors.red, size: 20),
+                      const Icon(Icons.delete_sweep_rounded, color: Colors.red, size: 20),
                       const SizedBox(width: 8),
                       Text(
-                        'SILINECEKLER:',
+                        'SILINECEKLER',
                         style: GoogleFonts.poppins(
                           fontSize: 13,
                           color: Colors.red[700],
@@ -1322,24 +1325,45 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(
-                    'Yukaridaki 2 UID HARICINDEKI\nTUM KULLANICILAR silinecek!',
+                    'Sadece "Demo Kullanici" olarak isaretlenmis hesaplar (isDemoUser: true) ve bu hesaplara ait tum veriler silinecektir:',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       color: Colors.red[600],
+                      height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  _buildDeleteItem('Profil verileri'),
+                  _buildDeleteItem('Begeni/esleme kayitlari'),
+                  _buildDeleteItem('Sohbet gecmisleri'),
+                  _buildDeleteItem('Bildirimler'),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Emin misiniz?',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.red,
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber[700], size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bu islem geri alinamaz!',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.amber[800],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1364,7 +1388,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             child: Text(
-              'EVET, SIL!',
+              'Temizle',
               style: GoogleFonts.poppins(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -1378,16 +1402,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Widget _buildProtectedItem(String text) {
     return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle, color: Colors.green[600], size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.green[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeleteItem(String text) {
+    return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(Icons.check_circle, color: Colors.green[600], size: 14),
+          Icon(Icons.remove_circle_outline, color: Colors.red[400], size: 14),
           const SizedBox(width: 6),
           Text(
             text,
             style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.green[700],
+              fontSize: 11,
+              color: Colors.red[500],
             ),
           ),
         ],

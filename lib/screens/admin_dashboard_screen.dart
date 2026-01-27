@@ -302,25 +302,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Açıklama
-                if (description.isNotEmpty) ...[
-                  Text(
-                    'Aciklama:',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                    ),
+                Text(
+                  'Aciklama:',
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                    ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description.isNotEmpty ? description : 'Aciklama girilmemis',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: description.isNotEmpty ? Colors.grey[700] : Colors.grey[400],
+                    fontStyle: description.isEmpty ? FontStyle.italic : FontStyle.normal,
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
+                const SizedBox(height: 16),
 
                 // User IDs
                 Row(

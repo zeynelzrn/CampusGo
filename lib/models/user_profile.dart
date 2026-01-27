@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserProfile {
   final String id;
   final String name;
-  final int age;
+  final DateTime? birthDate; // Doğum tarihi - yaş buradan hesaplanır
   final String bio;
   final String university;
   final String department;
@@ -25,10 +25,14 @@ class UserProfile {
   final bool isAdmin; // Admin yetkisi (Firebase Console'dan manuel verilir)
   final bool isBanned; // Banlı kullanıcı (Adminler tarafından verilir)
 
+  // Legacy age field for backward compatibility (eski kayıtlar için)
+  final int? _legacyAge;
+
   const UserProfile({
     required this.id,
     required this.name,
-    required this.age,
+    this.birthDate,
+    int? legacyAge, // Eski kayıtlardan gelen yaş değeri
     this.bio = '',
     this.university = '',
     this.department = '',
@@ -44,7 +48,24 @@ class UserProfile {
     this.intent = const [],
     this.isAdmin = false,
     this.isBanned = false,
-  });
+  }) : _legacyAge = legacyAge;
+
+  /// Dinamik yaş hesaplama - doğum tarihinden otomatik hesaplanır
+  /// Eğer birthDate yoksa legacy age değerini kullanır (geriye uyumluluk)
+  int get age {
+    if (birthDate != null) {
+      final now = DateTime.now();
+      int calculatedAge = now.year - birthDate!.year;
+      // Doğum günü henüz gelmemişse 1 çıkar
+      if (now.month < birthDate!.month ||
+          (now.month == birthDate!.month && now.day < birthDate!.day)) {
+        calculatedAge--;
+      }
+      return calculatedAge;
+    }
+    // Eski kayıtlar için legacy age kullan
+    return _legacyAge ?? 0;
+  }
 
   /// Create from Firestore document
   factory UserProfile.fromFirestore(DocumentSnapshot doc) {
@@ -53,7 +74,8 @@ class UserProfile {
     return UserProfile(
       id: doc.id,
       name: data['name'] as String? ?? 'İsimsiz',
-      age: data['age'] as int? ?? 0,
+      birthDate: (data['birthDate'] as Timestamp?)?.toDate(),
+      legacyAge: data['age'] as int?, // Eski kayıtlar için geriye uyumluluk
       bio: data['bio'] as String? ?? '',
       university: data['university'] as String? ?? '',
       department: data['department'] as String? ?? '',
@@ -77,6 +99,8 @@ class UserProfile {
   Map<String, dynamic> toFirestore() {
     return {
       'name': name,
+      if (birthDate != null) 'birthDate': Timestamp.fromDate(birthDate!),
+      // age alanını da kaydet (geriye uyumluluk ve hızlı sorgular için)
       'age': age,
       'bio': bio,
       'university': university,
@@ -101,7 +125,8 @@ class UserProfile {
     return {
       'id': id,
       'name': name,
-      'age': age,
+      'birthDate': birthDate?.toIso8601String(),
+      'legacyAge': _legacyAge,
       'bio': bio,
       'university': university,
       'department': department,
@@ -125,7 +150,10 @@ class UserProfile {
     return UserProfile(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? 'İsimsiz',
-      age: json['age'] as int? ?? 0,
+      birthDate: json['birthDate'] != null
+          ? DateTime.tryParse(json['birthDate'] as String)
+          : null,
+      legacyAge: json['legacyAge'] as int? ?? json['age'] as int?,
       bio: json['bio'] as String? ?? '',
       university: json['university'] as String? ?? '',
       department: json['department'] as String? ?? '',
@@ -152,6 +180,9 @@ class UserProfile {
 
   /// Check if profile is complete
   bool get isComplete => name.isNotEmpty && age > 0 && photos.isNotEmpty;
+
+  /// Doğum tarihi var mı kontrol et
+  bool get hasBirthDate => birthDate != null;
 
   @override
   String toString() => 'UserProfile(id: $id, name: $name, age: $age)';

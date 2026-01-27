@@ -429,32 +429,23 @@ class UserService {
 
   // ==================== REPORT OPERATIONS ====================
 
-  /// Report reasons for App Store compliance
+  /// Report reasons for App Store compliance (Apple UGC Guidelines)
+  /// Apple requires: harassment, nudity/sexual, fake/spam, other
   static const List<ReportReason> reportReasons = [
     ReportReason(
       id: 'harassment',
-      label: 'Rahatsiz edici mesajlar / Taciz',
+      label: 'Rahatsiz edici icerik / Taciz',
       icon: 'warning',
     ),
     ReportReason(
-      id: 'fake_profile',
-      label: 'Sahte Profil / Spam',
+      id: 'nudity',
+      label: 'Cipaklik / Cinsellik',
+      icon: 'no_adult_content',
+    ),
+    ReportReason(
+      id: 'fake_spam',
+      label: 'Sahte Hesap / Spam',
       icon: 'person_off',
-    ),
-    ReportReason(
-      id: 'inappropriate_content',
-      label: 'Uygunsuz Icerik / Fotograf',
-      icon: 'image_not_supported',
-    ),
-    ReportReason(
-      id: 'underage',
-      label: 'Reşit olmayan kullanici',
-      icon: 'child_care',
-    ),
-    ReportReason(
-      id: 'scam',
-      label: 'Dolandiricilik',
-      icon: 'money_off',
     ),
     ReportReason(
       id: 'other',
@@ -508,6 +499,69 @@ class UserService {
     } catch (e) {
       debugPrint('UserService: Error reporting user: $e');
       return false;
+    }
+  }
+
+  /// Report AND block a user (Apple App Store UGC compliance)
+  /// Apple requires automatic blocking after reporting for user safety
+  /// Returns: success status and whether user was newly blocked
+  Future<ReportAndBlockResult> reportAndBlockUser({
+    required String targetUserId,
+    required String reason,
+    String? description,
+    String? chatId,
+  }) async {
+    final currentUid = currentUserId;
+    if (currentUid == null) {
+      return const ReportAndBlockResult(success: false, alreadyBlocked: false);
+    }
+
+    if (currentUid == targetUserId) {
+      return const ReportAndBlockResult(success: false, alreadyBlocked: false);
+    }
+
+    // İnternet bağlantısı kontrolü
+    if (!await _checkInternetConnection()) {
+      debugPrint('UserService: İnternet bağlantısı yok - rapor gönderilemedi');
+      return const ReportAndBlockResult(success: false, alreadyBlocked: false);
+    }
+
+    try {
+      // 1. Raporu oluştur
+      await _reportsCollection.add({
+        'reporterId': currentUid,
+        'reportedId': targetUserId,
+        'reason': reason,
+        'description': description ?? '',
+        'chatId': chatId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'reviewedAt': null,
+        'reviewedBy': null,
+        'action': null,
+        'autoBlocked': true, // Apple compliance flag
+      });
+
+      debugPrint('UserService: Report created for $targetUserId');
+
+      // 2. Kullanıcı zaten engellenmiş mi kontrol et
+      final alreadyBlocked = await isUserBlocked(targetUserId);
+
+      // 3. Engellenmediyse engelle (Apple UGC requirement)
+      if (!alreadyBlocked) {
+        final blockSuccess = await blockUser(targetUserId);
+        if (blockSuccess) {
+          debugPrint('UserService: Auto-blocked user $targetUserId after report');
+        }
+      }
+
+      return ReportAndBlockResult(
+        success: true,
+        alreadyBlocked: alreadyBlocked,
+      );
+    } catch (e) {
+      debugPrint('UserService: Error in reportAndBlockUser: $e');
+      return const ReportAndBlockResult(success: false, alreadyBlocked: false);
     }
   }
 
@@ -1004,4 +1058,15 @@ class _DeleteStats {
   int subcollections = 0;
   int errors = 0;
   bool userDocDeleted = false;
+}
+
+/// Result of reportAndBlockUser operation
+class ReportAndBlockResult {
+  final bool success;
+  final bool alreadyBlocked;
+
+  const ReportAndBlockResult({
+    required this.success,
+    required this.alreadyBlocked,
+  });
 }

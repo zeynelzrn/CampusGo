@@ -228,12 +228,15 @@ class SeedService {
 
   /// Tüm test profillerini sil (SADECE isDemoUser: true olanlar)
   /// GERCEK KULLANICILAR KORUNUR!
+  /// Alt koleksiyonlar ve ilişkili veriler de temizlenir
   Future<void> clearTestProfiles() async {
     final currentUserId = _auth.currentUser?.uid;
     final snapshot = await _firestore.collection('users').get();
-    final batch = _firestore.batch();
     int deletedCount = 0;
     int protectedCount = 0;
+
+    // Silinecek demo kullanıcı ID'lerini topla
+    final demoUserIds = <String>[];
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
@@ -254,14 +257,299 @@ class SeedService {
         continue;
       }
 
-      // Sadece demo kullaniciyi sil
-      batch.delete(doc.reference);
-      deletedCount++;
+      demoUserIds.add(doc.id);
     }
 
-    await batch.commit();
-    debugPrint('SeedService: Silindi: $deletedCount demo profil');
-    debugPrint('SeedService: Korundu: $protectedCount gercek profil');
+    debugPrint('SeedService: ${demoUserIds.length} demo kullanici silinecek...');
+
+    // Her demo kullanıcı için alt koleksiyonları ve ilişkili verileri sil
+    for (final userId in demoUserIds) {
+      await _deleteUserWithSubcollections(userId);
+      deletedCount++;
+      debugPrint('SeedService: Silindi ($deletedCount/${demoUserIds.length}): $userId');
+    }
+
+    debugPrint('SeedService: ✓ Silindi: $deletedCount demo profil');
+    debugPrint('SeedService: ✓ Korundu: $protectedCount gercek profil');
+  }
+
+  /// Kullanıcı ve tüm alt koleksiyonlarını + ilişkili verileri sil
+  /// Ghost document oluşmasını önler
+  /// ÇAPRAZ TEMİZLİK: Diğer kullanıcıların subcollection'larındaki referansları da siler
+  Future<void> _deleteUserWithSubcollections(String userId) async {
+    final userRef = _firestore.collection('users').doc(userId);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 1. ÇAPRAZ TEMİZLİK - DİĞER KULLANICILARIN ALT KOLEKSİYONLARINI TEMİZLE
+    // Bu demo kullanıcının diğer kullanıcılarda bıraktığı tüm izleri sil
+    // ═══════════════════════════════════════════════════════════════════
+
+    await _crossCleanupForDeletedUser(userId);
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 2. KENDİ ALT KOLEKSİYONLARINI SİL
+    // ═══════════════════════════════════════════════════════════════════
+    const subcollections = [
+      'notifications',
+      'matches',
+      'likes',
+      'blocked_users',
+      'blocked_by',
+      'swipes',
+    ];
+
+    for (final subcollection in subcollections) {
+      await _deleteSubcollection(userRef.collection(subcollection));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 3. ÜST SEVİYE İLİŞKİLİ DÖKÜMALARI SİL
+    // ═══════════════════════════════════════════════════════════════════
+
+    // 3a. matches koleksiyonundan bu kullanıcıyı içeren dökümanları sil
+    final matchesSnapshot = await _firestore
+        .collection('matches')
+        .where('users', arrayContains: userId)
+        .get();
+
+    for (final doc in matchesSnapshot.docs) {
+      await doc.reference.delete();
+    }
+    if (matchesSnapshot.docs.isNotEmpty) {
+      debugPrint('  → ${matchesSnapshot.docs.length} global match silindi');
+    }
+
+    // 3b. chats koleksiyonundan bu kullanıcıyı içeren dökümanları sil
+    final chatsSnapshot = await _firestore
+        .collection('chats')
+        .where('users', arrayContains: userId)
+        .get();
+
+    for (final chatDoc in chatsSnapshot.docs) {
+      await _deleteSubcollection(chatDoc.reference.collection('messages'));
+      await chatDoc.reference.delete();
+    }
+    if (chatsSnapshot.docs.isNotEmpty) {
+      debugPrint('  → ${chatsSnapshot.docs.length} chat silindi');
+    }
+
+    // 3c. actions koleksiyonundan bu kullanıcıyla ilişkili dökümanları sil
+    final actionsFromSnapshot = await _firestore
+        .collection('actions')
+        .where('fromUserId', isEqualTo: userId)
+        .get();
+
+    final actionsToSnapshot = await _firestore
+        .collection('actions')
+        .where('toUserId', isEqualTo: userId)
+        .get();
+
+    for (final doc in actionsFromSnapshot.docs) {
+      await doc.reference.delete();
+    }
+    for (final doc in actionsToSnapshot.docs) {
+      await doc.reference.delete();
+    }
+
+    final totalActions = actionsFromSnapshot.docs.length + actionsToSnapshot.docs.length;
+    if (totalActions > 0) {
+      debugPrint('  → $totalActions action silindi');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 4. ANA KULLANICI DÖKÜMANINI SİL
+    // ═══════════════════════════════════════════════════════════════════
+    await userRef.delete();
+  }
+
+  /// ÇAPRAZ TEMİZLİK: Silinen kullanıcının diğer kullanıcılardaki izlerini temizle
+  /// Collection Group Query kullanarak tüm veritabanını tarar
+  Future<void> _crossCleanupForDeletedUser(String deletedUserId) async {
+    int totalCleaned = 0;
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 1. LIKES: Diğer kullanıcıların "likes" subcollection'larında
+    //    bu demo kullanıcının ID'sine sahip dökümanları sil
+    //    Path: users/{anyUserId}/likes/{deletedUserId}
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      final likesSnapshot = await _firestore
+          .collectionGroup('likes')
+          .where(FieldPath.documentId, isEqualTo: deletedUserId)
+          .get();
+
+      for (final doc in likesSnapshot.docs) {
+        await doc.reference.delete();
+        totalCleaned++;
+      }
+      if (likesSnapshot.docs.isNotEmpty) {
+        debugPrint('  ⨯ ${likesSnapshot.docs.length} like referansı temizlendi (collectionGroup)');
+      }
+    } catch (e) {
+      // Collection Group Query index yoksa manuel temizlik yap
+      debugPrint('  ⚠ likes collectionGroup hatası, manuel temizlik yapılıyor: $e');
+      totalCleaned += await _manualCrossCleanupLikes(deletedUserId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 2. MATCHES: Diğer kullanıcıların "matches" subcollection'larında
+    //    bu demo kullanıcının ID'sine sahip dökümanları sil
+    //    Path: users/{anyUserId}/matches/{deletedUserId}
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      final matchesSnapshot = await _firestore
+          .collectionGroup('matches')
+          .where(FieldPath.documentId, isEqualTo: deletedUserId)
+          .get();
+
+      for (final doc in matchesSnapshot.docs) {
+        // Sadece users/{uid}/matches altındakileri sil, global matches koleksiyonunu değil
+        if (doc.reference.parent.parent?.parent.id == 'users') {
+          await doc.reference.delete();
+          totalCleaned++;
+        }
+      }
+      if (matchesSnapshot.docs.isNotEmpty) {
+        debugPrint('  ⨯ Subcollection match referansları temizlendi');
+      }
+    } catch (e) {
+      debugPrint('  ⚠ matches collectionGroup hatası: $e');
+      totalCleaned += await _manualCrossCleanupMatches(deletedUserId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 3. NOTIFICATIONS: fromUserId bu kullanıcı olan bildirimleri sil
+    //    Path: users/{anyUserId}/notifications/{notifId} where fromUserId == deletedUserId
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      final notificationsSnapshot = await _firestore
+          .collectionGroup('notifications')
+          .where('fromUserId', isEqualTo: deletedUserId)
+          .get();
+
+      for (final doc in notificationsSnapshot.docs) {
+        await doc.reference.delete();
+        totalCleaned++;
+      }
+      if (notificationsSnapshot.docs.isNotEmpty) {
+        debugPrint('  ⨯ ${notificationsSnapshot.docs.length} bildirim temizlendi');
+      }
+    } catch (e) {
+      debugPrint('  ⚠ notifications collectionGroup hatası: $e');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 4. BLOCKED İLİŞKİLERİ: Bu kullanıcıyı engelleyen/engellediği kayıtlar
+    // ─────────────────────────────────────────────────────────────────────
+    try {
+      // blocked_users subcollection'larında bu kullanıcıya ait kayıtlar
+      final blockedUsersSnapshot = await _firestore
+          .collectionGroup('blocked_users')
+          .where(FieldPath.documentId, isEqualTo: deletedUserId)
+          .get();
+
+      for (final doc in blockedUsersSnapshot.docs) {
+        await doc.reference.delete();
+        totalCleaned++;
+      }
+
+      // blocked_by subcollection'larında bu kullanıcıya ait kayıtlar
+      final blockedBySnapshot = await _firestore
+          .collectionGroup('blocked_by')
+          .where(FieldPath.documentId, isEqualTo: deletedUserId)
+          .get();
+
+      for (final doc in blockedBySnapshot.docs) {
+        await doc.reference.delete();
+        totalCleaned++;
+      }
+    } catch (e) {
+      debugPrint('  ⚠ blocked collectionGroup hatası: $e');
+    }
+
+    if (totalCleaned > 0) {
+      debugPrint('  ✓ Çapraz temizlik: $totalCleaned referans silindi');
+    }
+  }
+
+  /// Manuel çapraz temizlik - likes için (index yoksa)
+  Future<int> _manualCrossCleanupLikes(String deletedUserId) async {
+    int cleaned = 0;
+    final usersSnapshot = await _firestore.collection('users').get();
+
+    for (final userDoc in usersSnapshot.docs) {
+      // Silinen kullanıcının kendi dökümanını atla
+      if (userDoc.id == deletedUserId) continue;
+
+      final likeDoc = await _firestore
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('likes')
+          .doc(deletedUserId)
+          .get();
+
+      if (likeDoc.exists) {
+        await likeDoc.reference.delete();
+        cleaned++;
+        debugPrint('  ⨯ Like silindi: users/${userDoc.id}/likes/$deletedUserId');
+      }
+    }
+    return cleaned;
+  }
+
+  /// Manuel çapraz temizlik - matches için (index yoksa)
+  Future<int> _manualCrossCleanupMatches(String deletedUserId) async {
+    int cleaned = 0;
+    final usersSnapshot = await _firestore.collection('users').get();
+
+    for (final userDoc in usersSnapshot.docs) {
+      if (userDoc.id == deletedUserId) continue;
+
+      final matchDoc = await _firestore
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('matches')
+          .doc(deletedUserId)
+          .get();
+
+      if (matchDoc.exists) {
+        await matchDoc.reference.delete();
+        cleaned++;
+        debugPrint('  ⨯ Match ref silindi: users/${userDoc.id}/matches/$deletedUserId');
+      }
+    }
+    return cleaned;
+  }
+
+  /// Alt koleksiyondaki tüm dökümanları sil
+  Future<void> _deleteSubcollection(CollectionReference collection) async {
+    final snapshot = await collection.get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    // Batch ile toplu silme (500 limit)
+    const batchLimit = 500;
+    var batch = _firestore.batch();
+    var count = 0;
+
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+      count++;
+
+      // Batch limiti aşıldıysa commit et ve yeni batch başlat
+      if (count >= batchLimit) {
+        await batch.commit();
+        batch = _firestore.batch();
+        count = 0;
+      }
+    }
+
+    // Kalan dökümanları commit et
+    if (count > 0) {
+      await batch.commit();
+    }
+
+    debugPrint('  → ${collection.path}: ${snapshot.docs.length} doküman silindi');
   }
 
   /// Demo kullanıcıların mevcut kullanıcıyı beğenmesini sağla

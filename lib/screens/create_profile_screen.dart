@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,36 +20,183 @@ class CreateProfileScreen extends ConsumerStatefulWidget {
       _CreateProfileScreenState();
 }
 
-class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
+class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
   final _universityController = TextEditingController();
   final _departmentController = TextEditingController();
   final _bioController = TextEditingController();
 
-  File? _selectedImage;
+  // 6 slotlu fotoğraf listesi (null = boş slot)
+  final List<File?> _selectedPhotos = List.filled(6, null);
+
+  DateTime? _selectedBirthDate;
   String _selectedGender = 'Erkek';
   String _selectedLookingFor = 'Kadın';
 
   final List<String> _genderOptions = ['Erkek', 'Kadın', 'Diğer'];
   final List<String> _lookingForOptions = ['Erkek', 'Kadın', 'Herkes'];
 
+  // Animation controllers
+  late AnimationController _gridAnimationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _gridAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _gridAnimationController.forward();
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
-    _ageController.dispose();
     _universityController.dispose();
     _departmentController.dispose();
     _bioController.dispose();
+    _gridAnimationController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  /// Yüklenen fotoğraf sayısı
+  int get _photoCount => _selectedPhotos.where((p) => p != null).length;
+
+  /// En az 1 fotoğraf var mı?
+  bool get _hasMinimumPhotos => _photoCount >= 1;
+
+  /// Seçilen doğum tarihinden yaş hesapla
+  int? get _calculatedAge {
+    if (_selectedBirthDate == null) return null;
+    final now = DateTime.now();
+    int age = now.year - _selectedBirthDate!.year;
+    if (now.month < _selectedBirthDate!.month ||
+        (now.month == _selectedBirthDate!.month &&
+            now.day < _selectedBirthDate!.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  /// 18 yaş kontrolü
+  bool get _isAdult => (_calculatedAge ?? 0) >= 18;
+
+  /// Doğum tarihi seçici göster
+  void _showBirthDatePicker() {
+    final initialDate =
+        _selectedBirthDate ?? DateTime.now().subtract(const Duration(days: 365 * 20));
+    final minDate = DateTime.now().subtract(const Duration(days: 365 * 100));
+    final maxDate = DateTime.now().subtract(const Duration(days: 365 * 18));
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: 340,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'İptal',
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Doğum Tarihi',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text(
+                      'Tamam',
+                      style: GoogleFonts.poppins(
+                        color: const Color(0xFF5C6BC0),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.date,
+                initialDateTime:
+                    initialDate.isAfter(maxDate) ? maxDate : initialDate,
+                minimumDate: minDate,
+                maximumDate: maxDate,
+                dateOrder: DatePickerDateOrder.dmy,
+                onDateTimeChanged: (DateTime newDate) {
+                  setState(() {
+                    _selectedBirthDate = newDate;
+                  });
+                },
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber[700], size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Uygulamayı kullanmak için 18 yaşından büyük olmalısınız',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.amber[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Fotoğraf seç (belirli slot için)
+  Future<void> _pickPhotoForSlot(int slotIndex, ImageSource source) async {
     Navigator.pop(context); // Close bottom sheet
 
     try {
-      // ImageHelper ile izin kontrolu + resim secme + sikistirma (hepsi bir arada)
       final File? compressedFile = await ImageHelper.pickAndCompressImage(
         context,
         source,
@@ -57,7 +204,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
 
       if (compressedFile != null) {
         setState(() {
-          _selectedImage = compressedFile;
+          _selectedPhotos[slotIndex] = compressedFile;
         });
       }
     } catch (e) {
@@ -65,7 +212,8 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     }
   }
 
-  void _showImagePicker() {
+  /// Fotoğraf seçici bottom sheet göster
+  void _showImagePickerForSlot(int slotIndex) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -88,10 +236,20 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Fotoğraf Seç',
+              slotIndex == 0 ? 'Ana Fotoğrafını Seç' : 'Fotoğraf Ekle',
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              slotIndex == 0
+                  ? 'Bu fotoğraf profil avatarın olarak görünecek'
+                  : 'Galerini zenginleştir',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: Colors.grey[600],
               ),
             ),
             const SizedBox(height: 20),
@@ -101,12 +259,12 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                 _buildImageSourceOption(
                   icon: Icons.camera_alt,
                   label: 'Kamera',
-                  onTap: () => _pickImage(ImageSource.camera),
+                  onTap: () => _pickPhotoForSlot(slotIndex, ImageSource.camera),
                 ),
                 _buildImageSourceOption(
                   icon: Icons.photo_library,
                   label: 'Galeri',
-                  onTap: () => _pickImage(ImageSource.gallery),
+                  onTap: () => _pickPhotoForSlot(slotIndex, ImageSource.gallery),
                 ),
               ],
             ),
@@ -115,6 +273,23 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// Fotoğraf sil
+  void _removePhoto(int slotIndex) {
+    setState(() {
+      _selectedPhotos[slotIndex] = null;
+      // Fotoğrafları sola kaydır (boşlukları doldur)
+      _compactPhotos();
+    });
+  }
+
+  /// Boş slotları doldur (fotoğrafları sola kaydır)
+  void _compactPhotos() {
+    final nonNullPhotos = _selectedPhotos.where((p) => p != null).toList();
+    for (int i = 0; i < 6; i++) {
+      _selectedPhotos[i] = i < nonNullPhotos.length ? nonNullPhotos[i] : null;
+    }
   }
 
   Widget _buildImageSourceOption({
@@ -161,8 +336,21 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   }
 
   Future<void> _submitProfile() async {
-    if (_selectedImage == null) {
-      _showError('Lütfen bir profil fotoğrafı seçin');
+    // Fotoğraf kontrolü
+    if (!_hasMinimumPhotos) {
+      _showError('En az 1 fotoğraf eklemelisin');
+      return;
+    }
+
+    // Doğum tarihi kontrolü
+    if (_selectedBirthDate == null) {
+      _showError('Lütfen doğum tarihinizi seçin');
+      return;
+    }
+
+    // 18 yaş kontrolü
+    if (!_isAdult) {
+      _showError('Uygulamayı kullanmak için 18 yaşından büyük olmalısınız');
       return;
     }
 
@@ -172,7 +360,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
 
     final profileData = ProfileData(
       name: _nameController.text.trim(),
-      age: int.parse(_ageController.text.trim()),
+      birthDate: _selectedBirthDate!,
       university: _universityController.text.trim(),
       department: _departmentController.text.trim(),
       bio: _bioController.text.trim(),
@@ -180,18 +368,20 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       lookingFor: _selectedLookingFor,
     );
 
-    final success =
-        await ref.read(profileCreationProvider.notifier).createProfile(
-              profileData: profileData,
-              imageFile: _selectedImage!,
-            );
+    // Sadece dolu slotları al
+    final photoFiles = _selectedPhotos.whereType<File>().toList();
+
+    final success = await ref
+        .read(profileCreationProvider.notifier)
+        .createProfileWithPhotos(
+          profileData: profileData,
+          imageFiles: photoFiles,
+        );
 
     if (success && mounted) {
-      // Show success notification
       _showSuccess('Profil Oluşturuldu',
           subtitle: 'Keşfetmeye başlayabilirsin!');
 
-      // Update app state and navigate after short delay
       await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) {
         ref.read(appStateProvider.notifier).setAuthenticated();
@@ -207,7 +397,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   Widget build(BuildContext context) {
     final creationState = ref.watch(profileCreationProvider);
 
-    // Show error if any
     ref.listen<ProfileCreationState>(profileCreationProvider,
         (previous, current) {
       if (current.error != null && previous?.error != current.error) {
@@ -218,14 +407,13 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          // Welcome ekranı ile uyumlu soft mavi gradient
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFF5F8FF), // Soft buz mavisi
-              Color(0xFFE8F0FE), // Açık indigo tonu
-              Color(0xFFF0F4FF), // Ferah mavi-beyaz
+              Color(0xFFF5F8FF),
+              Color(0xFFE8F0FE),
+              Color(0xFFF0F4FF),
             ],
             stops: [0.0, 0.5, 1.0],
           ),
@@ -238,13 +426,12 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Header
                   _buildHeader(),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                  // Profile Photo
-                  _buildPhotoSection(),
-                  const SizedBox(height: 32),
+                  // Photo Grid Section
+                  _buildPhotoGridSection(),
+                  const SizedBox(height: 24),
 
                   // Form Fields
                   _buildFormFields(),
@@ -258,7 +445,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                   _buildLookingForSection(),
                   const SizedBox(height: 32),
 
-                  // Submit Button
+                  // Submit Button with Progress
                   _buildSubmitButton(creationState),
                   const SizedBox(height: 24),
                 ],
@@ -274,7 +461,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Geri butonu - WelcomeScreen'e döner
         Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.9),
@@ -297,7 +483,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        // Başlık - ortalanmış
         Center(
           child: Column(
             children: [
@@ -359,7 +544,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Dialog'u kapat
+              Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (context) => WelcomeScreen()),
@@ -382,63 +567,332 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     );
   }
 
-  Widget _buildPhotoSection() {
-    return Center(
-      child: GestureDetector(
-        onTap: _showImagePicker,
-        child: Stack(
-          children: [
-            Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[200],
-                border: Border.all(
-                  color: const Color(0xFF5C6BC0),
-                  width: 3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-                image: _selectedImage != null
-                    ? DecorationImage(
-                        image: FileImage(_selectedImage!),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
-              ),
-              child: _selectedImage == null
-                  ? Icon(
-                      Icons.person,
-                      size: 60,
-                      color: Colors.grey[400],
-                    )
-                  : null,
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
+  /// 6 slotlu fotoğraf grid bölümü
+  Widget _buildPhotoGridSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
                     colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
                   ),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
-                  Icons.camera_alt,
+                  Icons.photo_library,
                   color: Colors.white,
-                  size: 24,
+                  size: 20,
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'En İyi Fotoğraflarını Ekle',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    Text(
+                      '$_photoCount / 6 fotoğraf eklendi',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: _hasMinimumPhotos
+                            ? const Color(0xFF5C6BC0)
+                            : Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Photo Grid (2x3 layout with first slot larger)
+          _buildPhotoGrid(),
+
+          // Hint
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.tips_and_updates, color: Colors.amber[700], size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'İlk fotoğraf ana profil fotoğrafın olacak',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.amber[800],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Fotoğraf grid yapısı - Tinder/Bumble tarzı 6 slot
+  Widget _buildPhotoGrid() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gridWidth = constraints.maxWidth;
+        final smallSlotSize = (gridWidth - 16) / 3; // 3 küçük slot (2 gap * 8px)
+        final largeSlotHeight = smallSlotSize * 2 + 8; // 2 satır yüksekliği
+
+        return Column(
+          children: [
+            // Üst satır: Ana fotoğraf (2x2) + 2 küçük fotoğraf
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sol taraf: Ana fotoğraf (2x2 boyutunda)
+                _buildPhotoSlot(
+                  index: 0,
+                  width: smallSlotSize * 2 + 8,
+                  height: largeSlotHeight,
+                  isPrimary: true,
+                ),
+                const SizedBox(width: 8),
+                // Sağ taraf: 2 küçük fotoğraf (dikey)
+                Column(
+                  children: [
+                    _buildPhotoSlot(
+                      index: 1,
+                      width: smallSlotSize,
+                      height: smallSlotSize,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPhotoSlot(
+                      index: 2,
+                      width: smallSlotSize,
+                      height: smallSlotSize,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Alt satır: 3 küçük fotoğraf
+            Row(
+              children: [
+                _buildPhotoSlot(
+                  index: 3,
+                  width: smallSlotSize,
+                  height: smallSlotSize,
+                ),
+                const SizedBox(width: 8),
+                _buildPhotoSlot(
+                  index: 4,
+                  width: smallSlotSize,
+                  height: smallSlotSize,
+                ),
+                const SizedBox(width: 8),
+                _buildPhotoSlot(
+                  index: 5,
+                  width: smallSlotSize,
+                  height: smallSlotSize,
+                ),
+              ],
             ),
           ],
+        );
+      },
+    );
+  }
+
+  /// Tek bir fotoğraf slotu
+  Widget _buildPhotoSlot({
+    required int index,
+    required double width,
+    required double height,
+    bool isPrimary = false,
+  }) {
+    final photo = _selectedPhotos[index];
+    final hasPhoto = photo != null;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: hasPhoto ? null : Colors.grey[100],
+        borderRadius: BorderRadius.circular(isPrimary ? 16 : 12),
+        border: Border.all(
+          color: isPrimary
+              ? (hasPhoto ? const Color(0xFF5C6BC0) : Colors.grey[300]!)
+              : Colors.grey[300]!,
+          width: isPrimary ? 2 : 1,
+        ),
+        image: hasPhoto
+            ? DecorationImage(
+                image: FileImage(photo),
+                fit: BoxFit.cover,
+              )
+            : null,
+        boxShadow: hasPhoto
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: hasPhoto ? null : () => _showImagePickerForSlot(index),
+          borderRadius: BorderRadius.circular(isPrimary ? 16 : 12),
+          child: Stack(
+            children: [
+              // Boş slot içeriği
+              if (!hasPhoto)
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.add_photo_alternate,
+                          color: const Color(0xFF5C6BC0),
+                          size: isPrimary ? 32 : 24,
+                        ),
+                      ),
+                      if (isPrimary) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5C6BC0),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Ana Fotoğraf',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+              // Fotoğraf varsa: Ana fotoğraf etiketi
+              if (hasPhoto && isPrimary)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.star,
+                          size: 14,
+                          color: Color(0xFF5C6BC0),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Ana Fotoğraf',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF5C6BC0),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Silme butonu
+              if (hasPhoto)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: GestureDetector(
+                    onTap: () => _removePhoto(index),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -447,7 +901,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   Widget _buildFormFields() {
     return Column(
       children: [
-        // Name
         _buildTextField(
           controller: _nameController,
           label: 'İsim',
@@ -464,35 +917,8 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           },
         ),
         const SizedBox(height: 16),
-
-        // Age
-        _buildTextField(
-          controller: _ageController,
-          label: 'Yaş',
-          hint: 'Yaşınızı girin',
-          icon: Icons.cake_outlined,
-          keyboardType: TextInputType.number,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Yaş gerekli';
-            }
-            final age = int.tryParse(value);
-            if (age == null) {
-              return 'Geçerli bir yaş girin';
-            }
-            if (age < 18) {
-              return '18 yaşından büyük olmalısınız';
-            }
-            if (age > 100) {
-              return 'Geçerli bir yaş girin';
-            }
-            return null;
-          },
-        ),
+        _buildBirthDateField(),
         const SizedBox(height: 16),
-
-        // University (Autocomplete)
         _buildAutocompleteField(
           controller: _universityController,
           label: 'Üniversite',
@@ -501,8 +927,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           suggestions: TurkishUniversities.universities,
         ),
         const SizedBox(height: 16),
-
-        // Department (Autocomplete)
         _buildAutocompleteField(
           controller: _departmentController,
           label: 'Bölüm',
@@ -511,8 +935,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
           suggestions: TurkishUniversities.departments,
         ),
         const SizedBox(height: 16),
-
-        // Bio
         _buildTextField(
           controller: _bioController,
           label: 'Hakkında',
@@ -534,6 +956,98 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     );
   }
 
+  static const _turkishMonths = [
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+  ];
+
+  Widget _buildBirthDateField() {
+    final hasDate = _selectedBirthDate != null;
+    final formattedDate = hasDate
+        ? '${_selectedBirthDate!.day} ${_turkishMonths[_selectedBirthDate!.month - 1]} ${_selectedBirthDate!.year}'
+        : null;
+
+    return GestureDetector(
+      onTap: _showBirthDatePicker,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: !hasDate
+              ? null
+              : Border.all(
+                  color: _isAdult ? const Color(0xFF5C6BC0) : Colors.red,
+                  width: 2,
+                ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: [
+            Icon(
+              Icons.cake_outlined,
+              color: hasDate
+                  ? (_isAdult ? const Color(0xFF5C6BC0) : Colors.red)
+                  : const Color(0xFF5C6BC0),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Doğum Tarihi',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasDate ? formattedDate! : 'Tarih seçin',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: hasDate ? FontWeight.w500 : FontWeight.normal,
+                      color: hasDate ? Colors.grey[800] : Colors.grey[400],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (hasDate) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _isAdult
+                      ? const Color(0xFF5C6BC0).withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$_calculatedAge yaş',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _isAdult ? const Color(0xFF5C6BC0) : Colors.red,
+                  ),
+                ),
+              ),
+            ] else ...[
+              Icon(Icons.calendar_month, color: Colors.grey[400]),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -542,7 +1056,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
     int maxLines = 1,
     int? maxLength,
     TextInputType? keyboardType,
-    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return Container(
@@ -562,7 +1075,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
         maxLines: maxLines,
         maxLength: maxLength,
         keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
         validator: validator,
         style: GoogleFonts.poppins(fontSize: 14),
         decoration: InputDecoration(
@@ -633,7 +1145,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
         },
         fieldViewBuilder:
             (context, textController, focusNode, onFieldSubmitted) {
-          // Sync initial value only once
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (controller.text.isNotEmpty && textController.text.isEmpty) {
               textController.text = controller.text;
@@ -844,63 +1355,124 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   }
 
   Widget _buildSubmitButton(ProfileCreationState state) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: state.isLoading ? null : _submitProfile,
-          borderRadius: BorderRadius.circular(16),
-          child: Center(
-            child: state.isLoading
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
+    final isUploading = state.status == ProfileCreationStatus.uploadingImage;
+    final isSaving = state.status == ProfileCreationStatus.savingProfile;
+
+    return Column(
+      children: [
+        // Progress bar (only when uploading)
+        if (isUploading)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Fotoğraflar yükleniyor...',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        color: Colors.grey[600],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        state.status == ProfileCreationStatus.uploadingImage
-                            ? 'Fotoğraf yükleniyor...'
-                            : 'Profil kaydediliyor...',
+                    ),
+                    Text(
+                      '${(state.uploadProgress * 100).toInt()}%',
+                      style: GoogleFonts.poppins(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF5C6BC0),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: state.uploadProgress,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey[200],
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFF5C6BC0),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Submit button
+        Container(
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: _hasMinimumPhotos
+                ? const LinearGradient(
+                    colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                  )
+                : null,
+            color: _hasMinimumPhotos ? null : Colors.grey[300],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: _hasMinimumPhotos
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF5C6BC0).withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: state.isLoading || !_hasMinimumPhotos
+                  ? null
+                  : _submitProfile,
+              borderRadius: BorderRadius.circular(16),
+              child: Center(
+                child: state.isLoading
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            isSaving
+                                ? 'Profil kaydediliyor...'
+                                : 'Fotoğraflar yükleniyor...',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Text(
+                        _hasMinimumPhotos
+                            ? 'Kaydet ve Başla'
+                            : 'En az 1 fotoğraf ekle',
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: _hasMinimumPhotos
+                              ? Colors.white
+                              : Colors.grey[600],
                         ),
                       ),
-                    ],
-                  )
-                : Text(
-                    'Kaydet ve Başla',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

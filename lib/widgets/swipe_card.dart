@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/user_profile.dart';
 import '../utils/image_helper.dart';
+import 'report_sheet.dart';
 
 /// Beautiful Tinder-style swipe card widget
 class SwipeCard extends StatefulWidget {
@@ -15,6 +16,12 @@ class SwipeCard extends StatefulWidget {
   final double? horizontalOffset;
   final double? verticalOffset;
 
+  /// Report callback - called when user reports this profile
+  final void Function(String reason, String description)? onReport;
+
+  /// Block callback - called when user blocks this profile
+  final VoidCallback? onBlock;
+
   const SwipeCard({
     super.key,
     required this.profile,
@@ -22,6 +29,8 @@ class SwipeCard extends StatefulWidget {
     this.showFullInfo = false,
     this.horizontalOffset,
     this.verticalOffset,
+    this.onReport,
+    this.onBlock,
   });
 
   @override
@@ -92,6 +101,10 @@ class _SwipeCardState extends State<SwipeCard> {
                   // Photo navigation indicators
                   if (widget.profile.photos.length > 1) _buildPhotoIndicators(),
 
+                  // Three-dot menu button (Report & Block)
+                  if (widget.onReport != null || widget.onBlock != null)
+                    _buildOptionsButton(),
+
                   // Tap zones indicator (subtle)
                   _buildTapZones(),
 
@@ -114,6 +127,52 @@ class _SwipeCardState extends State<SwipeCard> {
           ),
         );
       },
+    );
+  }
+
+  /// Three-dot menu button for Report & Block options
+  Widget _buildOptionsButton() {
+    return Positioned(
+      top: 24,
+      right: 12,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          UserOptionsMenu.show(
+            context: context,
+            userName: widget.profile.name,
+            onReport: () {
+              // Show report bottom sheet
+              ReportBottomSheet.show(
+                context: context,
+                userName: widget.profile.name,
+                onSubmit: (reason, description) {
+                  if (widget.onReport != null) {
+                    widget.onReport!(reason, description);
+                  }
+                },
+              );
+            },
+            onBlock: () {
+              if (widget.onBlock != null) {
+                widget.onBlock!();
+              }
+            },
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.more_vert_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1325,42 +1384,63 @@ class _MatchPopupState extends State<MatchPopup> with TickerProviderStateMixin {
           ),
         ],
       ),
-      child: ClipOval(
-        child: photoUrl != null
-            ? CachedNetworkImage(
-                imageUrl: photoUrl,
-                fit: BoxFit.cover,
-                cacheManager: AppCacheManager.instance,
-                placeholder: (context, url) => Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
+      child: photoUrl != null
+          ? CachedNetworkImage(
+              imageUrl: photoUrl,
+              width: 130,
+              height: 130,
+              cacheManager: AppCacheManager.instance,
+              imageBuilder: (context, imageProvider) => Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  image: DecorationImage(
+                    image: imageProvider,
+                    fit: BoxFit.cover,
                   ),
                 ),
-                errorWidget: (context, url, error) => Shimmer.fromColors(
-                  baseColor: Colors.grey[300]!,
-                  highlightColor: Colors.grey[100]!,
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: Icon(
-                      Icons.person,
-                      size: 50,
-                      color: isCurrentUser ? const Color(0xFF667eea) : Colors.grey,
-                    ),
+              ),
+              placeholder: (context, url) => Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Container(
+                  width: 130,
+                  height: 130,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey,
                   ),
+                  child: const Icon(Icons.person, size: 50, color: Colors.white54),
                 ),
-              )
-            : Container(
-                color: Colors.white.withValues(alpha: 0.3),
+              ),
+              errorWidget: (context, url, error) => Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey[200],
+                ),
                 child: Icon(
                   Icons.person,
                   size: 50,
-                  color: isCurrentUser ? Colors.white : Colors.grey[300],
+                  color: isCurrentUser ? const Color(0xFF667eea) : Colors.grey,
                 ),
               ),
-      ),
+            )
+          : Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.3),
+              ),
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: isCurrentUser ? Colors.white : Colors.grey[300],
+              ),
+            ),
     );
   }
 

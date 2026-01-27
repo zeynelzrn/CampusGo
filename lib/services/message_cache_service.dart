@@ -55,14 +55,19 @@ class MessageCacheService {
   ///
   /// [chatId] - Sohbet ID'si
   /// [limit] - Getirilecek maksimum mesaj sayısı (varsayılan: 20)
+  /// [beforeTimestamp] - Bu timestamp'ten önceki mesajları getir (pagination için)
   ///
-  /// Returns: Mesaj listesi (en yeniden en eskiye sıralı) veya null
-  Future<List<Message>?> getCachedMessages(String chatId, {int limit = _defaultFetchLimit}) async {
+  /// Returns: Mesaj listesi (en eskiden en yeniye sıralı - ListView için) veya null
+  Future<List<Message>?> getCachedMessages(
+    String chatId, {
+    int limit = _defaultFetchLimit,
+    DateTime? beforeTimestamp,
+  }) async {
     try {
       final box = await _getBox();
 
       // Bu chat'e ait mesajları filtrele
-      final chatMessages = box.values
+      var chatMessages = box.values
           .where((msg) => msg.chatId == chatId)
           .toList();
 
@@ -74,17 +79,82 @@ class MessageCacheService {
       // Timestamp'e göre sırala (en yeni önce)
       chatMessages.sort((a, b) => b.timestampMs.compareTo(a.timestampMs));
 
+      // Pagination: beforeTimestamp varsa, ondan önceki mesajları al
+      if (beforeTimestamp != null) {
+        final beforeMs = beforeTimestamp.millisecondsSinceEpoch;
+        chatMessages = chatMessages
+            .where((msg) => msg.timestampMs < beforeMs)
+            .toList();
+      }
+
       // Limit uygula (RAM optimizasyonu)
       final limitedMessages = chatMessages.take(limit).toList();
 
       // Message modellerine dönüştür ve ters çevir (en eski önce - ListView için)
       final messages = limitedMessages.map((c) => c.toMessage()).toList().reversed.toList();
 
-      debugPrint('MessageCacheService: Loaded ${messages.length} messages from cache for chat $chatId');
+      debugPrint('MessageCacheService: Loaded ${messages.length} messages from cache for chat $chatId (before: ${beforeTimestamp?.toIso8601String() ?? 'latest'})');
       return messages;
     } catch (e) {
       debugPrint('MessageCacheService: Error loading cache: $e');
       return null;
+    }
+  }
+
+  /// Önbellekte bu chat için toplam mesaj sayısını getir
+  Future<int> getCachedMessageCount(String chatId) async {
+    try {
+      final box = await _getBox();
+      return box.values.where((msg) => msg.chatId == chatId).length;
+    } catch (e) {
+      debugPrint('MessageCacheService: Error getting message count: $e');
+      return 0;
+    }
+  }
+
+  /// Önbellekteki en eski mesajın timestamp'ini getir (pagination için)
+  Future<DateTime?> getOldestCachedMessageTimestamp(String chatId) async {
+    try {
+      final box = await _getBox();
+      final chatMessages = box.values.where((msg) => msg.chatId == chatId).toList();
+
+      if (chatMessages.isEmpty) return null;
+
+      chatMessages.sort((a, b) => a.timestampMs.compareTo(b.timestampMs));
+      return DateTime.fromMillisecondsSinceEpoch(chatMessages.first.timestampMs);
+    } catch (e) {
+      debugPrint('MessageCacheService: Error getting oldest timestamp: $e');
+      return null;
+    }
+  }
+
+  /// Önbellekteki en yeni mesajın timestamp'ini getir (delta sync için)
+  ///
+  /// ChatService.watchMessages bu değeri kullanarak sadece
+  /// yeni mesajları sorgulamasına olanak tanır (maliyet optimizasyonu)
+  Future<DateTime?> getNewestCachedMessageTimestamp(String chatId) async {
+    try {
+      final box = await _getBox();
+      final chatMessages = box.values.where((msg) => msg.chatId == chatId).toList();
+
+      if (chatMessages.isEmpty) return null;
+
+      // En yeni mesajı bul
+      chatMessages.sort((a, b) => b.timestampMs.compareTo(a.timestampMs));
+      return DateTime.fromMillisecondsSinceEpoch(chatMessages.first.timestampMs);
+    } catch (e) {
+      debugPrint('MessageCacheService: Error getting newest timestamp: $e');
+      return null;
+    }
+  }
+
+  /// Cache'de bu chat için veri var mı?
+  Future<bool> hasCachedMessages(String chatId) async {
+    try {
+      final box = await _getBox();
+      return box.values.any((msg) => msg.chatId == chatId);
+    } catch (e) {
+      return false;
     }
   }
 
@@ -135,15 +205,150 @@ class MessageCacheService {
   Future<void> addOrUpdateMessage(String chatId, Message message) async {
     try {
       final box = await _getBox();
+      final key = '${chatId}_${message.id}';
+
+      // Mevcut mesajı kontrol et - sadece değişiklik varsa güncelle
+      final existing = box.get(key);
+      if (existing != null) {
+        // isRead durumu değiştiyse güncelle
+        if (existing.isRead != message.isRead) {
+          final updated = CachedMessage.fromMessage(message, chatId);
+          await box.put(key, updated);
+          debugPrint('MessageCacheService: Updated isRead for message ${message.id}');
+        }
+        return; // Mesaj zaten var, tekrar ekleme
+      }
+
+      // Yeni mesaj ekle
       final cached = CachedMessage.fromMessage(message, chatId);
-      await box.put('${chatId}_${message.id}', cached);
+      await box.put(key, cached);
 
       // Cache limitini kontrol et ve eski mesajları temizle
       await _enforceLimit(chatId);
 
-      debugPrint('MessageCacheService: Added/updated message ${message.id}');
+      debugPrint('MessageCacheService: Added message ${message.id}');
     } catch (e) {
       debugPrint('MessageCacheService: Error adding message: $e');
+    }
+  }
+
+  /// Tek bir mesajın isRead durumunu güncelle (doğrudan key erişimi)
+  ///
+  /// [chatId] - Sohbet ID'si
+  /// [messageId] - Mesaj ID'si
+  /// [isRead] - Yeni okundu durumu
+  /// [readAt] - Okunma zamanı (opsiyonel)
+  Future<void> markMessageAsRead(String chatId, String messageId, {DateTime? readAt}) async {
+    try {
+      final box = await _getBox();
+      final key = '${chatId}_$messageId';
+
+      final existing = box.get(key);
+      if (existing == null) return;
+
+      // Zaten okunmuşsa tekrar güncelleme
+      if (existing.isRead) return;
+
+      // isRead durumunu güncelle
+      final updated = CachedMessage(
+        id: existing.id,
+        chatId: existing.chatId,
+        senderId: existing.senderId,
+        text: existing.text,
+        timestampMs: existing.timestampMs,
+        typeIndex: existing.typeIndex,
+        isRead: true,
+        readAtMs: readAt?.millisecondsSinceEpoch,
+      );
+
+      await box.put(key, updated);
+      debugPrint('MessageCacheService: Marked message $messageId as read');
+    } catch (e) {
+      debugPrint('MessageCacheService: Error marking message as read: $e');
+    }
+  }
+
+  /// Bir sohbetteki tüm mesajları okundu olarak işaretle (batch update)
+  ///
+  /// markMessagesAsRead başarılı olduğunda çağrılır
+  /// Sadece göndereni [excludeSenderId] olmayan mesajları günceller
+  Future<void> markChatMessagesAsRead(String chatId, String excludeSenderId) async {
+    try {
+      final box = await _getBox();
+      final now = DateTime.now().millisecondsSinceEpoch;
+      int updatedCount = 0;
+
+      // Bu chat'e ait mesajları bul ve güncelle
+      for (final key in box.keys) {
+        if (!key.toString().startsWith('${chatId}_')) continue;
+
+        final msg = box.get(key);
+        if (msg == null) continue;
+
+        // Sadece karşı tarafın mesajlarını ve okunmamış olanları güncelle
+        if (msg.senderId != excludeSenderId && !msg.isRead) {
+          final updated = CachedMessage(
+            id: msg.id,
+            chatId: msg.chatId,
+            senderId: msg.senderId,
+            text: msg.text,
+            timestampMs: msg.timestampMs,
+            typeIndex: msg.typeIndex,
+            isRead: true,
+            readAtMs: now,
+          );
+          await box.put(key, updated);
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        debugPrint('MessageCacheService: Marked $updatedCount messages as read in chat $chatId');
+      }
+    } catch (e) {
+      debugPrint('MessageCacheService: Error marking chat messages as read: $e');
+    }
+  }
+
+  /// Firebase'den gelen mesajları Hive ile akıllı senkronize et
+  ///
+  /// - Yeni mesajları ekler
+  /// - isRead durumu değişen mesajları günceller
+  /// - Performans için sadece değişen kayıtları yazar
+  Future<void> syncMessagesFromFirestore(String chatId, List<Message> firestoreMessages) async {
+    if (firestoreMessages.isEmpty) return;
+
+    try {
+      final box = await _getBox();
+      int addedCount = 0;
+      int updatedCount = 0;
+
+      for (final message in firestoreMessages) {
+        final key = '${chatId}_${message.id}';
+        final existing = box.get(key);
+
+        if (existing == null) {
+          // Yeni mesaj - ekle
+          final cached = CachedMessage.fromMessage(message, chatId);
+          await box.put(key, cached);
+          addedCount++;
+        } else if (existing.isRead != message.isRead) {
+          // isRead durumu değişmiş - güncelle (mavi tik senkronizasyonu)
+          final updated = CachedMessage.fromMessage(message, chatId);
+          await box.put(key, updated);
+          updatedCount++;
+        }
+        // Diğer durumlarda değişiklik yok, yazma işlemi yapma
+      }
+
+      // Cache limitini uygula
+      await _enforceLimit(chatId);
+
+      if (addedCount > 0 || updatedCount > 0) {
+        debugPrint('MessageCacheService: Synced - Added: $addedCount, Updated isRead: $updatedCount');
+      }
+    } catch (e) {
+      debugPrint('MessageCacheService: Error syncing messages: $e');
     }
   }
 
