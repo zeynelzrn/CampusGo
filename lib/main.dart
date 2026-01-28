@@ -11,6 +11,7 @@ import 'screens/splash_screen.dart';
 import 'screens/main_screen.dart';
 import 'services/notification_service.dart';
 import 'services/message_cache_service.dart';
+import 'services/purchase_service.dart';
 
 // Global navigator key for navigation from notifications
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -35,6 +36,9 @@ void main() async {
 
   // Initialize Hive (Message Cache)
   await MessageCacheService.initialize();
+
+  // Initialize RevenueCat (Premium Subscriptions)
+  await PurchaseService().initialize();
 
   // Initialize notification service
   final notificationService = NotificationService();

@@ -24,6 +24,10 @@ class UserProfile {
   // Admin ve Ban Durumu
   final bool isAdmin; // Admin yetkisi (Firebase Console'dan manuel verilir)
   final bool isBanned; // Banlı kullanıcı (Adminler tarafından verilir)
+  
+  // Premium Durum (RevenueCat tarafından yönetilir)
+  final bool isPremium; // Premium üyelik aktif mi?
+  final DateTime? premiumUpdatedAt; // Premium durumu son güncellenme zamanı
 
   // Legacy age field for backward compatibility (eski kayıtlar için)
   final int? _legacyAge;
@@ -48,6 +52,8 @@ class UserProfile {
     this.intent = const [],
     this.isAdmin = false,
     this.isBanned = false,
+    this.isPremium = false,
+    this.premiumUpdatedAt,
   }) : _legacyAge = legacyAge;
 
   /// Dinamik yaş hesaplama - doğum tarihinden otomatik hesaplanır
@@ -92,6 +98,9 @@ class UserProfile {
       // Admin ve Ban durumu - varsayılan olarak false (güvenlik için kritik)
       isAdmin: data['isAdmin'] as bool? ?? false,
       isBanned: data['isBanned'] as bool? ?? false,
+      // Premium durum - varsayılan olarak false
+      isPremium: data['isPremium'] as bool? ?? false,
+      premiumUpdatedAt: (data['premiumUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
