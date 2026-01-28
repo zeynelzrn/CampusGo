@@ -30,6 +30,7 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     with AutoRefreshMixin {
   final PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();
   final UserService _userService = UserService();
   final ChatService _chatService = ChatService();
 
@@ -93,6 +94,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   @override
   void dispose() {
     _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -327,7 +329,11 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     return Stack(
       children: [
         // Scrollable profile content - starts from very top
+        // ValueKey ile her kullanıcı için yeni widget instance oluştur
+        // Bu sayede scroll pozisyonu her kullanıcı için sıfırdan başlar
         CustomScrollView(
+          key: ValueKey(profile.id), // BU SATIR ÇOK ÖNEMLİ - Scroll state sıfırlama
+          controller: _scrollController,
           slivers: [
             // Main photo with action buttons - no top spacing
             SliverToBoxAdapter(

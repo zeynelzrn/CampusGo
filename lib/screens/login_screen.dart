@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
 import '../services/auth_service.dart';
 import '../repositories/profile_repository.dart';
 import '../widgets/app_notification.dart';
 import 'main_screen.dart';
 import 'create_profile_screen.dart';
+import 'email_verification_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -826,43 +828,81 @@ class _LoginScreenState extends State<LoginScreen>
                                                         if (mounted) {
                                                           _showModernNotification(
                                                             message:
-                                                                'Hoş geldin! Profil kontrol ediliyor...',
+                                                                'Hoş geldin! Kontrol ediliyor...',
                                                             isSuccess: true,
                                                             icon: Icons
                                                                 .favorite_rounded,
                                                           );
-
-                                                          // Profil kontrolü yap
-                                                          final profileRepository =
-                                                              ProfileRepository();
-                                                          final hasProfile =
-                                                              await profileRepository
-                                                                  .hasProfile();
 
                                                           await Future.delayed(
                                                               const Duration(
                                                                   milliseconds:
                                                                       500));
 
+                                                          // E-posta doğrulama kontrolü
+                                                          final currentUser =
+                                                              FirebaseAuth
+                                                                  .instance
+                                                                  .currentUser;
+                                                          if (currentUser !=
+                                                              null) {
+                                                            await currentUser
+                                                                .reload();
+                                                            final refreshedUser =
+                                                                FirebaseAuth
+                                                                    .instance
+                                                                    .currentUser;
+                                                            final isEmailVerified =
+                                                                refreshedUser
+                                                                        ?.emailVerified ??
+                                                                    false;
+
+                                                            if (!isEmailVerified) {
+                                                              // E-posta doğrulanmamış, EmailVerificationScreen'e yönlendir
+                                                              if (mounted) {
+                                                                Navigator
+                                                                    .pushReplacement(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                      builder:
+                                                                          (context) =>
+                                                                              EmailVerificationScreen(
+                                                                                email: currentUser.email,
+                                                                              )),
+                                                                );
+                                                              }
+                                                              return;
+                                                            }
+                                                          }
+
+                                                          // E-posta doğrulanmış, profil kontrolü yap
                                                           if (mounted) {
-                                                            if (hasProfile) {
-                                                              Navigator
-                                                                  .pushReplacement(
-                                                                context,
-                                                                MaterialPageRoute(
-                                                                    builder:
-                                                                        (context) =>
-                                                                            const MainScreen()),
-                                                              );
-                                                            } else {
-                                                              Navigator
-                                                                  .pushReplacement(
-                                                                context,
-                                                                MaterialPageRoute(
-                                                                    builder:
-                                                                        (context) =>
-                                                                            const CreateProfileScreen()),
-                                                              );
+                                                            final profileRepository =
+                                                                ProfileRepository();
+                                                            final hasProfile =
+                                                                await profileRepository
+                                                                    .hasProfile();
+
+                                                            if (mounted) {
+                                                              if (hasProfile) {
+                                                                Navigator
+                                                                    .pushReplacement(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                      builder:
+                                                                          (context) =>
+                                                                              const MainScreen()),
+                                                                );
+                                                              } else {
+                                                                Navigator
+                                                                    .pushReplacement(
+                                                                  context,
+                                                                  MaterialPageRoute(
+                                                                      builder:
+                                                                          (context) =>
+                                                                              const CreateProfileScreen()),
+                                                                );
+                                                              }
                                                             }
                                                           }
                                                         }

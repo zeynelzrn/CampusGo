@@ -5,6 +5,7 @@ import '../repositories/profile_repository.dart';
 import 'welcome_screen.dart';
 import 'main_screen.dart';
 import 'create_profile_screen.dart';
+import 'email_verification_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -78,7 +79,23 @@ class _SplashScreenState extends State<SplashScreen>
         return;
       }
 
-      // Kullanıcı giriş yapmış, profil kontrolü yap
+      // Kullanıcı giriş yapmış - E-posta doğrulama kontrolü
+      setState(() => _statusText = 'E-posta kontrolü...');
+      
+      // Güncel doğrulama durumunu al
+      await currentUser.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      final isEmailVerified = refreshedUser?.emailVerified ?? false;
+
+      if (!mounted) return;
+
+      // E-posta doğrulanmamışsa, doğrulama ekranına yönlendir
+      if (!isEmailVerified) {
+        _navigateTo(EmailVerificationScreen(email: currentUser.email));
+        return;
+      }
+
+      // E-posta doğrulanmış, profil kontrolü yap
       setState(() => _statusText = 'Profil kontrol ediliyor...');
 
       final profileRepository = ProfileRepository();

@@ -53,11 +53,11 @@
 		<key>FirebaseAppDelegateProxyEnabled</key>
 		<false/>
 		<key>NSCameraUsageDescription</key>
-		<string>Profil fotoğrafı çekmek için kamera erişimi gereklidir.</string>
+		<string>Profil fotoğrafınızı anlık olarak çekip yükleyebilmeniz için kamera erişimine izin vermelisiniz.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Profil fotoğrafı seçmek için galeri erişimi gereklidir.</string>
+		<string>Profilinizi oluşturmak, galerinizi düzenlemek ve fotoğraf yükleyebilmek için galeri erişimine ihtiyacımız var.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
-		<string>Fotoğrafları kaydetmek için galeri erişimi gereklidir.</string>
+		<string>Çektiğiniz fotoğrafları galerinize kaydedebilmek için bu izne ihtiyacımız var.</string>
 		<key>UIStatusBarHidden</key>
 		<false/>
 	</dict>

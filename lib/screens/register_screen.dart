@@ -19,7 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen>
   final AuthService _authService = AuthService();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _agreeToTerms = false;
+  bool _agreeToTerms = false; // EULA & Gizlilik (Zorunlu)
+  bool _agreeToCommercialNotifications = false; // ETK - Ticari İleti (İsteğe Bağlı)
   bool _isLoading = false;
 
   late AnimationController _animationController;
@@ -112,6 +113,528 @@ class _RegisterScreenState extends State<RegisterScreen>
     } else {
       _buttonAnimationController.reverse(); // Hızlı deaktivasyon
     }
+  }
+
+  void _toggleCommercialNotifications(bool? value) {
+    setState(() {
+      _agreeToCommercialNotifications = value ?? false;
+    });
+  }
+
+  // EULA - Sıfır Tolerans Metni (Apple UGC Compliance)
+  void _showEulaDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sürükleme çubuğu
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Başlık
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.gavel_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Kullanıcı Sözleşmesi (EULA)',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2D3142),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Sıfır Tolerans İçeriği
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFFB74D).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFFFF9800),
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Sıfır Tolerans Politikası',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFE65100),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'CampusGo\'da taciz, küfür, çıplaklık ve nefret söylemine sıfır tolerans gösterilir. Bu kuralları ihlal eden hesaplar kalıcı olarak engellenir.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: Colors.grey[700],
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Uygulamayı kullanarak Apple Standart EULA şartlarını kabul etmiş sayılırsınız.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Kapat butonu
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5C6BC0),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Anladım',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Gizlilik Politikası
+  void _showPrivacyPolicyDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sürükleme çubuğu
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Başlık
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.privacy_tip_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Gizlilik Politikası',
+                      style: GoogleFonts.poppins(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF2D3142),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Kişisel verileriniz KVKK kapsamında korunmaktadır. Verileriniz yalnızca uygulama hizmetlerini sunmak için kullanılır ve üçüncü taraflarla izinsiz paylaşılmaz.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    color: Colors.grey[700],
+                    height: 1.6,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Detaylı bilgi için Aydınlatma Metni\'ni inceleyebilirsiniz.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5C6BC0),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Anladım',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Ticari Elektronik İleti Bilgilendirmesi (ETK)
+  void _showCommercialNotificationInfo() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sürükleme çubuğu
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Başlık
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Ticari Elektronik İleti',
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF2D3142),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // İçerik
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF81C784).withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: Color(0xFF4CAF50),
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Size sadece önemli güncellemeleri göndereceğiz',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Onay verdiğinizde şunları alabilirsiniz:',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildInfoItem(Icons.local_offer_rounded, 'Özel kampanya ve fırsatlar'),
+                _buildInfoItem(Icons.new_releases_rounded, 'Yeni özellik duyuruları'),
+                _buildInfoItem(Icons.event_rounded, 'Kampüs etkinlik bildirimleri'),
+                const SizedBox(height: 16),
+                Text(
+                  'İstediğiniz zaman ayarlardan iptal edebilirsiniz.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5C6BC0),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Anladım',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: const Color(0xFF5C6BC0)),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Modern onay kutusu widget'ı
+  Widget _buildAgreementCheckbox({
+    required bool isChecked,
+    required ValueChanged<bool?> onChanged,
+    required bool isRequired,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isChecked
+              ? const Color(0xFF5C6BC0)
+              : (isRequired ? Colors.grey[300]! : Colors.grey[200]!),
+          width: isChecked ? 1.5 : 1,
+        ),
+        boxShadow: isChecked
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Checkbox
+          GestureDetector(
+            onTap: () => onChanged(!isChecked),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                gradient: isChecked
+                    ? const LinearGradient(
+                        colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
+                      )
+                    : null,
+                color: isChecked ? null : Colors.grey[200],
+                border: isChecked
+                    ? null
+                    : Border.all(color: Colors.grey[400]!, width: 1.5),
+              ),
+              child: isChecked
+                  ? const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                child,
+                if (isRequired) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 12,
+                        color: Colors.grey[500],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Zorunlu',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.grey[500],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -228,7 +751,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                               ),
 
-                              const SizedBox(height: 40),
+                              const SizedBox(height: 12),
 
                               // Başlık bölümü
                               Center(
@@ -263,27 +786,30 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 ),
                               ),
 
-                              const SizedBox(height: 50),
+                              const SizedBox(height: 24),
 
                               // Form alanları
                               _buildModernTextField(
                                 controller: _emailController,
                                 label: 'E-posta',
-                                hint: 'ornek@mail.com',
+                                hint: 'ornek@universite.edu.tr',
                                 icon: Icons.alternate_email,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'E-posta adresi gerekli';
                                   }
-                                  // TODO: Yayın öncesi .edu.tr kontrolünü geri aç
-                                  // if (!value.endsWith('.edu.tr')) {
-                                  //   return 'Sadece .edu.tr uzantılı e-postalar kabul edilir';
-                                  // }
+                                  // Standart email format kontrolü
                                   if (!RegExp(
                                           r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
                                       .hasMatch(value)) {
                                     return 'Geçerli bir e-posta adresi girin';
+                                  }
+                                  // Üniversite email kontrolü (.edu veya .edu.tr)
+                                  final lowerEmail = value.toLowerCase();
+                                  if (!lowerEmail.endsWith('.edu.tr') &&
+                                      !lowerEmail.endsWith('.edu')) {
+                                    return 'Sadece üniversite e-posta adresiyle (.edu veya .edu.tr) kayıt olabilirsiniz.';
                                   }
                                   return null;
                                 },
@@ -294,7 +820,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                               _buildModernTextField(
                                 controller: _passwordController,
                                 label: 'Şifre',
-                                hint: 'En az 6 karakter',
+                                hint: 'En az 8 karakter, büyük/küçük harf ve rakam',
                                 icon: Icons.lock_outline,
                                 obscureText: _obscurePassword,
                                 suffixIcon: IconButton(
@@ -314,8 +840,18 @@ class _RegisterScreenState extends State<RegisterScreen>
                                   if (value == null || value.isEmpty) {
                                     return 'Şifre gerekli';
                                   }
-                                  if (value.length < 6) {
-                                    return 'Şifre en az 6 karakter olmalı';
+                                  // Güçlü şifre validasyonu
+                                  if (value.length < 8) {
+                                    return 'Şifre en az 8 karakter olmalı';
+                                  }
+                                  if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                                    return 'Şifre en az 1 büyük harf içermeli';
+                                  }
+                                  if (!RegExp(r'[a-z]').hasMatch(value)) {
+                                    return 'Şifre en az 1 küçük harf içermeli';
+                                  }
+                                  if (!RegExp(r'[0-9]').hasMatch(value)) {
+                                    return 'Şifre en az 1 rakam içermeli';
                                   }
                                   return null;
                                 },
@@ -354,87 +890,92 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 },
                               ),
 
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 20),
 
-                              // KVKK Onayı
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.7),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: _agreeToTerms
-                                        ? const Color(0xFF5C6BC0)
-                                        : Colors.grey[300]!,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(6),
-                                        gradient: _agreeToTerms
-                                            ? const LinearGradient(
-                                                colors: [
-                                                  Color(0xFF5C6BC0),
-                                                  Color(0xFF7986CB)
-                                                ],
-                                              )
-                                            : null,
-                                        color: _agreeToTerms
-                                            ? null
-                                            : Colors.grey[300],
-                                      ),
-                                      child: Checkbox(
-                                        value: _agreeToTerms,
-                                        onChanged: _toggleTermsAgreement,
-                                        activeColor: Colors.transparent,
-                                        checkColor: Colors.white,
-                                        side: BorderSide.none,
-                                      ),
+                              // 1. Checkbox - EULA & Gizlilik (Zorunlu)
+                              _buildAgreementCheckbox(
+                                isChecked: _agreeToTerms,
+                                onChanged: _toggleTermsAgreement,
+                                isRequired: true,
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      color: Colors.grey[700],
+                                      height: 1.4,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: GestureDetector(
-                                        onTap: () => _toggleTermsAgreement(
-                                            !_agreeToTerms),
-                                        child: RichText(
-                                          text: TextSpan(
+                                    children: [
+                                      WidgetSpan(
+                                        child: GestureDetector(
+                                          onTap: _showEulaDialog,
+                                          child: Text(
+                                            'Kullanıcı Sözleşmesi (EULA)',
                                             style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
+                                              fontSize: 13,
+                                              color: const Color(0xFF5C6BC0),
+                                              fontWeight: FontWeight.w600,
+                                              decoration: TextDecoration.underline,
+                                              decorationColor: const Color(0xFF5C6BC0),
                                             ),
-                                            children: const [
-                                              TextSpan(
-                                                  text: 'KVKK kapsamında '),
-                                              TextSpan(
-                                                text: 'Aydınlatma Metni',
-                                                style: TextStyle(
-                                                  color: Color(0xFF5C6BC0),
-                                                  fontWeight: FontWeight.w600,
-                                                  decoration:
-                                                      TextDecoration.underline,
-                                                ),
-                                              ),
-                                              TextSpan(text: "'ni okudum ve "),
-                                              TextSpan(
-                                                text: 'Kullanım Şartları',
-                                                style: TextStyle(
-                                                  color: Color(0xFF5C6BC0),
-                                                  fontWeight: FontWeight.w600,
-                                                  decoration:
-                                                      TextDecoration.underline,
-                                                ),
-                                              ),
-                                              TextSpan(
-                                                  text: "'nı kabul ediyorum."),
-                                            ],
                                           ),
                                         ),
                                       ),
+                                      const TextSpan(text: ' ve '),
+                                      WidgetSpan(
+                                        child: GestureDetector(
+                                          onTap: _showPrivacyPolicyDialog,
+                                          child: Text(
+                                            'Gizlilik Politikası',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 13,
+                                              color: const Color(0xFF5C6BC0),
+                                              fontWeight: FontWeight.w600,
+                                              decoration: TextDecoration.underline,
+                                              decorationColor: const Color(0xFF5C6BC0),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const TextSpan(text: '\'nı okudum, kabul ediyorum.'),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // 2. Checkbox - Ticari Elektronik İleti / ETK (İsteğe Bağlı)
+                              _buildAgreementCheckbox(
+                                isChecked: _agreeToCommercialNotifications,
+                                onChanged: _toggleCommercialNotifications,
+                                isRequired: false,
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      color: Colors.grey[700],
+                                      height: 1.4,
                                     ),
-                                  ],
+                                    children: [
+                                      const TextSpan(text: 'Kampanya, duyuru ve bilgilendirmelerden haberdar olmak için '),
+                                      WidgetSpan(
+                                        child: GestureDetector(
+                                          onTap: _showCommercialNotificationInfo,
+                                          child: Text(
+                                            'Ticari Elektronik İleti',
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 13,
+                                              color: const Color(0xFF5C6BC0),
+                                              fontWeight: FontWeight.w600,
+                                              decoration: TextDecoration.underline,
+                                              decorationColor: const Color(0xFF5C6BC0),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const TextSpan(text: ' almayı kabul ediyorum.'),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -568,6 +1109,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                                         password:
                                                             _passwordController
                                                                 .text,
+                                                        isCommercialNotificationsEnabled:
+                                                            _agreeToCommercialNotifications,
                                                       );
 
                                                       setState(() =>
@@ -584,13 +1127,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                                                         if (mounted) {
                                                           _showModernNotification(
                                                             message:
-                                                                'Hesabın başarıyla oluşturuldu! Hoş geldin!',
+                                                                'Hesabın başarıyla oluşturuldu! Şimdi profilini oluştur.',
                                                             isSuccess: true,
                                                             icon: Icons
                                                                 .celebration_rounded,
                                                           );
 
-                                                          // Kısa gecikme ile yönlendir
+                                                          // Kısa gecikme ile CreateProfileScreen'e yönlendir
                                                           await Future.delayed(
                                                               const Duration(
                                                                   milliseconds:

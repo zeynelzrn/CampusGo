@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'notification_service.dart';
@@ -9,6 +10,7 @@ import '../repositories/likes_repository.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final NotificationService _notificationService = NotificationService();
   final UserService _userService = UserService();
 
@@ -32,10 +34,119 @@ class AuthService {
   // Auth durumunu dinle
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
+  /// Kullanıcı ayarlarını kaydet (kayıt sırasında)
+  /// ETK (Ticari Elektronik İleti) tercihi burada saklanır
+  Future<void> _saveUserSettings({
+    required String userId,
+    required String email,
+    required bool isCommercialNotificationsEnabled,
+  }) async {
+    try {
+      await _firestore.collection('user_settings').doc(userId).set({
+        'email': email,
+        'isCommercialNotificationsEnabled': isCommercialNotificationsEnabled,
+        'eulaAcceptedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint('AuthService: User settings saved - ETK: $isCommercialNotificationsEnabled');
+    } catch (e) {
+      debugPrint('AuthService: Error saving user settings: $e');
+      // Hata olsa bile kayıt işlemini durdurmuyoruz
+    }
+  }
+
+  /// Ticari ileti tercihini güncelle (ayarlar sayfasından)
+  Future<bool> updateCommercialNotificationPreference({
+    required String userId,
+    required bool isEnabled,
+  }) async {
+    try {
+      await _firestore.collection('user_settings').doc(userId).update({
+        'isCommercialNotificationsEnabled': isEnabled,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      debugPrint('AuthService: Commercial notification preference updated: $isEnabled');
+      return true;
+    } catch (e) {
+      debugPrint('AuthService: Error updating commercial notification preference: $e');
+      return false;
+    }
+  }
+
+  /// Ticari ileti tercihini oku
+  Future<bool> getCommercialNotificationPreference(String userId) async {
+    try {
+      final doc = await _firestore.collection('user_settings').doc(userId).get();
+      if (doc.exists) {
+        return doc.data()?['isCommercialNotificationsEnabled'] as bool? ?? false;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('AuthService: Error getting commercial notification preference: $e');
+      return false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // EMAIL DOĞRULAMA (VERIFICATION) İŞLEMLERİ
+  // ═══════════════════════════════════════════════════════════════
+
+  /// E-posta doğrulama linki gönder
+  Future<Map<String, dynamic>> sendEmailVerification() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        return {'success': false, 'error': 'Kullanıcı bulunamadı'};
+      }
+
+      if (user.emailVerified) {
+        return {'success': true, 'message': 'E-posta zaten doğrulanmış'};
+      }
+
+      await user.sendEmailVerification();
+      debugPrint('AuthService: Verification email sent to ${user.email}');
+      return {'success': true, 'message': 'Doğrulama maili gönderildi'};
+    } catch (e) {
+      debugPrint('AuthService: Error sending verification email: $e');
+      String errorMessage = 'Doğrulama maili gönderilemedi';
+      if (e.toString().contains('too-many-requests')) {
+        errorMessage = 'Çok fazla istek gönderildi. Lütfen biraz bekleyin.';
+      }
+      return {'success': false, 'error': errorMessage};
+    }
+  }
+
+  /// E-posta doğrulama durumunu kontrol et (reload ile güncel bilgi al)
+  Future<bool> checkEmailVerified() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return false;
+
+      await user.reload();
+      final refreshedUser = _auth.currentUser;
+      final isVerified = refreshedUser?.emailVerified ?? false;
+
+      debugPrint('AuthService: Email verified status: $isVerified');
+      return isVerified;
+    } catch (e) {
+      debugPrint('AuthService: Error checking email verification: $e');
+      return false;
+    }
+  }
+
+  /// Kullanıcının email doğrulama durumunu al (reload yapmadan)
+  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
+
+  /// Mevcut kullanıcının email adresini al
+  String? get currentUserEmail => _auth.currentUser?.email;
+
   // Kayıt ol
   Future<Map<String, dynamic>> register({
     required String email,
     required String password,
+    bool isCommercialNotificationsEnabled = false, // ETK tercihi
   }) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -49,7 +160,24 @@ class AuthService {
         // Save FCM token on successful registration
         await _notificationService.saveTokenToFirestore(user.uid);
         _notificationService.listenToTokenRefresh(user.uid);
-        return {'success': true, 'user': user};
+
+        // Save user settings (ETK/commercial notifications preference)
+        await _saveUserSettings(
+          userId: user.uid,
+          email: email,
+          isCommercialNotificationsEnabled: isCommercialNotificationsEnabled,
+        );
+
+        // E-posta doğrulama linki gönder
+        try {
+          await user.sendEmailVerification();
+          debugPrint('AuthService: Verification email sent to $email');
+        } catch (e) {
+          debugPrint('AuthService: Could not send verification email: $e');
+          // Doğrulama maili gönderilemese bile kayıt başarılı sayılır
+        }
+
+        return {'success': true, 'user': user, 'emailSent': true};
       }
 
       return {'success': false, 'error': 'Kullanici olusturulamadi'};
