@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
 import '../utils/network_utils.dart';
@@ -17,6 +19,12 @@ class SwipeState {
   final UserProfile? lastSwipedProfile; // For undo functionality
   final bool isMatch;
   final String? genderFilter;
+  
+  // Gelişmiş Filtreler (Premium özelliği)
+  final String? filterCity;
+  final String? filterUniversity;
+  final String? filterDepartment;
+  final String? filterGrade;
 
   const SwipeState({
     this.profiles = const [],
@@ -28,6 +36,10 @@ class SwipeState {
     this.lastSwipedProfile,
     this.isMatch = false,
     this.genderFilter,
+    this.filterCity,
+    this.filterUniversity,
+    this.filterDepartment,
+    this.filterGrade,
   });
 
   SwipeState copyWith({
@@ -40,10 +52,20 @@ class SwipeState {
     UserProfile? lastSwipedProfile,
     bool? isMatch,
     String? genderFilter,
+    String? filterCity,
+    String? filterUniversity,
+    String? filterDepartment,
+    String? filterGrade,
     bool clearError = false,
     bool clearLastDocument = false,
     bool clearLastSwiped = false,
     bool clearMatch = false,
+    bool clearFilters = false,
+    bool clearGenderFilter = false,
+    bool clearFilterCity = false,
+    bool clearFilterUniversity = false,
+    bool clearFilterDepartment = false,
+    bool clearFilterGrade = false,
   }) {
     return SwipeState(
       profiles: profiles ?? this.profiles,
@@ -57,7 +79,11 @@ class SwipeState {
           ? null
           : (lastSwipedProfile ?? this.lastSwipedProfile),
       isMatch: clearMatch ? false : (isMatch ?? this.isMatch),
-      genderFilter: genderFilter ?? this.genderFilter,
+      genderFilter: clearFilters || clearGenderFilter ? null : (genderFilter ?? this.genderFilter),
+      filterCity: clearFilters || clearFilterCity ? null : (filterCity ?? this.filterCity),
+      filterUniversity: clearFilters || clearFilterUniversity ? null : (filterUniversity ?? this.filterUniversity),
+      filterDepartment: clearFilters || clearFilterDepartment ? null : (filterDepartment ?? this.filterDepartment),
+      filterGrade: clearFilters || clearFilterGrade ? null : (filterGrade ?? this.filterGrade),
     );
   }
 
@@ -82,19 +108,60 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
   }
 
   /// Initialize the provider
-  Future<void> _initialize() async {
+  /// preserveFilters: Eğer true ise, mevcut filtreleri korur (refresh için)
+  Future<void> _initialize({bool preserveFilters = false}) async {
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
       // 1. Fetch all action IDs for client-side filtering
       final excludedIds = await _repository.fetchAllActionIds();
 
-      // 2. Get user's preference for gender filter
-      final genderFilter = await _repository.getUserLookingForPreference();
+      // 2. Get user's preference for gender filter (SADECE İLK AÇILIŞTA!)
+      String? genderFilter;
+      String? filterCity;
+      String? filterUniversity;
+      String? filterDepartment;
+      String? filterGrade;
+      
+      if (preserveFilters) {
+        // Refresh sırasında mevcut filtreyi koru
+        genderFilter = state.genderFilter;
+        filterCity = state.filterCity;
+        filterUniversity = state.filterUniversity;
+        filterDepartment = state.filterDepartment;
+        filterGrade = state.filterGrade;
+        debugPrint('🔒 [Initialize] Mevcut filtreler korunuyor (Gender: $genderFilter, City: $filterCity)');
+      } else {
+        // İlk açılışta SharedPreferences'tan yükle
+        final prefs = await SharedPreferences.getInstance();
+        genderFilter = prefs.getString('filter_gender');
+        filterCity = prefs.getString('filter_city');
+        filterUniversity = prefs.getString('filter_university');
+        filterDepartment = prefs.getString('filter_department');
+        filterGrade = prefs.getString('filter_grade');
+        
+        // Eğer SharedPreferences'ta kayıtlı filtre yoksa, database'den yükle (sadece gender için)
+        if (genderFilter == null || genderFilter.isEmpty) {
+          genderFilter = await _repository.getUserLookingForPreference();
+          debugPrint('📥 [Initialize] Gender filter database\'den yüklendi: $genderFilter');
+        } else {
+          debugPrint('💾 [Initialize] Filtreler SharedPreferences\'tan yüklendi (Gender: $genderFilter, City: $filterCity)');
+        }
+        
+        // Gender filter hala null ise, default olarak "Herkes" yap
+        if (genderFilter == null || genderFilter.isEmpty) {
+          genderFilter = 'Herkes';
+          debugPrint('🔧 [Initialize] Gender filter otomatik "Herkes" olarak ayarlandı');
+        }
+      }
 
       state = state.copyWith(
         excludedIds: excludedIds,
         genderFilter: genderFilter,
+        filterCity: filterCity,
+        filterUniversity: filterUniversity,
+        filterDepartment: filterDepartment,
+        filterGrade: filterGrade,
         isLoading: false,
       );
 
@@ -139,6 +206,11 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
         final batch = await _repository.fetchUserBatch(
           lastDocument: currentLastDoc,
           genderFilter: state.genderFilter,
+          filterCity: state.filterCity,
+          filterUniversity: state.filterUniversity,
+          filterDepartment: state.filterDepartment,
+          filterGrade: state.filterGrade,
+          excludedIds: state.excludedIds,  // ← excludedIds eklendi! ✅
         );
 
         // No more data available
@@ -184,9 +256,15 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
   /// Handle swipe action
   Future<void> onSwipe(int index, SwipeActionType actionType) async {
-    if (index < 0 || index >= state.profiles.length) return;
+    debugPrint('🔵 DEBUG: onSwipe başladı - Index: $index, Type: $actionType');
+    
+    if (index < 0 || index >= state.profiles.length) {
+      debugPrint('⚠️ DEBUG: Geçersiz index - Index: $index, Profil sayısı: ${state.profiles.length}');
+      return;
+    }
 
     final swipedProfile = state.profiles[index];
+    debugPrint('🔵 DEBUG: Swiped Profile - ID: ${swipedProfile.id}, Name: ${swipedProfile.name}');
 
     // 1. Optimistically update UI
     final updatedProfiles = List<UserProfile>.from(state.profiles);
@@ -202,12 +280,14 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
       lastSwipedProfile: swipedProfile,
       clearMatch: true,
     );
+    debugPrint('✅ DEBUG: UI güncellendi - Kalan profil: ${updatedProfiles.length}');
 
     // 3. Record action in Firestore (async, don't wait)
     _recordSwipeAction(swipedProfile.id, actionType);
 
     // 4. Check if prefetch is needed
     if (state.shouldPrefetch) {
+      debugPrint('🔵 DEBUG: Prefetch tetiklendi');
       _fetchNextBatch();
     }
   }
@@ -242,6 +322,7 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
   /// Swipe right (like)
   Future<void> swipeRight(int index) async {
+    debugPrint('🔵 DEBUG: Swipe Right tetiklendi - Index: $index');
     await onSwipe(index, SwipeActionType.like);
   }
 
@@ -278,10 +359,46 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
     }
   }
 
+  /// Rewind last swipe (Premium özelliği - sadece kartı geri getirir, Firestore'dan silmez)
+  void rewindLastSwipe(UserProfile profile) {
+    // Kartı başa ekle
+    final updatedProfiles = [profile, ...state.profiles];
+    
+    state = state.copyWith(
+      profiles: updatedProfiles,
+    );
+  }
+
   /// Refresh profiles
   Future<void> refresh() async {
-    state = const SwipeState();
-    await _initialize();
+    debugPrint('🔄 [SwipeProvider] refresh() başladı - Filtreleri koruyarak...');
+    
+    // Mevcut filtreleri kaydet
+    final currentGenderFilter = state.genderFilter;
+    final currentFilterCity = state.filterCity;
+    final currentFilterUniversity = state.filterUniversity;
+    final currentFilterDepartment = state.filterDepartment;
+    final currentFilterGrade = state.filterGrade;
+    
+    debugPrint('   - Korunacak filtreler:');
+    debugPrint('     * genderFilter: $currentGenderFilter');
+    debugPrint('     * filterCity: $currentFilterCity');
+    debugPrint('     * filterUniversity: $currentFilterUniversity');
+    debugPrint('     * filterDepartment: $currentFilterDepartment');
+    debugPrint('     * filterGrade: $currentFilterGrade');
+    
+    // State'i sıfırla AMA FİLTRELERİ KORU!
+    state = SwipeState(
+      genderFilter: currentGenderFilter,
+      filterCity: currentFilterCity,
+      filterUniversity: currentFilterUniversity,
+      filterDepartment: currentFilterDepartment,
+      filterGrade: currentFilterGrade,
+    );
+    
+    // Initialize'i FİLTRELERİ KORUYARAK çağır!
+    await _initialize(preserveFilters: true);
+    debugPrint('✅ [SwipeProvider] refresh() tamamlandı - Filtreler korundu!');
   }
 
   /// Clear match notification
@@ -319,6 +436,100 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
     if (state.shouldPrefetch) {
       _fetchNextBatch();
     }
+  }
+
+  /// Gelişmiş Filtreleri Ayarla
+  /// gender filtresi FREE, diğerleri Premium özelliği
+  Future<void> setFilters({
+    String? gender,
+    String? city,
+    String? university,
+    String? department,
+    String? grade,
+  }) async {
+    debugPrint('🔧 [SwipeProvider] setFilters çağrıldı');
+    debugPrint('   - gender: $gender');
+    debugPrint('   - city: $city');
+    debugPrint('   - university: $university');
+    debugPrint('   - department: $department');
+    debugPrint('   - grade: $grade');
+
+    // Filtreleri SharedPreferences'a kaydet
+    final prefs = await SharedPreferences.getInstance();
+    if (gender != null) {
+      await prefs.setString('filter_gender', gender);
+    } else {
+      await prefs.remove('filter_gender');
+    }
+    if (city != null) {
+      await prefs.setString('filter_city', city);
+    } else {
+      await prefs.remove('filter_city');
+    }
+    if (university != null) {
+      await prefs.setString('filter_university', university);
+    } else {
+      await prefs.remove('filter_university');
+    }
+    if (department != null) {
+      await prefs.setString('filter_department', department);
+    } else {
+      await prefs.remove('filter_department');
+    }
+    if (grade != null) {
+      await prefs.setString('filter_grade', grade);
+    } else {
+      await prefs.remove('filter_grade');
+    }
+    debugPrint('💾 [SwipeProvider] Filtreler SharedPreferences\'a kaydedildi');
+
+    state = state.copyWith(
+      genderFilter: gender,
+      clearGenderFilter: gender == null,
+      filterCity: city,
+      clearFilterCity: city == null,
+      filterUniversity: university,
+      clearFilterUniversity: university == null,
+      filterDepartment: department,
+      clearFilterDepartment: department == null,
+      filterGrade: grade,
+      clearFilterGrade: grade == null,
+    );
+
+    debugPrint('✅ [SwipeProvider] State güncellendi:');
+    debugPrint('   - genderFilter: ${state.genderFilter}');
+    debugPrint('   - filterCity: ${state.filterCity}');
+    debugPrint('   - filterUniversity: ${state.filterUniversity}');
+    debugPrint('   - filterDepartment: ${state.filterDepartment}');
+    debugPrint('   - filterGrade: ${state.filterGrade}');
+
+    // Filtreleri uygula - profilleri yeniden yükle
+    await refresh();
+    debugPrint('✅ [SwipeProvider] refresh() tamamlandı');
+  }
+
+  /// Tüm Filtreleri Temizle
+  Future<void> clearFilters() async {
+    // SharedPreferences'tan filtreleri temizle
+    final prefs = await SharedPreferences.getInstance();
+    // Gender'ı "Herkes"e ayarla, diğerlerini sil
+    await prefs.setString('filter_gender', 'Herkes');
+    await prefs.remove('filter_city');
+    await prefs.remove('filter_university');
+    await prefs.remove('filter_department');
+    await prefs.remove('filter_grade');
+    debugPrint('🗑️ [SwipeProvider] Filtreler temizlendi (Gender: Herkes)');
+
+    state = state.copyWith(
+      genderFilter: 'Herkes',         // ✅ Gender "Herkes"e dönüyor
+      clearFilterCity: true,          // ✅ City null yapılıyor
+      clearFilterUniversity: true,    // ✅ University null yapılıyor
+      clearFilterDepartment: true,    // ✅ Department null yapılıyor
+      clearFilterGrade: true,         // ✅ Grade null yapılıyor
+    );
+
+    // Filtreleri temizle - profilleri yeniden yükle
+    await refresh();
   }
 }
 

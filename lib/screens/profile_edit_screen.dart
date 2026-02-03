@@ -12,7 +12,6 @@ import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 import '../data/turkish_universities.dart';
 import '../widgets/app_notification.dart';
-import '../providers/swipe_provider.dart';
 import '../providers/connectivity_provider.dart';
 import '../utils/image_helper.dart';
 import '../widgets/modern_animated_dialog.dart';
@@ -39,7 +38,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   int _displayAge = 0; // Gösterim için hesaplanan yaş
 
   String _selectedGender = 'Erkek';
-  String _lookingFor = 'Kadın';
   String _selectedGrade = '';
 
   List<String?> _photoUrls = List.filled(6, null);
@@ -80,7 +78,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   String _initialUniversity = '';
   String _initialDepartment = '';
   String _initialGender = 'Erkek';
-  String _initialLookingFor = 'Kadın';
   String _initialGrade = '';
   String _initialClubs = '';
   List<String> _initialInterests = [];
@@ -139,7 +136,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         _departmentController.text.trim() != _initialDepartment.trim() ||
         _clubsController.text.trim() != _initialClubs.trim() ||
         _selectedGender != _initialGender ||
-        _lookingFor != _initialLookingFor ||
         _selectedGrade != _initialGrade ||
         // Set-based deep comparison for lists (order doesn't matter)
         !_setEquals(_selectedInterests, _initialInterests) ||
@@ -216,13 +212,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         _selectedGender = 'Erkek';
       }
 
-      // Aranan cinsiyet
-      final loadedLookingFor = profile['lookingFor'] ?? 'Kadın';
-      if (['Erkek', 'Kadın', 'Herkes'].contains(loadedLookingFor)) {
-        _lookingFor = loadedLookingFor;
-      } else {
-        _lookingFor = 'Kadın';
-      }
+      // lookingFor artık filters modal'dan ayarlanıyor, burada yüklemiyoruz
 
       _selectedInterests = List<String>.from(profile['interests'] ?? []);
 
@@ -256,7 +246,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _initialUniversity = _universityController.text;
     _initialDepartment = _departmentController.text;
     _initialGender = _selectedGender;
-    _initialLookingFor = _lookingFor;
     _initialGrade = _selectedGrade;
     _initialClubs = _clubsController.text;
     _initialInterests = List<String>.from(_selectedInterests);
@@ -507,7 +496,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         interests: _selectedInterests,
         photoUrls: finalPhotoUrls,
         gender: _selectedGender,
-        lookingFor: _lookingFor,
+        lookingFor: 'Herkes', // Varsayılan değer - artık filters modal'dan ayarlanacak
         grade: _selectedGrade,
         clubs: clubsList,
         socialLinks: {},
@@ -524,14 +513,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             _localPhotos[i] = null;
           }
 
-          // IMPORTANT: Check if lookingFor changed BEFORE saving initial values!
-          final lookingForChanged = _lookingFor != _initialLookingFor;
-          final newLookingFor = _lookingFor;
-
-          if (lookingForChanged) {
-            debugPrint('ProfileEdit: lookingFor changed from $_initialLookingFor to $newLookingFor');
-          }
-
           // Save new initial values (current state becomes the new baseline)
           _saveInitialValues();
 
@@ -540,13 +521,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
           // Close keyboard
           FocusScope.of(context).unfocus();
-
-          // Update gender filter if lookingFor changed
-          if (lookingForChanged) {
-            debugPrint('ProfileEdit: Updating gender filter to $newLookingFor');
-            await ref.read(swipeProvider.notifier).updateGenderFilter(newLookingFor);
-            debugPrint('ProfileEdit: Gender filter updated successfully');
-          }
 
           // Show beautiful success notification (check mounted after async)
           if (mounted) {
@@ -620,7 +594,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       photos: previewPhotos,
       interests: List<String>.from(_selectedInterests),
       gender: _selectedGender,
-      lookingFor: _lookingFor,
+      lookingFor: 'Herkes', // Varsayılan - artık filters modal'dan ayarlanacak
       grade: _selectedGrade,
       clubs: previewClubs,
       socialLinks: {},
@@ -781,7 +755,14 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       ),
       // Global ConnectivityBanner handles offline state
       body: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Container(
+                    color: const Color(0xFFF8F9FA), // Solid background
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5C6BC0)),
+                      ),
+                    ),
+                  )
                 : SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -811,10 +792,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         const SizedBox(height: 24),
                         _buildSection('Cinsiyet', [
                           _buildGenderSelector(),
-                        ]),
-                        const SizedBox(height: 24),
-                        _buildSection('Kiminle Tanışmak İstiyorsun?', [
-                          _buildLookingForSelector(),
                         ]),
                         const SizedBox(height: 24),
                         _buildSection('Eğitim', [
@@ -1283,47 +1260,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     );
   }
 
-  Widget _buildLookingForSelector() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSelectableOption(
-            'Erkek',
-            Icons.male,
-            _lookingFor == 'Erkek',
-            () {
-              setState(() => _lookingFor = 'Erkek');
-              _checkForChanges();
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSelectableOption(
-            'Kadın',
-            Icons.female,
-            _lookingFor == 'Kadın',
-            () {
-              setState(() => _lookingFor = 'Kadın');
-              _checkForChanges();
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildSelectableOption(
-            'Herkes',
-            Icons.people,
-            _lookingFor == 'Herkes',
-            () {
-              setState(() => _lookingFor = 'Herkes');
-              _checkForChanges();
-            },
-          ),
-        ),
-      ],
-    );
-  }
+  // lookingFor selector kaldırıldı - artık Discovery Filters'da!
 
   Widget _buildSelectableOption(
     String label,

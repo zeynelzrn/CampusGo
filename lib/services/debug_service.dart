@@ -175,12 +175,12 @@ class DebugService {
 
   // ==================== DELETE DEMO USERS (SIMPLE UID WHITELIST) ====================
 
-  /// PROTECTED UIDs: Only these 2 accounts will NEVER be deleted
+  /// PROTECTED UIDs: Only these 3 accounts will NEVER be deleted
   /// Everything else gets deleted - no email checks, no domain checks
   static const List<String> _protectedUids = [
-    'KJcDoC0XTZZRAKP6QNu6ahOugCA3', // zeynel gmail.    
-    'GEE22M3nqpNR890Fz4igFIzFQoj1', // zeyneltcr gmail
-    'KhpezrxgStV67YYYo6fHWGkwlxm1', // (Okul Maili)
+    'WEacRnjytahh7cL74fvdT4H0Fpx1', // Ana geliştirici hesabı (Yaşar Üniversitesi)
+    'KJcDoC0XTZZRAKP6QNu6ahOugCA3', // Test hesabı - Zeynel Zeren
+    'GEE22M3nqpNR890Fz4igFIzFQoj1', // Test hesabı - Zeynel TCR
   ];
 
   /// Delete all users EXCEPT the 2 protected UIDs

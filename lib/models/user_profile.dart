@@ -8,6 +8,7 @@ class UserProfile {
   final String bio;
   final String university;
   final String department;
+  final String? universityCity; // Şelale Algoritması için: Üniversitenin bulunduğu şehir
   final List<String> photos;
   final List<String> interests;
   final String gender;
@@ -28,6 +29,14 @@ class UserProfile {
   // Premium Durum (RevenueCat tarafından yönetilir)
   final bool isPremium; // Premium üyelik aktif mi?
   final DateTime? premiumUpdatedAt; // Premium durumu son güncellenme zamanı
+  
+  // Rewind (Geri Alma) Hakları (Premium özelliği)
+  final int monthlyRewindRights; // Aylık geri alma hakkı (Premium kullanıcılar için 5/ay)
+  final DateTime? lastRewindResetDate; // Hakların en son ne zaman yenilendiği
+  
+  // Like Quota (Zaman Pencereli Limit - Free Users için)
+  final int remainingFreeLikes; // 8 saatlik pencerede kalan like hakkı (Free: 5)
+  final DateTime? likeWindowStartTime; // 8 saatlik pencerenin başlangıç zamanı
 
   // Legacy age field for backward compatibility (eski kayıtlar için)
   final int? _legacyAge;
@@ -40,6 +49,7 @@ class UserProfile {
     this.bio = '',
     this.university = '',
     this.department = '',
+    this.universityCity,
     this.photos = const [],
     this.interests = const [],
     this.gender = '',
@@ -54,6 +64,10 @@ class UserProfile {
     this.isBanned = false,
     this.isPremium = false,
     this.premiumUpdatedAt,
+    this.monthlyRewindRights = 5,
+    this.lastRewindResetDate,
+    this.remainingFreeLikes = 5,
+    this.likeWindowStartTime,
   }) : _legacyAge = legacyAge;
 
   /// Dinamik yaş hesaplama - doğum tarihinden otomatik hesaplanır
@@ -85,6 +99,7 @@ class UserProfile {
       bio: data['bio'] as String? ?? '',
       university: data['university'] as String? ?? '',
       department: data['department'] as String? ?? '',
+      universityCity: data['universityCity'] as String?,
       photos: List<String>.from(data['photos'] ?? []),
       interests: List<String>.from(data['interests'] ?? []),
       gender: data['gender'] as String? ?? '',
@@ -101,6 +116,12 @@ class UserProfile {
       // Premium durum - varsayılan olarak false
       isPremium: data['isPremium'] as bool? ?? false,
       premiumUpdatedAt: (data['premiumUpdatedAt'] as Timestamp?)?.toDate(),
+      // Rewind hakları - varsayılan olarak 5
+      monthlyRewindRights: data['monthlyRewindRights'] as int? ?? 5,
+      lastRewindResetDate: (data['lastRewindResetDate'] as Timestamp?)?.toDate(),
+      // Like quota - varsayılan olarak 5
+      remainingFreeLikes: data['remainingFreeLikes'] as int? ?? 5,
+      likeWindowStartTime: (data['likeWindowStartTime'] as Timestamp?)?.toDate(),
     );
   }
 

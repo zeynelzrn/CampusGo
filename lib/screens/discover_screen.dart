@@ -19,6 +19,8 @@ import '../services/chat_service.dart';
 import '../widgets/app_notification.dart';
 import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
+import 'premium/premium_offer_screen.dart';
+import 'discovery/filters_modal.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -39,6 +41,9 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
 
   /// Yenileme durumu (loading indicator için)
   bool _isRefreshing = false;
+
+  /// Son 5 dislike edilen kullanıcı geçmişi (Stack - LIFO mantığı)
+  final List<UserProfile> _dislikedHistory = [];
 
   @override
   List<ProviderOrFamily> get providersToRefresh => [swipeProvider];
@@ -98,25 +103,324 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     super.dispose();
   }
 
-  void _onLike() {
-    if (!_checkConnectivity()) return;
-    HapticFeedback.mediumImpact();
-    final notifier = ref.read(swipeProvider.notifier);
-    notifier.swipeRight(0);
+  Future<void> _onLike() async {
+    debugPrint('🟢 DEBUG: _onLike tetiklendi');
+    
+    if (!_checkConnectivity()) {
+      debugPrint('❌ DEBUG: İnternet bağlantısı yok');
+      return;
+    }
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint('❌ DEBUG: Kullanıcı giriş yapmamış');
+      return;
+    }
+    debugPrint('🟢 DEBUG: User ID: ${user.uid}');
+
+    try {
+      // Kullanıcı verisini al
+      debugPrint('🟢 DEBUG: Firebase\'den kullanıcı verisi çekiliyor...');
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        debugPrint('❌ DEBUG: Kullanıcı dokümanı bulunamadı');
+        return;
+      }
+
+      final userData = userDoc.data()!;
+      final isPremium = userData['isPremium'] as bool? ?? false;
+      debugPrint('🟢 DEBUG: Is Premium: $isPremium');
+
+      // ADIM A: Premium Kontrolü
+      if (isPremium) {
+        // Premium kullanıcı - limit yok
+        debugPrint('🟢 DEBUG: Premium kullanıcı - limit yok, direkt swipe yapılıyor');
+        HapticFeedback.mediumImpact();
+        final notifier = ref.read(swipeProvider.notifier);
+        notifier.swipeRight(0);
+        return;
+      }
+
+      // ADIM B: Süre ve Reset Kontrolü (Lazy Reset)
+      int remainingFreeLikes = userData['remainingFreeLikes'] as int? ?? 5;
+      DateTime? likeWindowStartTime = (userData['likeWindowStartTime'] as Timestamp?)?.toDate();
+      debugPrint('🟢 DEBUG: Kalan like hakkı: $remainingFreeLikes/5');
+      debugPrint('🟢 DEBUG: Pencere başlangıç: $likeWindowStartTime');
+
+      final now = DateTime.now();
+      bool needsReset = false;
+
+      if (likeWindowStartTime == null) {
+        needsReset = true;
+        debugPrint('🟢 DEBUG: İlk like - pencere başlatılıyor');
+      } else {
+        final hoursSinceStart = now.difference(likeWindowStartTime).inHours;
+        debugPrint('🟢 DEBUG: Geçen süre: $hoursSinceStart saat');
+        if (hoursSinceStart >= 8) {
+          needsReset = true;
+          debugPrint('🟢 DEBUG: 8 saat geçti - haklar resetleniyor');
+        }
+      }
+
+      // Reset gerekiyorsa hakları 5'e eşitle
+      if (needsReset) {
+        remainingFreeLikes = 5;
+        likeWindowStartTime = now;
+        debugPrint('🟢 DEBUG: Reset sonrası: $remainingFreeLikes/5');
+      }
+
+      // ADIM C: Hak Kontrolü
+      if (remainingFreeLikes > 0) {
+        // Hakkı azalt
+        final newLikes = remainingFreeLikes - 1;
+        debugPrint('🟢 DEBUG: Yeni like sayısı: $newLikes/5');
+        
+        // Firebase'i güncelle (set + merge: true ile güvenli güncelleme)
+        try {
+          debugPrint('🟢 DEBUG: Firebase güncelleniyor...');
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'remainingFreeLikes': newLikes,
+            'likeWindowStartTime': Timestamp.fromDate(likeWindowStartTime!),
+          }, SetOptions(merge: true)); // merge: true ile güvenli güncelleme
+          
+          debugPrint('✅ DEBUG: Firebase başarıyla güncellendi!');
+        } catch (firebaseError) {
+          debugPrint('❌ DEBUG: Firebase güncelleme hatası: $firebaseError');
+          throw firebaseError; // Hatayı üst bloğa at
+        }
+
+        // Like işlemini gerçekleştir
+        debugPrint('🟢 DEBUG: Swipe tetikleniyor...');
+        HapticFeedback.mediumImpact();
+        final notifier = ref.read(swipeProvider.notifier);
+        notifier.swipeRight(0);
+
+        // Kullanıcıya bilgi ver
+        if (newLikes > 0) {
+          debugPrint('💚 Like atıldı! Kalan hakkın: $newLikes/5');
+        } else {
+          debugPrint('⚠️ Son like hakkını kullandın! 8 saat sonra yenilenecek.');
+        }
+      } else {
+        // Hak dolmuş - Dialog göster
+        debugPrint('❌ DEBUG: Like hakkı doldu - Dialog gösteriliyor');
+        HapticFeedback.heavyImpact();
+        
+        // Kalan süreyi hesapla
+        final remainingMinutes = (8 * 60) - now.difference(likeWindowStartTime!).inMinutes;
+        final displayHours = remainingMinutes ~/ 60;
+        final displayMinutes = remainingMinutes % 60;
+        debugPrint('🟢 DEBUG: Kalan süre: ${displayHours}s ${displayMinutes}dk');
+        
+        _showLikeQuotaDialog(displayHours, displayMinutes);
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ DEBUG: Like quota error: $e');
+      debugPrint('❌ DEBUG: StackTrace: $stackTrace');
+      // Hata olursa direkt like'ı geçir (fallback)
+      debugPrint('⚠️ DEBUG: Fallback - Hata oluştu ama swipe tetikleniyor');
+      HapticFeedback.mediumImpact();
+      final notifier = ref.read(swipeProvider.notifier);
+      notifier.swipeRight(0);
+    }
   }
 
   void _onDislike() {
     if (!_checkConnectivity()) return;
     HapticFeedback.mediumImpact();
+    
+    // Son 5 dislike edilen kullanıcıyı geçmişe ekle (Stack - LIFO)
+    final swipeState = ref.read(swipeProvider);
+    if (swipeState.profiles.isNotEmpty) {
+      setState(() {
+        // Listeye ekle (sona)
+        _dislikedHistory.add(swipeState.profiles.first);
+        
+        // 5'ten fazla ise en eskiyi sil (baştan)
+        if (_dislikedHistory.length > 5) {
+          _dislikedHistory.removeAt(0);
+        }
+      });
+    }
+    
     final notifier = ref.read(swipeProvider.notifier);
     notifier.swipeLeft(0);
   }
 
-  void _onSuperLike() {
+  /// Geri Al (Rewind) - Premium özelliği
+  Future<void> _onRewind() async {
     if (!_checkConnectivity()) return;
-    HapticFeedback.heavyImpact();
-    final notifier = ref.read(swipeProvider.notifier);
-    notifier.superLike(0);
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Kullanıcı verisini al
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) return;
+
+      final userData = userDoc.data()!;
+      final isPremium = userData['isPremium'] as bool? ?? false;
+
+      // ADIM A: Premium Kontrolü
+      if (!isPremium) {
+        HapticFeedback.heavyImpact();
+        _showPremiumRequiredDialog();
+        return;
+      }
+
+      // ADIM B: Tarih ve Reset Kontrolü
+      int monthlyRewindRights = userData['monthlyRewindRights'] as int? ?? 5;
+      DateTime? lastRewindResetDate = (userData['lastRewindResetDate'] as Timestamp?)?.toDate();
+
+      final now = DateTime.now();
+      bool needsReset = false;
+
+      if (lastRewindResetDate == null) {
+        needsReset = true;
+      } else {
+        final daysSinceReset = now.difference(lastRewindResetDate).inDays;
+        if (daysSinceReset >= 30) {
+          needsReset = true;
+        }
+      }
+
+      // Reset gerekiyorsa hakları 5'e eşitle
+      if (needsReset) {
+        monthlyRewindRights = 5;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'monthlyRewindRights': 5,
+          'lastRewindResetDate': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // ADIM C: Hak Kullanımı
+      if (monthlyRewindRights > 0) {
+        // Geri alınacak kullanıcı var mı? (Stack boş mu?)
+        if (_dislikedHistory.isEmpty) {
+          HapticFeedback.lightImpact();
+          AppNotification.error(
+            title: 'Geri Alınamıyor',
+            subtitle: 'Henüz kimseyi geçmedin!',
+          );
+          return;
+        }
+
+        // Geri alma işlemi - Stack'ten son kişiyi al (LIFO)
+        HapticFeedback.mediumImpact();
+        
+        // Son dislike edilen kullanıcıyı al (ama henüz listeden çıkarma)
+        final lastDislikedUser = _dislikedHistory.last;
+        
+        // Kartı geri ekle (Provider'a manuel ekle)
+        final notifier = ref.read(swipeProvider.notifier);
+        notifier.rewindLastSwipe(lastDislikedUser);
+        
+        // Hakkı azalt
+        final newRights = monthlyRewindRights - 1;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+          'monthlyRewindRights': newRights,
+        });
+
+        // Kullanıcıya bildir
+        AppNotification.success(
+          title: 'Geri Alındı! ✨',
+          subtitle: 'Kalan hakkın: $newRights/5',
+        );
+
+        // Stack'ten son kullanıcıyı çıkar (LIFO - removeLast)
+        setState(() {
+          _dislikedHistory.removeLast();
+        });
+      } else {
+        // Hak dolmuş
+        HapticFeedback.heavyImpact();
+        AppNotification.error(
+          title: 'Hakkın Doldu',
+          subtitle: 'Bu ayki geri alma hakkın doldu (5/5). Gelecek ay yenilenecek!',
+        );
+      }
+    } catch (e) {
+      debugPrint('Rewind error: $e');
+      AppNotification.error(
+        title: 'Hata',
+        subtitle: 'Geri alma işlemi başarısız oldu.',
+      );
+    }
+  }
+
+  /// Premium gerekli uyarısı göster
+  void _showPremiumRequiredDialog() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.workspace_premium_rounded,
+        title: 'Premium Özellik',
+        subtitle: 'Geri alma özelliği sadece Premium üyelere özeldir!',
+        confirmText: 'Premium\'a Geç',
+        confirmButtonColor: const Color(0xFFFFB300),
+        onConfirm: () async {
+          Navigator.pop(dialogContext);
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PremiumOfferScreen(),
+            ),
+          );
+        },
+        cancelText: 'İptal',
+        onCancel: () => Navigator.pop(dialogContext),
+      ),
+    );
+  }
+
+  /// Like hakkı doldu dialog'u
+  void _showLikeQuotaDialog(int hours, int minutes) {
+    // Zaman formatı: "X saat Y dakika" (daha okunaklı)
+    final timeText = hours > 0 
+        ? '$hours saat ${minutes > 0 ? "$minutes dakika" : ""}'.trim()
+        : '$minutes dakika';
+    
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.favorite_border_rounded,
+        title: 'Hızına Yetişemiyoruz!',
+        subtitle: 'Çok fazla kişiyi beğendin. Bir sonraki beğenini $timeText sonra atabilirsin.\n\nBeklemek istemiyorsan Premium\'a geç ve sınırları kaldır!',
+        confirmText: 'Premium\'a Geç',
+        confirmButtonColor: const Color(0xFFFF4458),
+        onConfirm: () async {
+          Navigator.pop(dialogContext);
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PremiumOfferScreen(),
+            ),
+          );
+        },
+        cancelText: 'Tamam',
+        onCancel: () => Navigator.pop(dialogContext),
+      ),
+    );
   }
 
   /// İnternet bağlantısını kontrol et, yoksa uyarı göster
@@ -275,6 +579,67 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
     }
   }
 
+  /// Filtre butonu (Gelişmiş filtreler - Premium özelliği)
+  Widget _buildFilterButton() {
+    final swipeState = ref.watch(swipeProvider);
+    final hasActiveFilters = swipeState.filterCity != null ||
+        swipeState.filterUniversity != null ||
+        swipeState.filterDepartment != null ||
+        swipeState.filterGrade != null;
+
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (context) => const FiltersModal(),
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Main Button
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.tune_rounded,
+              size: 24,
+              color: hasActiveFilters ? const Color(0xFF5C6BC0) : const Color(0xFF616161),
+            ),
+          ),
+
+          // Active Filter Badge
+          if (hasActiveFilters)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF4458),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final swipeState = ref.watch(swipeProvider);
@@ -376,6 +741,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
             ),
           ],
         ),
+        // Filtre butonu - sol üst köşe (Premium özelliği)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 16,
+          child: _buildFilterButton(),
+        ),
+
         // Seçenekler menüsü - sağ üst köşe (Üç Nokta)
         // Modern Bottom Sheet: Şikayet Et + Engelle (Apple App Store UGC compliance)
         Positioned(
@@ -820,34 +1192,46 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
             AnimatedOpacity(
               opacity: isOnline ? 1.0 : 0.5,
               duration: const Duration(milliseconds: 300),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Dislike button
-                  _buildActionButton(
-                    icon: Icons.close_rounded,
-                    color: const Color(0xFFFF4458),
-                    size: 64,
-                    iconSize: 32,
-                    onTap: _onDislike,
-                  ),
-                  // Super like button
-                  _buildActionButton(
-                    icon: Icons.star_rounded,
-                    color: const Color(0xFF00D4FF),
-                    size: 52,
-                    iconSize: 26,
-                    onTap: _onSuperLike,
-                  ),
-                  // Like button
-                  _buildActionButton(
-                    icon: Icons.waving_hand_rounded,
-                    color: const Color(0xFF00E676),
-                    size: 64,
-                    iconSize: 32,
-                    onTap: _onLike,
-                  ),
-                ],
+              child: StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(FirebaseAuth.instance.currentUser?.uid)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  final isPremium = snapshot.hasData
+                      ? ((snapshot.data!.data() as Map<String, dynamic>?)?['isPremium'] as bool? ?? false)
+                      : false;
+                  final rewindRights = snapshot.hasData
+                      ? ((snapshot.data!.data() as Map<String, dynamic>?)?['monthlyRewindRights'] as int? ?? 5)
+                      : 5;
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Dislike button
+                      _buildActionButton(
+                        icon: Icons.close_rounded,
+                        color: const Color(0xFFFF4458),
+                        size: 64,
+                        iconSize: 32,
+                        onTap: _onDislike,
+                      ),
+                      // Rewind button (Geri Al - Premium özelliği) + Badge
+                      _buildRewindButtonWithBadge(
+                        isPremium: isPremium,
+                        rewindRights: rewindRights,
+                      ),
+                      // Like button (Badge kaldırıldı - daha gizemli UX)
+                      _buildActionButton(
+                        icon: Icons.waving_hand_rounded,
+                        color: const Color(0xFF00E676),
+                        size: 64,
+                        iconSize: 32,
+                        onTap: _onLike,
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -897,6 +1281,60 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
           ),
         ),
       ),
+    );
+  }
+
+  /// Rewind button with Premium badge
+  Widget _buildRewindButtonWithBadge({
+    required bool isPremium,
+    required int rewindRights,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Rewind button
+        _buildActionButton(
+          icon: Icons.replay_rounded,
+          color: const Color(0xFFFFB300),
+          size: 52,
+          iconSize: 26,
+          onTap: _onRewind,
+        ),
+        // Premium badge (sadece Premium kullanıcılara göster)
+        if (isPremium)
+          Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFB300), Color(0xFFFFA000)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFFB300).withValues(alpha: 0.5),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '$rewindRights',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -997,42 +1435,45 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.explore_off_rounded,
-                size: 64,
-                color: Color(0xFF5C6BC0),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Su an icin profil kalmadi',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Daha sonra tekrar kontrol et',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
+    return Stack(
+      children: [
+        // Empty state content (center)
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5C6BC0).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.explore_off_rounded,
+                    size: 64,
+                    color: Color(0xFF5C6BC0),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Şu an için profil kalmadı',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Filtreleri değiştir veya daha sonra tekrar kontrol et',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
             const SizedBox(height: 32),
             // Admin için: Row içinde iki buton
             // Normal kullanıcı için: Ortalanmış tek Yenile butonu
@@ -1064,9 +1505,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
             else
               // Normal kullanıcı - ortalanmış Yenile butonu
               Center(child: _buildRefreshButton()),
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
+
+        // Filtre butonu - HER ZAMAN GÖRÜNÜR (profil olsa da olmasa da)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 16,
+          child: _buildFilterButton(),
+        ),
+      ],
     );
   }
 

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user_profile.dart';
 import '../services/profile_cache_service.dart';
+import '../data/university_data.dart';
 
 /// Profile data model for creating/updating profiles
 class ProfileData {
@@ -201,10 +202,14 @@ class ProfileRepository {
     }
 
     try {
+      // Şelale Algoritması için: Üniversiteden şehri otomatik hesapla
+      final universityCity = UniversityData.getCityForUniversity(profileData.university);
+      
       final data = {
         ...profileData.toMap(),
         'photos': photoUrls, // All photo URLs
         'photoUrl': photoUrls.first, // Primary photo for avatar usage
+        'universityCity': universityCity, // Şelale önceliklendirme için şehir
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -214,7 +219,7 @@ class ProfileRepository {
             SetOptions(merge: true),
           );
 
-      debugPrint('ProfileRepository: Profil kaydedildi (${photoUrls.length} fotoğraf)');
+      debugPrint('ProfileRepository: Profil kaydedildi (${photoUrls.length} fotoğraf, Şehir: $universityCity)');
     } on FirebaseException catch (e) {
       throw Exception('Profil kaydedilirken hata: ${e.message}');
     }

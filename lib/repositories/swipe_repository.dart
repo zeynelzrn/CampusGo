@@ -4,7 +4,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import '../models/user_profile.dart';
-import '../services/chat_service.dart';
 import '../services/user_service.dart';
 
 /// Repository for swipe-related Firestore operations
@@ -100,70 +99,323 @@ class SwipeRepository {
     return await fetchAllActionIds();
   }
 
-  /// Fetch a batch of users with pagination
-  /// Returns profiles and lastDocument for pagination
-  /// If gender filter returns no results, falls back to showing all users
-  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})> fetchUserBatch({
+  // ==================== USER FETCHING WITH FILTERS ====================
+
+  /// Main fetch method called by provider
+  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})>
+      fetchUserBatch({
     DocumentSnapshot? lastDocument,
     String? genderFilter,
+    String? filterCity,
+    String? filterUniversity,
+    String? filterDepartment,
+    String? filterGrade,
+    Set<String>? excludedIds,
   }) async {
-    final userId = currentUserId;
-    if (userId == null) return (profiles: <UserProfile>[], lastDoc: null);
+    return await _fetchUsersWithFilter(
+      lastDocument: lastDocument,
+      genderFilter: genderFilter,
+      filterCity: filterCity,
+      filterUniversity: filterUniversity,
+      filterDepartment: filterDepartment,
+      filterGrade: filterGrade,
+      excludedIds: excludedIds,
+    );
+  }
 
+  /// Index hatası durumunda yedek: Sadece createdAt ile çek, filtreleri client-side uygula.
+  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})> _fetchWithClientSideFilters({
+    required String userId,
+    required Set<String> excluded,
+    required String? genderFilter,
+    required String? filterCity,
+    required String? filterUniversity,
+    required String? filterDepartment,
+    required String? filterGrade,
+    required int fetchBatchSize,
+  }) async {
     try {
-      // First, try with gender filter
-      var result = await _fetchUsersWithFilter(
-        lastDocument: lastDocument,
-        genderFilter: genderFilter,
-      );
+      final q = _usersCollection
+          .orderBy('createdAt', descending: true)
+          .limit(80);
 
-      // FALLBACK: If no results with filter and we have a filter, try without it
-      if (result.profiles.isEmpty && genderFilter != null && genderFilter != 'Herkes' && genderFilter.isNotEmpty) {
-        result = await _fetchUsersWithFilter(
-          lastDocument: lastDocument,
-          genderFilter: null, // No filter - show everyone
-        );
-      }
+      final snapshot = await q.get();
+      final list = snapshot.docs
+          .map((doc) => UserProfile.fromFirestore(doc))
+          .where((p) {
+        if (!p.isComplete || p.id == userId || excluded.contains(p.id)) return false;
+        if (genderFilter != null && genderFilter.isNotEmpty && genderFilter != 'Herkes') {
+          if (p.gender != genderFilter) return false;
+        }
+        if (filterCity != null && filterCity.isNotEmpty) {
+          if (p.universityCity != filterCity) return false;
+        }
+        if (filterUniversity != null && filterUniversity.isNotEmpty) {
+          if (p.university != filterUniversity) return false;
+        }
+        if (filterDepartment != null && filterDepartment.isNotEmpty) {
+          if (p.department != filterDepartment) return false;
+        }
+        if (filterGrade != null && filterGrade.isNotEmpty) {
+          if (p.grade != filterGrade) return false;
+        }
+        return true;
+      })
+          .take(fetchBatchSize)
+          .toList();
 
-      return result;
+      debugPrint('─────────────────────────────────────');
+      return (profiles: list, lastDoc: null);
     } catch (e) {
+      debugPrint('⚠️ Yedek sorgu da başarısız: $e');
       return (profiles: <UserProfile>[], lastDoc: null);
     }
   }
 
-  /// Internal helper to fetch users with optional filter
-  /// Returns a record with profiles and the last document for pagination
-  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})> _fetchUsersWithFilter({
+  /// Smart Filter System with Waterfall Priority
+  /// 
+  /// MANTIK:
+  /// 1. Eğer HERHANGI BİR premium filtre aktifse (city, university, department, grade):
+  ///    → Waterfall algoritmasını ATLA, sadece filtrelere göre getir
+  /// 2. Eğer SADECE gender filtresi varsa:
+  ///    → Waterfall algoritmasını ÇALIŞTIR (normal akış)
+  Future<({List<UserProfile> profiles, DocumentSnapshot? lastDoc})>
+      _fetchUsersWithFilter({
     DocumentSnapshot? lastDocument,
     String? genderFilter,
+    String? filterCity,
+    String? filterUniversity,
+    String? filterDepartment,
+    String? filterGrade,
+    Set<String>? excludedIds,
   }) async {
-    Query<Map<String, dynamic>> query = _usersCollection
-        .orderBy('createdAt', descending: true)
-        .limit(fetchBatchSize);
+    final userId = currentUserId;
+    if (userId == null) return (profiles: <UserProfile>[], lastDoc: null);
+    
+    // excludedIds boşsa boş set kullan
+    final excluded = excludedIds ?? <String>{};
 
-    // Apply gender filter if specified
-    if (genderFilter != null &&
-        genderFilter.isNotEmpty &&
-        genderFilter != 'Herkes') {
-      query = query.where('gender', isEqualTo: genderFilter);
+    // ============ ADIM 0: PREMIUM FİLTRE KONTROLÜ ============
+    final hasPremiumFilters =
+        (filterCity != null && filterCity.isNotEmpty) ||
+            (filterUniversity != null && filterUniversity.isNotEmpty) ||
+            (filterDepartment != null && filterDepartment.isNotEmpty) ||
+            (filterGrade != null && filterGrade.isNotEmpty);
+
+    if (hasPremiumFilters) {
+      // ========== PREMIUM FİLTRE MODU: WATERFALL ATLA ==========
+      debugPrint('═════════════════════════════════════');
+      debugPrint('🔍 Premium Filtre Modu Aktif!');
+      debugPrint('🚫 Waterfall algoritması devre dışı');
+      debugPrint('📍 Filtreler:');
+      if (filterCity != null) debugPrint('   - İl: $filterCity');
+      if (filterUniversity != null) {
+        debugPrint('   - Üniversite: $filterUniversity');
+      }
+      if (filterDepartment != null) debugPrint('   - Bölüm: $filterDepartment');
+      if (filterGrade != null) debugPrint('   - Sınıf: $filterGrade');
+      if (genderFilter != null && genderFilter != 'Herkes') {
+        debugPrint('   - Cinsiyet: $genderFilter');
+      }
+
+      Query<Map<String, dynamic>> query = _usersCollection
+          .orderBy('createdAt', descending: true)
+          .limit(fetchBatchSize);
+
+      // Gender filtresi (FREE)
+      if (genderFilter != null &&
+          genderFilter.isNotEmpty &&
+          genderFilter != 'Herkes') {
+        query = query.where('gender', isEqualTo: genderFilter);
+      }
+
+      // İl filtresi (universityCity alanı!)
+      if (filterCity != null && filterCity.isNotEmpty) {
+        query = query.where('universityCity', isEqualTo: filterCity);
+      }
+
+      // Üniversite filtresi
+      if (filterUniversity != null && filterUniversity.isNotEmpty) {
+        query = query.where('university', isEqualTo: filterUniversity);
+      }
+
+      // Bölüm filtresi
+      if (filterDepartment != null && filterDepartment.isNotEmpty) {
+        query = query.where('department', isEqualTo: filterDepartment);
+      }
+
+      // Sınıf filtresi
+      if (filterGrade != null && filterGrade.isNotEmpty) {
+        query = query.where('grade', isEqualTo: filterGrade);
+      }
+
+      // 🎯 OPTİMİZASYON: Son 10 excluded ID'yi SERVER-SIDE filtrele (whereNotIn)
+      final recentExcluded = excluded.take(10).toList();
+      if (recentExcluded.isNotEmpty) {
+        query = query.where(FieldPath.documentId, whereNotIn: recentExcluded);
+        debugPrint('🚀 whereNotIn optimizasyonu: ${recentExcluded.length} ID server-side elendi');
+      }
+
+      // Pagination
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      try {
+        final snapshot = await query.get();
+        // Geri kalan excluded ID'leri client-side filtrele
+        final profiles = snapshot.docs
+            .map((doc) => UserProfile.fromFirestore(doc))
+            .where((profile) => 
+              profile.isComplete && 
+              profile.id != userId &&
+              !excluded.contains(profile.id))  // ← Geri kalanlar client-side eleniyor
+            .toList();
+
+        final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+
+        debugPrint('✅ Filtrelenmiş sonuç: ${profiles.length} profil bulundu (Server: ${recentExcluded.length}, Client: ${excluded.length - recentExcluded.length} kişi elendi)');
+        debugPrint('─────────────────────────────────────');
+
+        return (profiles: profiles, lastDoc: lastDoc);
+      } catch (e) {
+        debugPrint(
+            '⚠️ Filtre sorgusu hatası (composite index gerekli olabilir): $e');
+        // Yedek: Sadece createdAt ile çek, tüm filtreleri client-side uygula
+        final fallback = await _fetchWithClientSideFilters(
+          userId: userId,
+          excluded: excluded,
+          genderFilter: genderFilter,
+          filterCity: filterCity,
+          filterUniversity: filterUniversity,
+          filterDepartment: filterDepartment,
+          filterGrade: filterGrade,
+          fetchBatchSize: fetchBatchSize,
+        );
+        if (fallback.profiles.isNotEmpty) {
+          debugPrint('✅ Yedek sorgu (client-side filtre): ${fallback.profiles.length} profil bulundu');
+        }
+        return fallback;
+      }
     }
 
-    // Apply pagination cursor
-    if (lastDocument != null) {
-      query = query.startAfterDocument(lastDocument);
+    // ========== WATERFALL MODU: NORMAL AKIŞ (SADECE GENDER FİLTRESİ) ==========
+    debugPrint('═════════════════════════════════════');
+    debugPrint('🌊 Waterfall Algoritması Aktif');
+    if (genderFilter != null && genderFilter != 'Herkes') {
+      debugPrint('👥 Gender Filtresi: $genderFilter');
     }
 
-    final snapshot = await query.get();
+    // 🔍 Önce current user'ın universityCity'sini al
+    final currentUserDoc = await _usersCollection.doc(userId).get();
+    final currentUserCity =
+        currentUserDoc.data()?['universityCity'] as String?;
+    debugPrint('📍 Current User City: $currentUserCity');
 
-    // Get last document for pagination
-    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+    List<UserProfile> allProfiles = [];
+    DocumentSnapshot? finalLastDoc;
 
-    final profiles = snapshot.docs
-        .map((doc) => UserProfile.fromFirestore(doc))
-        .where((profile) => profile.isComplete) // Only show complete profiles
-        .toList();
+    // ============ ADIM 1: YEREL SORGU (Aynı Şehir) ============
+    if (currentUserCity != null && currentUserCity.isNotEmpty) {
+      debugPrint('🏙️ Yerel sorgu başlatılıyor: $currentUserCity');
 
-    return (profiles: profiles, lastDoc: lastDoc);
+      Query<Map<String, dynamic>> localQuery = _usersCollection
+          .orderBy('createdAt', descending: true)
+          .limit(fetchBatchSize);
+
+      // universityCity filtresi ekle
+      localQuery =
+          localQuery.where('universityCity', isEqualTo: currentUserCity);
+
+      // Gender filtresi
+      if (genderFilter != null &&
+          genderFilter.isNotEmpty &&
+          genderFilter != 'Herkes') {
+        localQuery = localQuery.where('gender', isEqualTo: genderFilter);
+      }
+
+      // 🎯 OPTİMİZASYON: Son 10 excluded ID'yi SERVER-SIDE filtrele (whereNotIn)
+      final recentExcluded = excluded.take(10).toList();
+      if (recentExcluded.isNotEmpty) {
+        localQuery = localQuery.where(FieldPath.documentId, whereNotIn: recentExcluded);
+      }
+
+      // Pagination
+      if (lastDocument != null) {
+        localQuery = localQuery.startAfterDocument(lastDocument);
+      }
+
+      final localSnapshot = await localQuery.get();
+      // Geri kalan excluded ID'leri client-side filtrele
+      final localProfiles = localSnapshot.docs
+          .map((doc) => UserProfile.fromFirestore(doc))
+          .where((profile) => 
+            profile.isComplete && 
+            profile.id != userId &&
+            !excluded.contains(profile.id))
+          .toList();
+
+      allProfiles.addAll(localProfiles);
+      finalLastDoc =
+          localSnapshot.docs.isNotEmpty ? localSnapshot.docs.last : null;
+
+      debugPrint('✅ Yerel sorgu: ${localProfiles.length} profil bulundu (Server: ${recentExcluded.length}, Client: ${excluded.length - recentExcluded.length} elendi)');
+      debugPrint('📊 Hedef: $fetchBatchSize, Mevcut: ${allProfiles.length}');
+    }
+
+    // ============ ADIM 2: YEREL YETMEDI Mİ? GENEL HAVUZA GEÇ ============
+    if (allProfiles.length < fetchBatchSize) {
+      final remaining = fetchBatchSize - allProfiles.length;
+      debugPrint(
+          '🌍 Yerel havuz yetmedi! Genel havuzdan $remaining profil çekiliyor...');
+
+      Query<Map<String, dynamic>> generalQuery = _usersCollection
+          .orderBy('createdAt', descending: true)
+          .limit(remaining);
+
+      // universityCity farklı olanları getir
+      if (currentUserCity != null && currentUserCity.isNotEmpty) {
+        generalQuery =
+            generalQuery.where('universityCity', isNotEqualTo: currentUserCity);
+      }
+
+      // Gender filtresi
+      if (genderFilter != null &&
+          genderFilter.isNotEmpty &&
+          genderFilter != 'Herkes') {
+        generalQuery = generalQuery.where('gender', isEqualTo: genderFilter);
+      }
+
+      // ⚠️ NOT: Genel sorguda isNotEqualTo kullanıldığı için whereNotIn eklenemez (Firestore kısıtlaması)
+      // Bu yüzden burada sadece client-side filtreleme yapıyoruz
+
+      try {
+        final generalSnapshot = await generalQuery.get();
+        // Tüm excluded ID'leri client-side filtrele
+        final generalProfiles = generalSnapshot.docs
+            .map((doc) => UserProfile.fromFirestore(doc))
+            .where((profile) => 
+              profile.isComplete && 
+              profile.id != userId &&
+              !excluded.contains(profile.id))
+            .toList();
+
+        allProfiles.addAll(generalProfiles);
+
+        if (generalSnapshot.docs.isNotEmpty) {
+          finalLastDoc = generalSnapshot.docs.last;
+        }
+
+        debugPrint('✅ Genel sorgu: ${generalProfiles.length} profil bulundu (Client-side: ${excluded.length} kişi elendi)');
+      } catch (e) {
+        debugPrint('⚠️ Genel sorgu hatası: $e');
+      }
+    }
+
+    debugPrint('🎯 Toplam döndürülen: ${allProfiles.length} profil');
+    debugPrint('─────────────────────────────────────');
+
+    return (profiles: allProfiles, lastDoc: finalLastDoc);
   }
 
   /// Record a swipe action
@@ -181,7 +433,8 @@ class SwipeRepository {
 
     // İnternet bağlantısı kontrolü
     if (!await _checkInternetConnection()) {
-      debugPrint('SwipeRepository: İnternet bağlantısı yok - swipe kaydedilemedi');
+      debugPrint(
+          'SwipeRepository: İnternet bağlantısı yok - swipe kaydedilemedi');
       throw const SocketException('İnternet bağlantısı yok');
     }
 
@@ -215,20 +468,19 @@ class SwipeRepository {
     if (userId == null) return false;
 
     try {
-      // Check if target user ALREADY liked current user BEFORE
+      // Check if target user has already liked current user
       final reverseActionId = SwipeAction.generateId(targetUserId, userId);
-      final reverseAction = await _actionsCollection.doc(reverseActionId).get();
+      final reverseAction =
+          await _actionsCollection.doc(reverseActionId).get();
 
-      // MUTUAL LIKE: Target user must have liked us FIRST
       if (reverseAction.exists) {
-        final data = reverseAction.data();
-        final type = data?['type'] as String?;
+        final actionType = reverseAction.data()?['type'] as String?;
+        if (actionType == SwipeActionType.like.name ||
+            actionType == SwipeActionType.superlike.name) {
+          // MUTUAL MATCH! Create match document
+          await _createMatch(userId, targetUserId);
 
-        // Only create match if it's a mutual like/superlike
-        if (type == SwipeActionType.like.name ||
-            type == SwipeActionType.superlike.name) {
-          await _createMatchAndChat(userId, targetUserId);
-          return true; // IT'S A MATCH!
+          return true;
         }
       }
 
@@ -238,110 +490,67 @@ class SwipeRepository {
     }
   }
 
-  /// Create a match document AND initialize chat room
-  /// Called ONLY when there's a MUTUAL like
-  Future<void> _createMatchAndChat(String userId1, String userId2) async {
-    // Sort IDs to create consistent match ID
-    final sortedIds = [userId1, userId2]..sort();
-    final matchId = '${sortedIds[0]}_${sortedIds[1]}';
-
+  /// Create a match document when BOTH users have liked each other
+  Future<void> _createMatch(String userId, String targetUserId) async {
     try {
-      // Check if match already exists
-      final existingMatch = await _matchesCollection.doc(matchId).get();
-      if (existingMatch.exists) return;
+      // Use consistent match ID (sorted user IDs)
+      final matchId = SwipeAction.generateId(userId, targetUserId);
 
-      // Create match document
       await _matchesCollection.doc(matchId).set({
-        'users': sortedIds,
+        'users': [userId, targetUserId],
         'timestamp': FieldValue.serverTimestamp(),
       });
-
-      // Add to each user's matches subcollection
-      final batch = _firestore.batch();
-
-      batch.set(
-        _usersCollection.doc(userId1).collection('matches').doc(userId2),
-        {'timestamp': FieldValue.serverTimestamp(), 'matchId': matchId},
-      );
-
-      batch.set(
-        _usersCollection.doc(userId2).collection('matches').doc(userId1),
-        {'timestamp': FieldValue.serverTimestamp(), 'matchId': matchId},
-      );
-
-      await batch.commit();
-
-      // Create chat room for the match
-      final chatService = ChatService();
-      await chatService.createMatchChat(userId1, userId2);
     } catch (e) {
-      // Silent fail - match creation is not critical
+      // Log error but don't throw - match creation failure shouldn't break flow
+      debugPrint('Error creating match: $e');
     }
   }
 
-  /// Get current user's profile
-  Future<UserProfile?> getCurrentUserProfile() async {
+  /// Undo last swipe by deleting action document
+  Future<void> undoLastSwipe(String targetUserId) async {
+    final userId = currentUserId;
+    if (userId == null) return;
+
+    try {
+      final actionId = SwipeAction.generateId(userId, targetUserId);
+      await _actionsCollection.doc(actionId).delete();
+    } catch (e) {
+      // Silently fail - undo is optional
+    }
+  }
+
+  /// Get user's looking for preference (for gender filtering)
+  Future<String?> getUserLookingForPreference() async {
     final userId = currentUserId;
     if (userId == null) return null;
 
     try {
-      final doc = await _usersCollection.doc(userId).get();
-      if (!doc.exists) return null;
-
-      return UserProfile.fromFirestore(doc);
+      final userDoc = await _usersCollection.doc(userId).get();
+      if (userDoc.exists) {
+        return userDoc.data()?['lookingFor'] as String?;
+      }
+      return null;
     } catch (e) {
+      debugPrint('Error getting user lookingFor: $e');
       return null;
     }
   }
 
-  /// Get user's looking for preference
-  Future<String?> getUserLookingForPreference() async {
-    final profile = await getCurrentUserProfile();
-    return profile?.lookingFor;
-  }
-
-  /// Stream user's matches
+  /// Watch matches for current user (for realtime updates)
   Stream<List<Match>> watchMatches() {
     final userId = currentUserId;
-    if (userId == null) return Stream.value([]);
+    if (userId == null) {
+      return Stream.value([]);
+    }
 
     return _matchesCollection
         .where('users', arrayContains: userId)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => Match.fromFirestore(doc)).toList());
-  }
-
-  /// Get a specific user profile by ID
-  Future<UserProfile?> getUserProfile(String userId) async {
-    try {
-      final doc = await _usersCollection.doc(userId).get();
-      if (!doc.exists) return null;
-
-      return UserProfile.fromFirestore(doc);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Undo last swipe action
-  Future<bool> undoLastSwipe(String targetUserId) async {
-    final userId = currentUserId;
-    if (userId == null) return false;
-
-    // İnternet bağlantısı kontrolü
-    if (!await _checkInternetConnection()) {
-      debugPrint('SwipeRepository: İnternet bağlantısı yok - geri al işlemi yapılamadı');
-      throw const SocketException('İnternet bağlantısı yok');
-    }
-
-    try {
-      final actionId = SwipeAction.generateId(userId, targetUserId);
-      await _actionsCollection.doc(actionId).delete();
-      return true;
-    } catch (e) {
-      return false;
-    }
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => Match.fromFirestore(doc))
+          .toList();
+    });
   }
 }

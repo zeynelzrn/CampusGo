@@ -352,6 +352,9 @@ class PurchaseService {
         // Firestore'da isPremium flag'ini guncelle
         await _updatePremiumStatus(true);
         
+        // AUTO-RENEWAL RESET: Abonelik yenilendiğinde Rewind Rights'ı sıfırla
+        await _checkAndResetRewindRights(customerInfo, entitlement);
+        
         return {
           'isPremium': true,
           'expirationDate': entitlement.expirationDate,
@@ -409,6 +412,176 @@ class PurchaseService {
       debugPrint('PurchaseService: Firestore updated - isPremium: $isPremium');
     } catch (e) {
       debugPrint('PurchaseService: Error updating Firestore: $e');
+    }
+  }
+
+  /// Abonelik yenilendiğinde Rewind Rights'ı otomatik sıfırla
+  /// 
+  /// Bu metod her uygulama açılışında çağrılır ve şu mantıkla çalışır:
+  /// 1. RevenueCat'ten son satın alma tarihini al
+  /// 2. Firestore'dan son reset tarihini al
+  /// 3. Eğer yeni bir ödeme yapılmışsa (veya ilk kez alınmışsa), hakları 5'e sıfırla
+  /// 4. Bu sayede abonelik yenilendiğinde otomatik olarak haklar yenilenir
+  Future<void> _checkAndResetRewindRights(
+    CustomerInfo customerInfo,
+    EntitlementInfo entitlement,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        debugPrint('PurchaseService: No user logged in, cannot reset rewind rights');
+        return;
+      }
+
+      // ADIM 1: RevenueCat'ten son satın alma tarihini al
+      // latestPurchaseDate: En son yapılan ödemenin tarihi (yenileme dahil)
+      // Not: RevenueCat bu tarihi ISO 8601 String formatında döner
+      final latestPurchaseDateStr = entitlement.latestPurchaseDate;
+      final originalPurchaseDateStr = entitlement.originalPurchaseDate;
+      
+      // En son satın alma tarihini parse et (varsa latestPurchaseDate, yoksa originalPurchaseDate)
+      DateTime? purchaseDateTime;
+      
+      // latestPurchaseDate kullan (en son ödeme tarihi - yenilemeler dahil)
+      try {
+        purchaseDateTime = DateTime.parse(latestPurchaseDateStr);
+        debugPrint('PurchaseService: Using latestPurchaseDate: $purchaseDateTime');
+      } catch (e) {
+        debugPrint('PurchaseService: Error parsing latestPurchaseDate: $e');
+        
+        // Fallback: originalPurchaseDate kullan (ilk satın alma)
+        try {
+          purchaseDateTime = DateTime.parse(originalPurchaseDateStr);
+          debugPrint('PurchaseService: Using originalPurchaseDate: $purchaseDateTime');
+        } catch (e2) {
+          debugPrint('PurchaseService: Error parsing originalPurchaseDate: $e2');
+        }
+      }
+      
+      if (purchaseDateTime == null) {
+        debugPrint('PurchaseService: No valid purchase date found, skipping reset');
+        return;
+      }
+
+      // ADIM 2: Firestore'dan son reset tarihini al
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      
+      if (!userDoc.exists) {
+        debugPrint('PurchaseService: User document does not exist, skipping reset');
+        return;
+      }
+
+      final userData = userDoc.data();
+      final lastRewindResetDate = (userData?['lastRewindResetDate'] as Timestamp?)?.toDate();
+      
+      debugPrint('PurchaseService: 🔍 Checking renewal cycle...');
+      debugPrint('  - Purchase Date: $purchaseDateTime');
+      debugPrint('  - Last Reset Date: $lastRewindResetDate');
+
+      // ADIM 3: Karşılaştırma Mantığı (Cycle Check)
+      bool shouldReset = false;
+      
+      if (lastRewindResetDate == null) {
+        // İlk kez Premium alınmış, henüz reset yapılmamış
+        debugPrint('PurchaseService: ✨ First time premium - resetting rights');
+        shouldReset = true;
+      } else if (purchaseDateTime.isAfter(lastRewindResetDate)) {
+        // Yeni bir ödeme yapılmış (abonelik yenilenmiş)
+        debugPrint('PurchaseService: 🔄 Subscription renewed - resetting rights');
+        shouldReset = true;
+      } else {
+        debugPrint('PurchaseService: ✅ No renewal detected, keeping current rights');
+      }
+
+      // ADIM 4: Gerekiyorsa Firestore'u Güncelle
+      if (shouldReset) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'monthlyRewindRights': 5, // Her yeni döngüde 5 hak ver
+          'lastRewindResetDate': FieldValue.serverTimestamp(), // Reset zamanını güncelle
+        });
+
+        debugPrint('PurchaseService: ✅ Rewind rights reset to 5/5');
+      }
+    } catch (e) {
+      debugPrint('PurchaseService: ⚠️ Error resetting rewind rights: $e');
+      // Hata olsa bile uygulama çalışmaya devam etsin (silent fail)
+    }
+  }
+
+  /// Firebase tabanlı aylık hak sıfırlama kontrolü (RevenueCat'ten bağımsız)
+  /// 
+  /// Bu metod her uygulama açılışında çağrılmalıdır.
+  /// RevenueCat çalışmasa bile (test ortamı, placeholder key vb.) Firebase'den
+  /// isPremium kontrolü yaparak 30 günlük döngüde hakları sıfırlar.
+  /// 
+  /// Çağrılacak yer: main.dart veya AuthWrapper (login sonrası)
+  Future<void> checkAndResetMonthlyRights() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        debugPrint('PurchaseService: No user logged in, skipping monthly reset check');
+        return;
+      }
+
+      // Firebase'den kullanıcı verisini al
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      
+      if (!userDoc.exists) {
+        debugPrint('PurchaseService: User document does not exist, skipping monthly reset check');
+        return;
+      }
+
+      final userData = userDoc.data();
+      if (userData == null) return;
+
+      final isPremium = userData['isPremium'] as bool? ?? false;
+      
+      // Sadece Premium kullanıcılar için kontrol yap
+      if (!isPremium) {
+        debugPrint('PurchaseService: User is not premium, skipping monthly reset check');
+        return;
+      }
+
+      final lastResetDate = (userData['lastRewindResetDate'] as Timestamp?)?.toDate();
+      final now = DateTime.now();
+      
+      debugPrint('PurchaseService: 🔍 Checking monthly cycle (Firebase-based)...');
+      debugPrint('  - Current Premium Status: $isPremium');
+      debugPrint('  - Last Reset Date: $lastResetDate');
+      debugPrint('  - Current Date: $now');
+
+      bool shouldReset = false;
+      
+      if (lastResetDate == null) {
+        // İlk kez Premium alınmış veya henüz reset yapılmamış
+        debugPrint('PurchaseService: ✨ First time premium detected (no reset date) - resetting rights');
+        shouldReset = true;
+      } else {
+        // 30 gün geçmiş mi kontrol et
+        final daysSinceReset = now.difference(lastResetDate).inDays;
+        debugPrint('  - Days since last reset: $daysSinceReset');
+        
+        if (daysSinceReset >= 30) {
+          // 30 gün geçmiş, yeni döngü başlatılmalı
+          debugPrint('PurchaseService: 🔄 Monthly cycle completed (30+ days) - resetting rights');
+          shouldReset = true;
+        } else {
+          debugPrint('PurchaseService: ✅ Within monthly cycle ($daysSinceReset/30 days), keeping current rights');
+        }
+      }
+
+      // Gerekiyorsa hakları sıfırla
+      if (shouldReset) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'monthlyRewindRights': 5, // 5 hak ver
+          'lastRewindResetDate': FieldValue.serverTimestamp(), // Reset zamanını güncelle
+        });
+
+        debugPrint('PurchaseService: ✅ Monthly rewind rights reset to 5/5');
+      }
+    } catch (e) {
+      debugPrint('PurchaseService: ⚠️ Error in monthly reset check: $e');
+      // Silent fail - uygulama çalışmaya devam etsin
     }
   }
 

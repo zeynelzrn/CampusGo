@@ -19,6 +19,8 @@ import '../utils/image_helper.dart';
 import 'chat_detail_screen.dart';
 import 'user_profile_screen.dart';
 import 'main_screen.dart';
+import 'premium/premium_offer_screen.dart';
+import 'dart:ui' as ui;
 
 class LikesScreen extends ConsumerStatefulWidget {
   const LikesScreen({super.key});
@@ -280,6 +282,225 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
     }
   }
 
+  /// Geri Al (Undo Reject) - Premium özelliği
+  Future<void> _undoReject(UserProfile user) async {
+    if (!_checkConnectivity()) return;
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      // Kullanıcı verisini al
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (!userDoc.exists) return;
+
+      final userData = userDoc.data()!;
+      final isPremium = userData['isPremium'] as bool? ?? false;
+
+      // ADIM A: Premium Kontrolü
+      if (!isPremium) {
+        HapticFeedback.heavyImpact();
+        _showPremiumRequiredDialog();
+        return;
+      }
+
+      // ADIM B: Tarih ve Reset Kontrolü
+      int monthlyRewindRights = userData['monthlyRewindRights'] as int? ?? 5;
+      DateTime? lastRewindResetDate = (userData['lastRewindResetDate'] as Timestamp?)?.toDate();
+
+      final now = DateTime.now();
+      bool needsReset = false;
+
+      if (lastRewindResetDate == null) {
+        needsReset = true;
+      } else {
+        final daysSinceReset = now.difference(lastRewindResetDate).inDays;
+        if (daysSinceReset >= 30) {
+          needsReset = true;
+        }
+      }
+
+      // Reset gerekiyorsa hakları 5'e eşitle
+      if (needsReset) {
+        monthlyRewindRights = 5;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .update({
+          'monthlyRewindRights': 5,
+          'lastRewindResetDate': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // ADIM C: Hak Kullanımı
+      if (monthlyRewindRights > 0) {
+        // Geri alma işlemi
+        HapticFeedback.mediumImpact();
+
+        // UI state'den eliminated durumunu kaldır
+        ref.read(likesUIProvider.notifier).restoreUser(user.id);
+
+        // Hakkı azalt
+        final newRights = monthlyRewindRights - 1;
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .update({
+          'monthlyRewindRights': newRights,
+        });
+
+        // Firebase action'ı güncelle (dislike/rejected durumunu kaldır)
+        final actionId = '${currentUser.uid}_${user.id}';
+        try {
+          // Action'ı tamamen sil (böylece kullanıcı tekrar "pending" olur)
+          await FirebaseFirestore.instance
+              .collection('actions')
+              .doc(actionId)
+              .delete();
+          
+          debugPrint('✅ Action deleted: $actionId (user restored to pending)');
+        } catch (e) {
+          debugPrint('⚠️ Error deleting action: $e');
+          // Hata olsa bile UI güncellemesi devam etsin
+        }
+
+        // Kullanıcıya bildir
+        AppNotification.success(
+          title: 'Geri Alındı! ✨',
+          subtitle: 'Kalan hakkın: $newRights/5',
+        );
+      } else {
+        // Hak dolmuş
+        HapticFeedback.heavyImpact();
+        AppNotification.error(
+          title: 'Hakkın Doldu',
+          subtitle: 'Bu ayki geri alma hakkın doldu (5/5). Gelecek ay yenilenecek!',
+        );
+      }
+    } catch (e) {
+      debugPrint('Undo reject error: $e');
+      AppNotification.error(
+        title: 'Hata',
+        subtitle: 'Geri alma işlemi başarısız oldu.',
+      );
+    }
+  }
+
+  /// Premium gerekli uyarısı göster
+  void _showPremiumRequiredDialog() {
+    showModernDialog(
+      context: context,
+      builder: (dialogContext) => ModernAnimatedDialog(
+        type: DialogType.warning,
+        icon: Icons.workspace_premium_rounded,
+        title: 'Premium Özellik',
+        subtitle: 'Geri alma özelliği sadece Premium üyelere özeldir!',
+        confirmText: 'Premium\'a Geç',
+        confirmButtonColor: const Color(0xFFFFB300),
+        onConfirm: () async {
+          Navigator.pop(dialogContext);
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PremiumOfferScreen(),
+            ),
+          );
+        },
+        cancelText: 'İptal',
+        onCancel: () => Navigator.pop(dialogContext),
+      ),
+    );
+  }
+
+  /// Geri Al butonu (Premium badge ile)
+  Widget _buildUndoButton(UserProfile user) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final isPremium = snapshot.hasData
+            ? ((snapshot.data!.data() as Map<String, dynamic>?)?['isPremium'] as bool? ?? false)
+            : false;
+        final rewindRights = snapshot.hasData
+            ? ((snapshot.data!.data() as Map<String, dynamic>?)?['monthlyRewindRights'] as int? ?? 5)
+            : 5;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Gold "Geri Al" butonu
+            GestureDetector(
+              onTap: () => _undoReject(user),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFB300), Color(0xFFFFA000)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFB300).withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.replay_rounded,
+                  color: Colors.white,
+                  size: 36,
+                ),
+              ),
+            ),
+            // Premium badge (sadece Premium kullanıcılara göster)
+            if (isPremium)
+              Positioned(
+                top: -8,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFB300), Color(0xFFFFA000)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.5),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    '$rewindRights',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showProfileDetail(UserProfile user) {
     // UserProfileScreen ile profil detayına git
     // Engelleme özelliği ve like/dislike butonları UserProfileScreen'de mevcut
@@ -306,11 +527,296 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
     );
   }
 
+  /// Premium Paywall - Blur efekti + "Premium'a Geç" çağrısı
+  Widget _buildPremiumPaywall(List<UserProfile> likedByUsers) {
+    final likesCount = likedByUsers.length;
+    
+    return RepaintBoundary(
+      child: ClipRect(
+        child: Container(
+          color: const Color(0xFFF8F9FA), // Solid background to prevent bleed
+          child: Stack(
+            children: [
+              // Arka plan - Gerçek kullanıcıların blurlu fotoğrafları
+              _buildBlurredBackground(likedByUsers),
+
+              // Ön plan - Paywall içeriği
+              Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Kilit ikonu (animasyonlu)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 800),
+                  curve: Curves.elasticOut,
+                  builder: (context, value, child) {
+                    return Transform.scale(
+                      scale: value,
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD700).withOpacity(0.5),
+                              blurRadius: 30,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          color: Colors.white,
+                          size: 56,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 32),
+
+                // Başlık - Güçlü beyaz shadow ile okunabilir
+                Text(
+                  'İstek Atanları Gör',
+                  style: GoogleFonts.poppins(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF212121),
+                    shadows: [
+                      Shadow(color: Colors.white, blurRadius: 25),
+                      Shadow(color: Colors.white, blurRadius: 35),
+                      Shadow(color: Colors.white, blurRadius: 45),
+                      Shadow(color: Colors.white, blurRadius: 55),
+                      Shadow(color: Colors.white, blurRadius: 65),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+
+                const SizedBox(height: 16),
+
+                // Alt metin - Dinamik içerik (Tekil/Çoğul düzeltmeli)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: likesCount == 0
+                      ? Text(
+                          'Sana birileri istek atarsa, o kişileri hemen görmek için Premium üyesi ol!',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: const Color(0xFF212121),
+                            height: 1.5,
+                            fontWeight: FontWeight.w600,
+                            shadows: [
+                              Shadow(color: Colors.white, blurRadius: 25),
+                              Shadow(color: Colors.white, blurRadius: 35),
+                              Shadow(color: Colors.white, blurRadius: 45),
+                              Shadow(color: Colors.white, blurRadius: 55),
+                            ],
+                          ),
+                          textAlign: TextAlign.center,
+                        )
+                      : RichText(
+                          textAlign: TextAlign.center,
+                          text: TextSpan(
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              color: const Color(0xFF212121),
+                              height: 1.5,
+                              fontWeight: FontWeight.w600,
+                              shadows: [
+                                Shadow(color: Colors.white, blurRadius: 25),
+                                Shadow(color: Colors.white, blurRadius: 35),
+                                Shadow(color: Colors.white, blurRadius: 45),
+                                Shadow(color: Colors.white, blurRadius: 55),
+                              ],
+                            ),
+                            children: [
+                              const TextSpan(text: 'Sana istek atan '),
+                              TextSpan(
+                                text: '$likesCount kişiyi',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF5C6BC0),
+                                  shadows: [
+                                    Shadow(color: Colors.white, blurRadius: 25),
+                                    Shadow(color: Colors.white, blurRadius: 35),
+                                    Shadow(color: Colors.white, blurRadius: 45),
+                                    Shadow(color: Colors.white, blurRadius: 55),
+                                  ],
+                                ),
+                              ),
+                              TextSpan(
+                                text: ' görmek ve ${likesCount == 1 ? "onunla" : "onlarla"} iletişime geçmek için Premium\'a geç!',
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // Premium'a Geç butonu
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      HapticFeedback.mediumImpact();
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PremiumOfferScreen(),
+                        ),
+                      );
+
+                      // Premium aktif olduysa sayfa otomatik yenilenecek (StreamBuilder sayesinde)
+                      if (result == true && mounted) {
+                        AppNotification.success(
+                          title: 'Premium Aktif! 🎉',
+                          subtitle: 'Artık seni beğenenleri görebilirsin',
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF5C6BC0),
+                      foregroundColor: Colors.white,
+                      elevation: 8,
+                      shadowColor: const Color(0xFF5C6BC0).withOpacity(0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.workspace_premium_rounded, size: 24),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Premium\'a Geç',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Premium özellikler mini listesi
+                _buildFeatureBadge('💖 Sınırsız Beğeni'),
+                const SizedBox(height: 8),
+                _buildFeatureBadge('⚡ Öncelikli Gösterim'),
+                const SizedBox(height: 8),
+                _buildFeatureBadge('👑 Premium Rozet'),
+              ],
+            ),
+          ),
+        ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Blur efektli arka plan - Gerçek kullanıcı fotoğrafları (blurlu)
+  Widget _buildBlurredBackground(List<UserProfile> likedByUsers) {
+    return Stack(
+      children: [
+        // Grid layout - Gerçek kullanıcı profil kartları
+        GridView.builder(
+          padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.7,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: likedByUsers.length.clamp(0, 6), // Maksimum 6 kart göster
+          itemBuilder: (context, index) {
+            final user = likedByUsers[index];
+            final hasPhoto = user.photos.isNotEmpty;
+            
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(20),
+                image: hasPhoto
+                    ? DecorationImage(
+                        image: NetworkImage(user.photos.first),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: !hasPhoto
+                  ? const Center(
+                      child: Icon(
+                        Icons.person_rounded,
+                        size: 80,
+                        color: Colors.white54,
+                      ),
+                    )
+                  : null,
+            );
+          },
+        ),
+
+        // Güçlü blur efekti - ClipRect ile izole edildi
+        Positioned.fill(
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                color: Colors.white.withOpacity(0.5),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Premium özellik badge'i
+  Widget _buildFeatureBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF5C6BC0).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF5C6BC0).withOpacity(0.3),
+        ),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF5C6BC0),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Watch the stream of received likes
     final likesAsync = ref.watch(receivedLikesProvider);
     final uiState = ref.watch(likesUIProvider);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    
     // Global ConnectivityBanner handles offline state
 
     return Scaffold(
@@ -320,16 +826,46 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
           children: [
             _buildHeader(likesAsync),
             Expanded(
-              child: likesAsync.when(
-                loading: () => _buildLoadingState(),
-                error: (error, stack) => _buildErrorState(error.toString()),
-                data: (likedByUsers) {
-                  if (likedByUsers.isEmpty) {
-                    return _buildEmptyState();
-                  }
-                  return _buildLikesList(likedByUsers, uiState);
-                },
-              ),
+              child: currentUser == null
+                  ? _buildErrorState('Kullanıcı bulunamadı')
+                  : StreamBuilder<DocumentSnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(currentUser.uid)
+                          .snapshots(),
+                      builder: (context, userSnapshot) {
+                        // Premium durumunu kontrol et
+                        final isPremium = userSnapshot.hasData
+                            ? ((userSnapshot.data!.data() as Map<String, dynamic>?)?['isPremium'] as bool? ?? false)
+                            : false;
+                        
+                        // DEBUG LOG
+                        debugPrint('🔍 LikesScreen - isPremium: $isPremium');
+                        debugPrint('🔍 LikesScreen - userSnapshot.hasData: ${userSnapshot.hasData}');
+                        if (userSnapshot.hasData) {
+                          debugPrint('🔍 LikesScreen - userData: ${userSnapshot.data!.data()}');
+                        }
+
+                        return likesAsync.when(
+                          loading: () => _buildLoadingState(),
+                          error: (error, stack) => _buildErrorState(error.toString()),
+                          data: (likedByUsers) {
+                            // Premium değilse paywall göster (beğeni sayısından bağımsız)
+                            if (!isPremium) {
+                              // Gerçek kullanıcı listesini gönder (blurlu fotoğrafları göstermek için)
+                              return _buildPremiumPaywall(likedByUsers);
+                            }
+                            
+                            // Premium ise: Beğeni varsa listele, yoksa empty state göster
+                            if (likedByUsers.isEmpty) {
+                              return _buildEmptyState();
+                            }
+                            
+                            return _buildLikesList(likedByUsers, uiState);
+                          },
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -462,13 +998,15 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                     ),
                   ],
                 ),
-                Text(
-                  '$count kisi seninle tanismak istiyor',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14,
-                    color: Colors.grey[600],
+                // Sadece 1+ istek varsa göster
+                if (count > 0)
+                  Text(
+                    '$count kisi seninle tanismak istiyor',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1010,41 +1548,31 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                         ),
                       ),
 
-                      // Eliminated overlay
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: AnimatedOpacity(
-                            duration: _animationDuration,
-                            curve: _animationCurve,
-                            opacity: isEliminated ? 1.0 : 0.0,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(20),
-                                color: Colors.black.withValues(alpha: 0.3),
-                              ),
-                              child: Center(
-                                child: AnimatedScale(
-                                  duration: _animationDuration,
-                                  curve: _animationCurve,
-                                  scale: isEliminated ? 1.0 : 0.5,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.5),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close_rounded,
-                                      color: Colors.white,
-                                      size: 40,
-                                    ),
-                                  ),
-                                ),
+                      // Eliminated overlay - Gold "Geri Al" butonu
+                      // Conditional Rendering: Sadece rejected ise render et
+                      if (isEliminated)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              color: Colors.black.withValues(alpha: 0.3),
+                            ),
+                            child: Center(
+                              child: TweenAnimationBuilder<double>(
+                                duration: _animationDuration,
+                                curve: _animationCurve,
+                                tween: Tween(begin: 0.0, end: 1.0),
+                                builder: (context, value, child) {
+                                  return Transform.scale(
+                                    scale: value,
+                                    child: child,
+                                  );
+                                },
+                                child: _buildUndoButton(user),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

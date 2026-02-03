@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../repositories/profile_repository.dart';
+import '../services/purchase_service.dart';
 import 'welcome_screen.dart';
 import 'main_screen.dart';
 import 'create_profile_screen.dart';
@@ -104,7 +105,14 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
 
       if (hasProfile) {
-        // Profil var, ana sayfaya git
+        // Profil var - Premium hakları kontrolü yap (arka planda, bloklama yok)
+        setState(() => _statusText = 'Premium kontrol ediliyor...');
+        PurchaseService().checkAndResetMonthlyRights().catchError((e) {
+          debugPrint('Monthly rights check error: $e');
+          // Hata olsa bile devam et (silent fail)
+        });
+        
+        // Ana sayfaya git
         _navigateTo(const MainScreen());
       } else {
         // Profil yok, profil oluşturma ekranına git

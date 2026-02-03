@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import '../data/university_data.dart';
 
 /// Test profilleri oluşturmak için servis
 class SeedService {
@@ -220,7 +221,21 @@ class SeedService {
 
     for (final profile in testProfiles) {
       final docRef = usersCollection.doc();
-      batch.set(docRef, profile);
+      
+      // Üniversiteye göre şehri otomatik belirle
+      final university = profile['university'] as String?;
+      final universityCity = university != null 
+          ? UniversityData.getCityForUniversity(university)
+          : null;
+      
+      // universityCity ve isComplete alanlarını profile ekle
+      final profileWithCity = {
+        ...profile,
+        if (universityCity != null) 'universityCity': universityCity,
+        'isComplete': true, // Demo kullanıcılar her zaman complete!
+      };
+      
+      batch.set(docRef, profileWithCity);
     }
 
     await batch.commit();

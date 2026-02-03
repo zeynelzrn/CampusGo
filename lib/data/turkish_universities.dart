@@ -621,4 +621,39 @@ class TurkishUniversities {
         .take(10)
         .toList();
   }
+
+  /// Tüm bölümleri döndür: Önce popüler bölümler, sonra alfabetik (tekrarsız)
+  /// Filtre modalında kullanılır (arama ile birlikte)
+  static List<String> getAllDepartmentsSorted() {
+    const popularDepartments = [
+      'Bilgisayar Mühendisliği',
+      'Yazılım Mühendisliği',
+      'Endüstri Mühendisliği',
+      'Elektrik-Elektronik Mühendisliği',
+      'Makine Mühendisliği',
+      'İşletme',
+      'İktisat',
+      'Hukuk',
+      'Tıp',
+      'Psikoloji',
+      'Mimarlık',
+      'İletişim',
+      'Gazetecilik',
+      'Hemşirelik',
+      'Pazarlama',
+      'Uluslararası İlişkiler',
+      'Muhasebe ve Finansman',
+      'Yönetim Bilişim Sistemleri',
+      'İnşaat Mühendisliği',
+      'Kimya Mühendisliği',
+    ];
+
+    final rest = departments
+        .where((d) => !popularDepartments.contains(d))
+        .toSet()
+        .toList()
+      ..sort();
+
+    return [...popularDepartments, ...rest];
+  }
 }

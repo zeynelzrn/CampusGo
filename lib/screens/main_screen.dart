@@ -111,7 +111,8 @@ class _DirectionalLockPageViewState extends State<_DirectionalLockPageView> {
           physics: _isVerticalScroll
               ? const NeverScrollableScrollPhysics()
               : const PageScrollPhysics(),
-          allowImplicitScrolling: true,
+          allowImplicitScrolling: false, // Ön-yüklemeyi kapat
+          pageSnapping: true, // Kesin sayfa sınırları
           children: widget.children,
         ),
       ),
