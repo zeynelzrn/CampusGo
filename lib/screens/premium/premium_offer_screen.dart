@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -11,17 +12,16 @@ import '../../widgets/app_notification.dart';
 class PremiumOfferScreen extends StatefulWidget {
   const PremiumOfferScreen({super.key});
 
+  /// Sağdan sola kayarak açılır; soldan sağa kaydırınca geri gider (CupertinoPageRoute).
+  static Route<bool?> route() =>
+      CupertinoPageRoute<bool?>(builder: (_) => const PremiumOfferScreen());
+
   @override
   State<PremiumOfferScreen> createState() => _PremiumOfferScreenState();
 }
 
-class _PremiumOfferScreenState extends State<PremiumOfferScreen>
-    with SingleTickerProviderStateMixin {
+class _PremiumOfferScreenState extends State<PremiumOfferScreen> {
   final PurchaseService _purchaseService = PurchaseService();
-
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
 
   // Seçili plan (0: Aylık, 1: 6 Aylık)
   int _selectedPlanIndex = 1; // Varsayılan olarak 6 aylık seçili
@@ -58,51 +58,14 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen>
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
     _loadOfferings();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _setupAnimations() {
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-      ),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _animationController.forward();
   }
 
   /// RevenueCat'ten offerings yükle
   Future<void> _loadOfferings() async {
     try {
       final offerings = await _purchaseService.getOfferings();
-      if (mounted) {
-        setState(() {
-          _offerings = offerings;
-        });
-      }
+      if (mounted) setState(() => _offerings = offerings);
     } catch (e) {
       debugPrint('Error loading offerings: $e');
     }
@@ -212,34 +175,17 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: CustomScrollView(
-              slivers: [
-                // AppBar
-                _buildAppBar(),
-
-                // Premium header
-                _buildPremiumHeader(),
-
-                // Features list
-                _buildFeaturesList(),
-
-                // Plans selection
-                _buildPlansSelection(),
-
-                // Purchase button & restore
-                _buildBottomActions(),
-
-                // Bottom padding
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 32),
-                ),
-              ],
+        child: CustomScrollView(
+          slivers: [
+            _buildAppBar(),
+            _buildPremiumHeader(),
+            _buildFeaturesList(),
+            _buildPlansSelection(),
+            _buildBottomActions(),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 32),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -362,20 +308,7 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen>
     required String description,
     required int delay,
   }) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600 + delay),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0, 20 * (1 - value)),
-            child: child,
-          ),
-        );
-      },
-      child: Container(
+    return Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -432,8 +365,7 @@ class _PremiumOfferScreenState extends State<PremiumOfferScreen>
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildPlansSelection() {

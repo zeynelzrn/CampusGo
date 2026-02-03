@@ -619,35 +619,32 @@ class _ChatListScreenState extends State<ChatListScreen>
           ),
         ],
       ),
-      child: chat.peerImage != null && chat.peerImage!.isNotEmpty
-          ? CachedNetworkImage(
-              imageUrl: chat.peerImage!,
-              width: 60,
-              height: 60,
-              cacheManager: AppCacheManager.instance,
-              imageBuilder: (context, imageProvider) => Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  image: DecorationImage(
-                    image: imageProvider,
-                    fit: BoxFit.cover, // Oranı bozmadan kırpar
-                  ),
-                ),
-              ),
-              placeholder: (context, url) => _buildDefaultAvatar(),
-              errorWidget: (context, url, error) => _buildDefaultAvatar(),
-            )
-          : _buildDefaultAvatar(),
+      child: ClipOval(
+        child: chat.peerImage != null && chat.peerImage!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: chat.peerImage!,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                cacheManager: AppCacheManager.instance,
+                placeholder: (context, url) => _buildDefaultAvatar(),
+                errorWidget: (context, url, error) => _buildDefaultAvatar(),
+              )
+            : _buildDefaultAvatar(),
+      ),
     );
   }
 
   Widget _buildDefaultAvatar() {
-    // Shimmer efekti ile loading/error durumu göster
+    // Yuvarlak placeholder (pp yüklenirken kare değil daire görünsün)
     return Shimmer.fromColors(
       baseColor: const Color(0xFF5C6BC0),
       highlightColor: const Color(0xFF7986CB),
       child: Container(
+        width: 60,
+        height: 60,
         decoration: const BoxDecoration(
+          shape: BoxShape.circle,
           gradient: LinearGradient(
             colors: [Color(0xFF5C6BC0), Color(0xFF7986CB)],
             begin: Alignment.topLeft,
@@ -904,9 +901,9 @@ class _SwipeableChatCardState extends State<_SwipeableChatCard>
                                 ),
                                 if (widget.hasUnread)
                                   Container(
-                                    margin: const EdgeInsets.only(left: 8),
-                                    width: 10,
-                                    height: 10,
+                                    margin: const EdgeInsets.only(left: 6, right: 2),
+                                    width: 8,
+                                    height: 8,
                                     decoration: const BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: [
@@ -938,6 +935,8 @@ class _SwipeableChatCardState extends State<_SwipeableChatCard>
                           ],
                         ),
                       ),
+
+                      const SizedBox(width: 10),
 
                       // Time and arrow
                       Column(

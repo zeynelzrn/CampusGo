@@ -379,12 +379,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
         confirmButtonColor: const Color(0xFFFFB300),
         onConfirm: () async {
           Navigator.pop(dialogContext);
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PremiumOfferScreen(),
-            ),
-          );
+          await Navigator.push(context, PremiumOfferScreen.route());
         },
         cancelText: 'İptal',
         onCancel: () => Navigator.pop(dialogContext),
@@ -410,12 +405,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
         confirmButtonColor: const Color(0xFFFF4458),
         onConfirm: () async {
           Navigator.pop(dialogContext);
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PremiumOfferScreen(),
-            ),
-          );
+          await Navigator.push(context, PremiumOfferScreen.route());
         },
         cancelText: 'Tamam',
         onCancel: () => Navigator.pop(dialogContext),
@@ -645,11 +635,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
   Widget build(BuildContext context) {
     final swipeState = ref.watch(swipeProvider);
 
-    // Listen for match notification
+    // Listen for match notification – önce sohbeti oluştur, sonra match popup göster
     ref.listen<SwipeState>(swipeProvider, (previous, current) {
       if (current.isMatch && current.lastSwipedProfile != null) {
-        _showMatchScreen(current.lastSwipedProfile!);
+        final profile = current.lastSwipedProfile!;
         ref.read(swipeProvider.notifier).clearMatchNotification();
+        _createChatAndShowMatch(profile);
       }
     });
 
@@ -1606,6 +1597,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
         );
       }
     }
+  }
+
+  /// Eşleşmede önce sohbeti Firestore'da oluşturur, sonra match popup gösterir.
+  /// Böylece "Mesaj Gönder"e basıldığında sohbet hazır olur, yükleniyorda takılmaz.
+  Future<void> _createChatAndShowMatch(UserProfile profile) async {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+    final chatId = await _chatService.createMatchChat(currentUserId, profile.id);
+    if (!mounted) return;
+    if (chatId == null) {
+      AppNotification.error(title: 'Sohbet oluşturulamadı');
+      return;
+    }
+    _showMatchScreen(profile);
   }
 
   void _showMatchScreen(UserProfile profile) {

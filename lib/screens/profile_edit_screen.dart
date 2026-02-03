@@ -15,6 +15,8 @@ import '../widgets/app_notification.dart';
 import '../providers/connectivity_provider.dart';
 import '../utils/image_helper.dart';
 import '../widgets/modern_animated_dialog.dart';
+import '../providers/swipe_provider.dart';
+import 'discovery/filters_modal.dart';
 import 'user_profile_screen.dart';
 
 class ProfileEditScreen extends ConsumerStatefulWidget {
@@ -816,6 +818,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                           _buildGradeSelector(),
                         ]),
                         const SizedBox(height: 24),
+                        _buildDiscoverFiltersCard(),
+                        const SizedBox(height: 24),
                         _buildSection('Topluluklar / Kulüpler', [
                           _buildClubsSelector(),
                         ]),
@@ -1375,6 +1379,177 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  /// Keşfet sayfasındaki filtrelerle senkron kart. Sınıf seviyesi kartının altında.
+  Widget _buildDiscoverFiltersCard() {
+    final swipeState = ref.watch(swipeProvider);
+    final gender = swipeState.genderFilter ?? 'Herkes';
+    final hasAnyFilter = swipeState.filterCity != null ||
+        swipeState.filterUniversity != null ||
+        swipeState.filterDepartment != null ||
+        swipeState.filterGrade != null ||
+        (swipeState.genderFilter != null && swipeState.genderFilter != 'Herkes');
+
+    const amber = Color(0xFFFFB300);
+    const amberDark = Color(0xFFE65100);
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 0,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const FiltersModal(),
+          );
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFFFFF8E1),
+                const Color(0xFFFFECB3).withValues(alpha: 0.6),
+              ],
+            ),
+            border: Border.all(color: amber.withValues(alpha: 0.6), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: amber.withValues(alpha: 0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: amber.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.tune_rounded, color: amberDark, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Keşfet\'te Kimleri Göreceğini Sen Belirle',
+                      style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF37474F),
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFFFFB300), size: 16),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'İl, üniversite ve bölüme göre filtrele • Dokun ve ayarla',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  color: const Color(0xFF5D4037),
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (hasAnyFilter) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (gender.isNotEmpty && gender != 'Herkes')
+                      _buildFilterChip('Kiminle', gender),
+                    if (swipeState.filterCity != null)
+                      _buildFilterChip('İl', swipeState.filterCity!),
+                    if (swipeState.filterUniversity != null)
+                      _buildFilterChip('Üniversite', swipeState.filterUniversity!),
+                    if (swipeState.filterDepartment != null)
+                      _buildFilterChip('Bölüm', swipeState.filterDepartment!),
+                    if (swipeState.filterGrade != null)
+                      _buildFilterChip('Sınıf', swipeState.filterGrade!),
+                  ],
+                ),
+              ] else
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Icon(Icons.touch_app_rounded, size: 18, color: amberDark.withValues(alpha: 0.8)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Dokun, keşfetmeyi kişiselleştir',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: amberDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFB300).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFFFB300).withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF5C6BC0),
+            ),
+          ),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 140),
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.grey[800],
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

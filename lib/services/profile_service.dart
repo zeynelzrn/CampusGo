@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../data/university_data.dart';
 
 class ProfileService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -182,11 +183,15 @@ class ProfileService {
         return false;
       }
 
+      // Üniversite değişince Discovery (Waterfall) için şehir alanını güncelle
+      final universityCity = UniversityData.getCityForUniversity(university);
+
       await _firestore.collection('users').doc(currentUserId).set({
         'name': name,
         'age': age,
         'bio': bio,
         'university': university,
+        'universityCity': universityCity, // Seçilen üniversiteye göre otomatik (İTÜ→İstanbul, Ege→İzmir)
         'department': department,
         'interests': interests,
         'photos': cleanedPhotos, // Temizlenmiş array
@@ -207,7 +212,7 @@ class ProfileService {
         });
       }
 
-      debugPrint('ProfileService: Profil kaydedildi (${cleanedPhotos.length} foto)');
+      debugPrint('ProfileService: Profil kaydedildi (${cleanedPhotos.length} foto, universityCity: $universityCity)');
       return true;
     } catch (e) {
       debugPrint('ProfileService: Profil kaydetme hatasi: $e');

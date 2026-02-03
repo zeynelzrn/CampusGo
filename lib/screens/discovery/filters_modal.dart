@@ -89,12 +89,7 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
   void _handleFilterTap(BuildContext context) {
     if (!_isPremium) {
       Navigator.pop(context); // Modalı kapat
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const PremiumOfferScreen(),
-        ),
-      );
+      Navigator.push(context, PremiumOfferScreen.route());
     }
   }
 
@@ -250,12 +245,12 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
 
                   const SizedBox(height: 16),
 
-                  // İl Filter
+                  // İl Filter (liste sheet açılınca yüklenir - performans)
                   _buildFilterTile(
                     icon: Icons.location_city_rounded,
                     label: 'İl',
                     value: _selectedCity,
-                    options: _cityOptions,
+                    optionsGetter: _getCityOptions,
                     isPremiumOnly: true,
                     onSelect: (value) {
                       if (_isPremium) {
@@ -276,12 +271,12 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
 
                   const SizedBox(height: 16),
 
-                  // Üniversite Filter (seçilen ile senkronize)
+                  // Üniversite Filter (liste sheet açılınca yüklenir - performans)
                   _buildFilterTile(
                     icon: Icons.school_rounded,
                     label: 'Üniversite',
                     value: _selectedUniversity,
-                    options: _getUniversityOptions(),
+                    optionsGetter: _getUniversityOptions,
                     isPremiumOnly: true,
                     onSelect: (value) {
                       if (_isPremium) {
@@ -294,12 +289,12 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
 
                   const SizedBox(height: 16),
 
-                  // Bölüm Filter
+                  // Bölüm Filter (liste sheet açılınca yüklenir - performans)
                   _buildFilterTile(
                     icon: Icons.book_rounded,
                     label: 'Bölüm',
                     value: _selectedDepartment,
-                    options: _departmentOptions,
+                    optionsGetter: _getDepartmentOptions,
                     isPremiumOnly: true,
                     onSelect: (value) {
                       if (_isPremium) {
@@ -510,7 +505,8 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
     required IconData icon,
     required String label,
     required String? value,
-    required List<String> options,
+    List<String> options = const [],
+    List<String> Function()? optionsGetter,
     required ValueChanged<String?> onSelect,
     bool isPremiumOnly = true, // Varsayılan: Premium gerekli
     bool showClearOption = true, // Gender için false
@@ -526,9 +522,10 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
           _showOptionsBottomSheet(
             label: label,
             options: options,
+            optionsGetter: optionsGetter,
             currentValue: value,
             onSelect: onSelect,
-            showClearOption: showClearOption, // ← YENİ parametre! ✅
+            showClearOption: showClearOption,
           );
         }
       },
@@ -603,7 +600,8 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
 
   void _showOptionsBottomSheet({
     required String label,
-    required List<String> options,
+    List<String> options = const [],
+    List<String> Function()? optionsGetter,
     required String? currentValue,
     required ValueChanged<String?> onSelect,
     bool showClearOption = true, // Gender için false olacak
@@ -615,6 +613,7 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
       builder: (context) => _SearchableOptionsSheet(
         label: label,
         options: options,
+        optionsGetter: optionsGetter,
         currentValue: currentValue,
         onSelect: onSelect,
         showClearOption: showClearOption,
@@ -630,20 +629,15 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
     'Herkes',
   ];
 
-  // İl seçenekleri - UniversityData'dan dinamik olarak yükleniyor
-  static final List<String> _cityOptions = UniversityData.getAllCitiesSorted();
-
-  /// Üniversite seçenekleri: İl seçiliyse sadece o ildeki üniversiteler, değilse tümü
+  // Ağır listeler sheet açıldığında getter ile yüklensin (modal açılışında kasma olmasın)
+  static List<String> _getCityOptions() => UniversityData.getAllCitiesSorted();
   List<String> _getUniversityOptions() {
     if (_selectedCity == null || _selectedCity!.isEmpty) {
       return UniversityData.getAllUniversitiesSorted();
     }
     return UniversityData.getUniversitiesInCity(_selectedCity!);
   }
-
-  // Bölüm seçenekleri - TurkishUniversities'ten (popülerler üstte, arama ile)
-  static final List<String> _departmentOptions =
-      TurkishUniversities.getAllDepartmentsSorted();
+  static List<String> _getDepartmentOptions() => TurkishUniversities.getAllDepartmentsSorted();
 
   static final List<String> _gradeOptions = [
     'Hazırlık',
@@ -656,16 +650,20 @@ class _FiltersModalState extends ConsumerState<FiltersModal> {
 }
 
 /// Arama Özellikli Seçenek Listesi
+/// [optionsGetter]: Ağır listeler için sheet açılınca yüklenir (performans).
+/// [options]: Küçük listeler için doğrudan (cinsiyet, sınıf).
 class _SearchableOptionsSheet extends StatefulWidget {
   final String label;
   final List<String> options;
+  final List<String> Function()? optionsGetter;
   final String? currentValue;
   final ValueChanged<String?> onSelect;
   final bool showClearOption;
 
   const _SearchableOptionsSheet({
     required this.label,
-    required this.options,
+    this.options = const [],
+    this.optionsGetter,
     required this.currentValue,
     required this.onSelect,
     required this.showClearOption,
@@ -676,13 +674,17 @@ class _SearchableOptionsSheet extends StatefulWidget {
 }
 
 class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
+  late List<String> _allOptions;
   late List<String> _filteredOptions;
   final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _filteredOptions = widget.options;
+    _allOptions = widget.optionsGetter != null
+        ? widget.optionsGetter!()
+        : widget.options;
+    _filteredOptions = List.from(_allOptions);
     _searchController.addListener(_filterOptions);
   }
 
@@ -696,9 +698,9 @@ class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filteredOptions = widget.options;
+        _filteredOptions = List.from(_allOptions);
       } else {
-        _filteredOptions = widget.options
+        _filteredOptions = _allOptions
             .where((option) => option.toLowerCase().contains(query))
             .toList();
       }
@@ -707,19 +709,25 @@ class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag Handle
-          Container(
+    final mediaQuery = MediaQuery.of(context);
+    final bottomInset = mediaQuery.viewInsets.bottom;
+    final screenHeight = mediaQuery.size.height;
+    // Klavye açıkken sheet tamamen klavyenin üstünde kalsın; liste seçilebilir olsun
+    final maxSheetHeight = (screenHeight - bottomInset - mediaQuery.padding.top - 24).clamp(200.0, screenHeight * 0.85);
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        constraints: BoxConstraints(maxHeight: maxSheetHeight),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag Handle
+            Container(
             margin: const EdgeInsets.only(top: 12),
             width: 40,
             height: 4,
@@ -745,7 +753,7 @@ class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
           const Divider(height: 1),
 
           // Search Field (Sadece çok seçenek varsa göster)
-          if (widget.options.length > 10)
+          if (_allOptions.length > 10)
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -776,10 +784,9 @@ class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
               ),
             ),
 
-          // Options List
-          Flexible(
+          // Options List: Expanded ile klavye üstünde kalan alanda scroll, seçenekler tıklanabilir
+          Expanded(
             child: ListView.builder(
-              shrinkWrap: true,
               itemCount: widget.showClearOption ? _filteredOptions.length + 1 : _filteredOptions.length,
               itemBuilder: (context, index) {
                 if (widget.showClearOption && index == 0) {
@@ -832,9 +839,9 @@ class _SearchableOptionsSheetState extends State<_SearchableOptionsSheet> {
               },
             ),
           ),
-
           const SizedBox(height: 20),
         ],
+        ),
       ),
     );
   }

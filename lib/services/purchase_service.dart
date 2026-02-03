@@ -591,43 +591,28 @@ class PurchaseService {
   static List<Map<String, dynamic>> get premiumFeatures => [
         {
           'icon': '💖',
-          'title': 'Sinirsiz Beğeni',
-          'description': 'Istedigin kadar kisiye super like gonder',
+          'title': 'Sınırsız Beğeni',
+          'description': 'İstediğin kadar kişiye beğeni gönder',
         },
         {
           'icon': '👁️',
-          'title': 'Kimin Begendini Gor',
-          'description': 'Seni kim begendi, hepsini gor',
+          'title': 'Kimin İstek Attığını Gör',
+          'description': 'Sana kim istek attı, hepsini gör ve onlarla eşleş',
         },
         {
           'icon': '⚡',
-          'title': 'Oncelikli Gosterim',
-          'description': 'Profilin daha cok kisiye gosterilir',
+          'title': 'Öncelikli Gösterim',
+          'description': 'Profilin daha çok kişiye gösterilir',
         },
         {
           'icon': '🔄',
-          'title': 'Sinirsiz Geri Al',
-          'description': 'Yanlis swipe\'lari geri al',
+          'title': '5 Geri Al Hakkı',
+          'description': 'Yanlış kaydırdıklarını ayda 5 kez geri al',
         },
         {
           'icon': '🎯',
-          'title': 'Gelismis Filtreler',
-          'description': 'Universite, bolum ve ilgi alanlarina gore filtrele',
-        },
-        {
-          'icon': '👑',
-          'title': 'Premium Rozet',
-          'description': 'Profilinde ozel premium rozeti gorun',
-        },
-        {
-          'icon': '🚫',
-          'title': 'Reklamsiz Deneyim',
-          'description': 'Hic reklam gormeden kesfet',
-        },
-        {
-          'icon': '📍',
-          'title': 'Konum Degistir',
-          'description': 'Istedigin kampuste kesfet',
+          'title': 'Gelişmiş Filtreler',
+          'description': "Üniversite, bölüm ve il'e göre filtrele",
         },
       ];
 }

@@ -403,12 +403,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
         confirmButtonColor: const Color(0xFFFFB300),
         onConfirm: () async {
           Navigator.pop(dialogContext);
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PremiumOfferScreen(),
-            ),
-          );
+          await Navigator.push(context, PremiumOfferScreen.route());
         },
         cancelText: 'İptal',
         onCancel: () => Navigator.pop(dialogContext),
@@ -673,9 +668,7 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                       HapticFeedback.mediumImpact();
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => const PremiumOfferScreen(),
-                        ),
+                        PremiumOfferScreen.route(),
                       );
 
                       // Premium aktif olduysa sayfa otomatik yenilenecek (StreamBuilder sayesinde)
@@ -719,7 +712,9 @@ class _LikesScreenState extends ConsumerState<LikesScreen>
                 const SizedBox(height: 8),
                 _buildFeatureBadge('⚡ Öncelikli Gösterim'),
                 const SizedBox(height: 8),
-                _buildFeatureBadge('👑 Premium Rozet'),
+                _buildFeatureBadge('🔄 Geri Al Özelliği'),
+                const SizedBox(height: 8),
+                _buildFeatureBadge('🎯 Gelişmiş Filtreler'),
               ],
             ),
           ),

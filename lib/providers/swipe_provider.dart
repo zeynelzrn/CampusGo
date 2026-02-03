@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
 import '../utils/network_utils.dart';
@@ -131,16 +132,21 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
         filterGrade = state.filterGrade;
         debugPrint('🔒 [Initialize] Mevcut filtreler korunuyor (Gender: $genderFilter, City: $filterCity)');
       } else {
-        // Uygulama tamamen kapatılıp açıldığında filtreler sıfırlanır (sadece bellekte tutuluyor)
+        // Uygulama tamamen kapatılıp açıldığında: sadece "Kiminle tanışmak istiyorsun?" kalıcı, diğerleri sıfırlanır
         filterCity = null;
         filterUniversity = null;
         filterDepartment = null;
         filterGrade = null;
-        genderFilter = await _repository.getUserLookingForPreference();
+        // Cinsiyet filtresi: önce kayıtlı tercihten yükle (SharedPreferences)
+        final prefs = await SharedPreferences.getInstance();
+        genderFilter = prefs.getString('filter_gender');
         if (genderFilter == null || genderFilter.isEmpty) {
-          genderFilter = 'Herkes';
+          genderFilter = await _repository.getUserLookingForPreference();
+          if (genderFilter == null || genderFilter.isEmpty) {
+            genderFilter = 'Herkes';
+          }
         }
-        debugPrint('🔄 [Initialize] Filtreler sıfırlandı (app cold start) - Gender: $genderFilter, diğerleri: null');
+        debugPrint('🔄 [Initialize] Cold start - Gender kalıcı: $genderFilter, diğer filtreler sıfırlandı');
       }
 
       state = state.copyWith(
@@ -442,7 +448,13 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
     debugPrint('   - department: $department');
     debugPrint('   - grade: $grade');
 
-    // Filtreler sadece bellekte tutulur; app tamamen kapatılınca sıfırlanır
+    // Sadece cinsiyet filtresi kalıcı (SharedPreferences); diğerleri sadece bellekte
+    final prefs = await SharedPreferences.getInstance();
+    if (gender != null && gender.isNotEmpty) {
+      await prefs.setString('filter_gender', gender);
+    } else {
+      await prefs.remove('filter_gender');
+    }
     state = state.copyWith(
       genderFilter: gender,
       clearGenderFilter: gender == null,
@@ -471,6 +483,8 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
   /// Tüm Filtreleri Temizle
   Future<void> clearFilters() async {
     debugPrint('🗑️ [SwipeProvider] Filtreler temizlendi (Gender: Herkes)');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('filter_gender', 'Herkes');
 
     state = state.copyWith(
       genderFilter: 'Herkes',         // ✅ Gender "Herkes"e dönüyor
