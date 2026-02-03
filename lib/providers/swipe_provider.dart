@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_profile.dart';
 import '../repositories/swipe_repository.dart';
 import '../utils/network_utils.dart';
@@ -124,7 +123,7 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
       String? filterGrade;
       
       if (preserveFilters) {
-        // Refresh sırasında mevcut filtreyi koru
+        // Refresh sırasında mevcut filtreyi koru (arka plandan dönünce aynı kalır)
         genderFilter = state.genderFilter;
         filterCity = state.filterCity;
         filterUniversity = state.filterUniversity;
@@ -132,27 +131,16 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
         filterGrade = state.filterGrade;
         debugPrint('🔒 [Initialize] Mevcut filtreler korunuyor (Gender: $genderFilter, City: $filterCity)');
       } else {
-        // İlk açılışta SharedPreferences'tan yükle
-        final prefs = await SharedPreferences.getInstance();
-        genderFilter = prefs.getString('filter_gender');
-        filterCity = prefs.getString('filter_city');
-        filterUniversity = prefs.getString('filter_university');
-        filterDepartment = prefs.getString('filter_department');
-        filterGrade = prefs.getString('filter_grade');
-        
-        // Eğer SharedPreferences'ta kayıtlı filtre yoksa, database'den yükle (sadece gender için)
-        if (genderFilter == null || genderFilter.isEmpty) {
-          genderFilter = await _repository.getUserLookingForPreference();
-          debugPrint('📥 [Initialize] Gender filter database\'den yüklendi: $genderFilter');
-        } else {
-          debugPrint('💾 [Initialize] Filtreler SharedPreferences\'tan yüklendi (Gender: $genderFilter, City: $filterCity)');
-        }
-        
-        // Gender filter hala null ise, default olarak "Herkes" yap
+        // Uygulama tamamen kapatılıp açıldığında filtreler sıfırlanır (sadece bellekte tutuluyor)
+        filterCity = null;
+        filterUniversity = null;
+        filterDepartment = null;
+        filterGrade = null;
+        genderFilter = await _repository.getUserLookingForPreference();
         if (genderFilter == null || genderFilter.isEmpty) {
           genderFilter = 'Herkes';
-          debugPrint('🔧 [Initialize] Gender filter otomatik "Herkes" olarak ayarlandı');
         }
+        debugPrint('🔄 [Initialize] Filtreler sıfırlandı (app cold start) - Gender: $genderFilter, diğerleri: null');
       }
 
       state = state.copyWith(
@@ -454,35 +442,7 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
     debugPrint('   - department: $department');
     debugPrint('   - grade: $grade');
 
-    // Filtreleri SharedPreferences'a kaydet
-    final prefs = await SharedPreferences.getInstance();
-    if (gender != null) {
-      await prefs.setString('filter_gender', gender);
-    } else {
-      await prefs.remove('filter_gender');
-    }
-    if (city != null) {
-      await prefs.setString('filter_city', city);
-    } else {
-      await prefs.remove('filter_city');
-    }
-    if (university != null) {
-      await prefs.setString('filter_university', university);
-    } else {
-      await prefs.remove('filter_university');
-    }
-    if (department != null) {
-      await prefs.setString('filter_department', department);
-    } else {
-      await prefs.remove('filter_department');
-    }
-    if (grade != null) {
-      await prefs.setString('filter_grade', grade);
-    } else {
-      await prefs.remove('filter_grade');
-    }
-    debugPrint('💾 [SwipeProvider] Filtreler SharedPreferences\'a kaydedildi');
-
+    // Filtreler sadece bellekte tutulur; app tamamen kapatılınca sıfırlanır
     state = state.copyWith(
       genderFilter: gender,
       clearGenderFilter: gender == null,
@@ -510,14 +470,6 @@ class SwipeNotifier extends StateNotifier<SwipeState> {
 
   /// Tüm Filtreleri Temizle
   Future<void> clearFilters() async {
-    // SharedPreferences'tan filtreleri temizle
-    final prefs = await SharedPreferences.getInstance();
-    // Gender'ı "Herkes"e ayarla, diğerlerini sil
-    await prefs.setString('filter_gender', 'Herkes');
-    await prefs.remove('filter_city');
-    await prefs.remove('filter_university');
-    await prefs.remove('filter_department');
-    await prefs.remove('filter_grade');
     debugPrint('🗑️ [SwipeProvider] Filtreler temizlendi (Gender: Herkes)');
 
     state = state.copyWith(

@@ -589,6 +589,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen>
 
     return GestureDetector(
       onTap: () {
+        HapticFeedback.selectionClick();
         showModalBottomSheet(
           context: context,
           backgroundColor: Colors.transparent,

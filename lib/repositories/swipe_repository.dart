@@ -387,18 +387,22 @@ class SwipeRepository {
       }
 
       // ⚠️ NOT: Genel sorguda isNotEqualTo kullanıldığı için whereNotIn eklenemez (Firestore kısıtlaması)
-      // Bu yüzden burada sadece client-side filtreleme yapıyoruz
+      // Bu yüzden diğer excluded ID'ler client-side filtreleniyor
 
       try {
         final generalSnapshot = await generalQuery.get();
-        // Tüm excluded ID'leri client-side filtrele
-        final generalProfiles = generalSnapshot.docs
+        final allFromGeneral = generalSnapshot.docs
             .map((doc) => UserProfile.fromFirestore(doc))
-            .where((profile) => 
-              profile.isComplete && 
-              profile.id != userId &&
-              !excluded.contains(profile.id))
+            .where((p) => p.isComplete && p.id != userId)
             .toList();
+        // excludedIds'te olanları ele (kendi ID veya daha önce aksiyon alınanlar)
+        final eliminated = allFromGeneral.where((p) => excluded.contains(p.id)).toList();
+        final generalProfiles = allFromGeneral.where((p) => !excluded.contains(p.id)).toList();
+        if (eliminated.isNotEmpty) {
+          for (final p in eliminated) {
+            debugPrint('   🚫 Genel havuzdan elenen: ${p.id} (${p.name}) ${p.id == userId ? "- KENDİ PROFİLİM" : "- excludedIds\'te"}');
+          }
+        }
 
         allProfiles.addAll(generalProfiles);
 
@@ -406,9 +410,43 @@ class SwipeRepository {
           finalLastDoc = generalSnapshot.docs.last;
         }
 
-        debugPrint('✅ Genel sorgu: ${generalProfiles.length} profil bulundu (Client-side: ${excluded.length} kişi elendi)');
+        debugPrint('✅ Genel sorgu: ${generalProfiles.length} profil bulundu (Server: ${generalSnapshot.docs.length} doc, elenen: ${eliminated.length}, excludedIds: ${excluded.length})');
       } catch (e) {
         debugPrint('⚠️ Genel sorgu hatası: $e');
+      }
+    }
+
+    // ============ ADIM 3: FALLBACK: universityCity null/boş kullanıcılar (genel 0 döndüyse) ============
+    // Firestore'da universityCity null olanlar isNotEqualTo('İstanbul') ile gelmez; bu yüzden ayrı çekiyoruz
+    if (allProfiles.isEmpty && lastDocument == null) {
+      try {
+        debugPrint('📍 Genel havuz 0 döndü; universityCity null/boş kullanıcılar deneniyor...');
+        final nullCityQuery = _usersCollection
+            .orderBy('createdAt', descending: true)
+            .limit(50);
+        final nullCitySnapshot = await nullCityQuery.get();
+        final nullCityProfiles = nullCitySnapshot.docs
+            .map((doc) => UserProfile.fromFirestore(doc))
+            .where((p) {
+              if (!p.isComplete || p.id == userId || excluded.contains(p.id)) return false;
+              if (p.universityCity != null && p.universityCity!.isNotEmpty) return false;
+              // Cinsiyet filtresi: Kadın/Erkek seçiliyse sadece o cinsiyet
+              if (genderFilter != null && genderFilter.isNotEmpty && genderFilter != 'Herkes') {
+                if (p.gender != genderFilter) return false;
+              }
+              return true;
+            })
+            .take(fetchBatchSize)
+            .toList();
+        allProfiles.addAll(nullCityProfiles);
+        if (nullCityProfiles.isNotEmpty) {
+          if (nullCitySnapshot.docs.isNotEmpty) {
+            finalLastDoc = nullCitySnapshot.docs.last;
+          }
+          debugPrint('✅ universityCity null/boş: ${nullCityProfiles.length} profil eklendi');
+        }
+      } catch (e) {
+        debugPrint('⚠️ universityCity null fallback hatası: $e');
       }
     }
 
