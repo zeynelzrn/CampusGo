@@ -93,6 +93,14 @@ class AuthService {
   // EMAIL DOĞRULAMA (VERIFICATION) İŞLEMLERİ
   // ═══════════════════════════════════════════════════════════════
 
+  /// Test hesapları e-posta doğrulamasından muaf (doğrudan ana sayfaya geçiş).
+  /// Sadece 'test-' ile başlayan e-postalar.
+  static bool isTestEmail(String? email) {
+    if (email == null || email.isEmpty) return false;
+    final e = email.trim().toLowerCase();
+    return e.startsWith('test-');
+  }
+
   /// E-posta doğrulama linki gönder
   Future<Map<String, dynamic>> sendEmailVerification() async {
     try {
@@ -118,11 +126,17 @@ class AuthService {
     }
   }
 
-  /// E-posta doğrulama durumunu kontrol et (reload ile güncel bilgi al)
+  /// E-posta doğrulama durumunu kontrol et (reload ile güncel bilgi al).
+  /// Test e-postaları (test-* ile başlayanlar) için true döner, doğrulama atlanır.
   Future<bool> checkEmailVerified() async {
     try {
       final user = _auth.currentUser;
       if (user == null) return false;
+
+      if (isTestEmail(user.email)) {
+        debugPrint('AuthService: Test account, skipping email verification');
+        return true;
+      }
 
       await user.reload();
       final refreshedUser = _auth.currentUser;

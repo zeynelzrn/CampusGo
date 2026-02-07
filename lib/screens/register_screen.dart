@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import 'create_profile_screen.dart';
 
@@ -19,8 +21,10 @@ class _RegisterScreenState extends State<RegisterScreen>
   final AuthService _authService = AuthService();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _agreeToTerms = false; // EULA & Gizlilik (Zorunlu)
-  bool _agreeToCommercialNotifications = false; // ETK - Ticari İleti (İsteğe Bağlı)
+  bool _agreeToTermsAndAge = false;   // 18 yaş + Kullanıcı Sözleşmesi (Zorunlu)
+  bool _agreeToPrivacy = false;      // Gizlilik Politikası (Zorunlu)
+  bool _agreeToKvkk = false;         // KVKK Açık Rıza (Zorunlu)
+  bool _agreeToCommercialNotifications = false; // Ticari İleti (Opsiyonel)
   bool _isLoading = false;
 
   late AnimationController _animationController;
@@ -103,15 +107,90 @@ class _RegisterScreenState extends State<RegisterScreen>
     });
   }
 
-  void _toggleTermsAgreement(bool? value) {
-    setState(() {
-      _agreeToTerms = value ?? false;
-    });
+  bool get _allRequiredAgreementsChecked =>
+      _agreeToTermsAndAge && _agreeToPrivacy && _agreeToKvkk;
 
-    if (_agreeToTerms) {
+  void _toggleTermsAndAge(bool? value) {
+    setState(() => _agreeToTermsAndAge = value ?? false);
+    _updateButtonAnimation();
+  }
+
+  void _togglePrivacy(bool? value) {
+    setState(() => _agreeToPrivacy = value ?? false);
+    _updateButtonAnimation();
+  }
+
+  void _toggleKvkk(bool? value) {
+    setState(() => _agreeToKvkk = value ?? false);
+    _updateButtonAnimation();
+  }
+
+  void _updateButtonAnimation() {
+    if (_allRequiredAgreementsChecked) {
       _buttonAnimationController.forward();
     } else {
-      _buttonAnimationController.reverse(); // Hızlı deaktivasyon
+      _buttonAnimationController.reverse();
+    }
+  }
+
+  Future<void> _launchLegalUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _onRegisterTap() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeToTermsAndAge || !_agreeToPrivacy || !_agreeToKvkk) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Lütfen tüm zorunlu onay kutucuklarını işaretleyin.',
+            ),
+            backgroundColor: const Color(0xFF5C6BC0),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    setState(() => _isLoading = true);
+    final result = await _authService.register(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      isCommercialNotificationsEnabled: _agreeToCommercialNotifications,
+    );
+    setState(() => _isLoading = false);
+    if (result['success'] == true) {
+      _buttonAnimationController.reverse().then((_) {
+        _buttonAnimationController.forward();
+      });
+      if (mounted) {
+        _showModernNotification(
+          message: 'Hesabın başarıyla oluşturuldu! Şimdi profilini oluştur.',
+          isSuccess: true,
+          icon: Icons.celebration_rounded,
+        );
+        Future.delayed(const Duration(milliseconds: 800)).then((_) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CreateProfileScreen(),
+              ),
+            );
+          }
+        });
+      }
+    } else {
+      if (mounted) {
+        _showModernNotification(
+          message: result['error'] as String? ?? 'Bir hata oluştu',
+          isSuccess: false,
+        );
+      }
     }
   }
 
@@ -637,6 +716,41 @@ class _RegisterScreenState extends State<RegisterScreen>
     );
   }
 
+  /// Metin içinde tıklanabilir link (indigo/mor tema, mavi/altı çizili)
+  /// TextSpan + recognizer kullanımı tıklamanın güvenilir çalışmasını sağlar
+  Widget _buildLinkText({
+    required String prefix,
+    required String linkText,
+    required String linkUrl,
+    required String suffix,
+  }) {
+    return RichText(
+      text: TextSpan(
+        style: GoogleFonts.poppins(
+          fontSize: 13,
+          color: Colors.grey[700],
+          height: 1.4,
+        ),
+        children: [
+          if (prefix.isNotEmpty) TextSpan(text: prefix),
+          TextSpan(
+            text: linkText,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: const Color(0xFF5C6BC0),
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+              decorationColor: const Color(0xFF5C6BC0),
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => _launchLegalUrl(linkUrl),
+          ),
+          TextSpan(text: suffix),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -892,59 +1006,52 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                               const SizedBox(height: 20),
 
-                              // 1. Checkbox - EULA & Gizlilik (Zorunlu)
+                              // 1. Zorunlu: 18 yaş + Kullanıcı Sözleşmesi
                               _buildAgreementCheckbox(
-                                isChecked: _agreeToTerms,
-                                onChanged: _toggleTermsAgreement,
+                                isChecked: _agreeToTermsAndAge,
+                                onChanged: _toggleTermsAndAge,
                                 isRequired: true,
-                                child: RichText(
-                                  text: TextSpan(
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      color: Colors.grey[700],
-                                      height: 1.4,
-                                    ),
-                                    children: [
-                                      WidgetSpan(
-                                        child: GestureDetector(
-                                          onTap: _showEulaDialog,
-                                          child: Text(
-                                            'Kullanıcı Sözleşmesi (EULA)',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 13,
-                                              color: const Color(0xFF5C6BC0),
-                                              fontWeight: FontWeight.w600,
-                                              decoration: TextDecoration.underline,
-                                              decorationColor: const Color(0xFF5C6BC0),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const TextSpan(text: ' ve '),
-                                      WidgetSpan(
-                                        child: GestureDetector(
-                                          onTap: _showPrivacyPolicyDialog,
-                                          child: Text(
-                                            'Gizlilik Politikası',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 13,
-                                              color: const Color(0xFF5C6BC0),
-                                              fontWeight: FontWeight.w600,
-                                              decoration: TextDecoration.underline,
-                                              decorationColor: const Color(0xFF5C6BC0),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const TextSpan(text: '\'nı okudum, kabul ediyorum.'),
-                                    ],
-                                  ),
+                                child: _buildLinkText(
+                                  prefix: '18 yaşından büyük olduğumu, ',
+                                  linkText: 'Kullanıcı Sözleşmesi',
+                                  linkUrl: 'https://campusgo.app/yasal#kullanim',
+                                  suffix: '\'ni okuduğumu ve kabul ettiğimi beyan ederim.',
                                 ),
                               ),
 
                               const SizedBox(height: 12),
 
-                              // 2. Checkbox - Ticari Elektronik İleti / ETK (İsteğe Bağlı)
+                              // 2. Zorunlu: Gizlilik Politikası
+                              _buildAgreementCheckbox(
+                                isChecked: _agreeToPrivacy,
+                                onChanged: _togglePrivacy,
+                                isRequired: true,
+                                child: _buildLinkText(
+                                  prefix: '',
+                                  linkText: 'Gizlilik Politikası',
+                                  linkUrl: 'https://campusgo.app/yasal#gizlilik',
+                                  suffix: ' metnini okudum.',
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // 3. Zorunlu: KVKK Açık Rıza
+                              _buildAgreementCheckbox(
+                                isChecked: _agreeToKvkk,
+                                onChanged: _toggleKvkk,
+                                isRequired: true,
+                                child: _buildLinkText(
+                                  prefix: '',
+                                  linkText: 'KVKK Açık Rıza Metni',
+                                  linkUrl: 'https://campusgo.app/yasal#kvkk',
+                                  suffix: ' çerçevesinde verilerimin işlenmesine izin veriyorum.',
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // 4. Opsiyonel: Ticari Elektronik İleti (en altta)
                               _buildAgreementCheckbox(
                                 isChecked: _agreeToCommercialNotifications,
                                 onChanged: _toggleCommercialNotifications,
@@ -973,7 +1080,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                           ),
                                         ),
                                       ),
-                                      const TextSpan(text: ' almayı kabul ediyorum.'),
+                                      const TextSpan(text: ' almayı kabul ediyorum. (Opsiyonel)'),
                                     ],
                                   ),
                                 ),
@@ -1003,7 +1110,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     height: 56,
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(16),
-                                      gradient: _agreeToTerms
+                                      gradient: _allRequiredAgreementsChecked
                                           ? const LinearGradient(
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
@@ -1020,7 +1127,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                               ],
                                             ),
                                       boxShadow: [
-                                        if (_agreeToTerms) ...[
+                                        if (_allRequiredAgreementsChecked) ...[
                                           BoxShadow(
                                             color: const Color(0xFF5C6BC0)
                                                 .withOpacity(0.4 *
@@ -1045,7 +1152,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                     child: Stack(
                                       children: [
                                         // Parıltı efekti
-                                        if (_agreeToTerms)
+                                        if (_allRequiredAgreementsChecked)
                                           Positioned.fill(
                                             child: AnimatedBuilder(
                                               animation:
@@ -1093,74 +1200,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                                         Material(
                                           color: Colors.transparent,
                                           child: InkWell(
-                                            onTap: _agreeToTerms && !_isLoading
-                                                ? () async {
-                                                    if (_formKey.currentState!
-                                                        .validate()) {
-                                                      setState(() =>
-                                                          _isLoading = true);
-
-                                                      final result =
-                                                          await _authService
-                                                              .register(
-                                                        email: _emailController
-                                                            .text
-                                                            .trim(),
-                                                        password:
-                                                            _passwordController
-                                                                .text,
-                                                        isCommercialNotificationsEnabled:
-                                                            _agreeToCommercialNotifications,
-                                                      );
-
-                                                      setState(() =>
-                                                          _isLoading = false);
-
-                                                      if (result['success']) {
-                                                        _buttonAnimationController
-                                                            .reverse()
-                                                            .then((_) {
-                                                          _buttonAnimationController
-                                                              .forward();
-                                                        });
-
-                                                        if (mounted) {
-                                                          _showModernNotification(
-                                                            message:
-                                                                'Hesabın başarıyla oluşturuldu! Şimdi profilini oluştur.',
-                                                            isSuccess: true,
-                                                            icon: Icons
-                                                                .celebration_rounded,
-                                                          );
-
-                                                          // Kısa gecikme ile CreateProfileScreen'e yönlendir
-                                                          await Future.delayed(
-                                                              const Duration(
-                                                                  milliseconds:
-                                                                      800));
-
-                                                          if (mounted) {
-                                                            Navigator
-                                                                .pushReplacement(
-                                                              context,
-                                                              MaterialPageRoute(
-                                                                  builder:
-                                                                      (context) =>
-                                                                          const CreateProfileScreen()),
-                                                            );
-                                                          }
-                                                        }
-                                                      } else {
-                                                        if (mounted) {
-                                                          _showModernNotification(
-                                                            message:
-                                                                result['error'],
-                                                            isSuccess: false,
-                                                          );
-                                                        }
-                                                      }
-                                                    }
-                                                  }
+                                            onTap: _allRequiredAgreementsChecked && !_isLoading
+                                                ? () => _onRegisterTap()
                                                 : null,
                                             borderRadius:
                                                 BorderRadius.circular(16),
@@ -1197,7 +1238,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                                                           color: Colors.white,
                                                         ),
                                                       ),
-                                                    ] else if (_agreeToTerms) ...[
+                                                    ] else if (_allRequiredAgreementsChecked) ...[
                                                       const Icon(
                                                         Icons.rocket_launch,
                                                         color: Colors.white,

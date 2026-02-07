@@ -839,7 +839,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                                   milliseconds:
                                                                       500));
 
-                                                          // E-posta doğrulama kontrolü
+                                                          // E-posta doğrulama kontrolü (test hesapları atlanır)
                                                           final currentUser =
                                                               FirebaseAuth
                                                                   .instance
@@ -856,8 +856,10 @@ class _LoginScreenState extends State<LoginScreen>
                                                                 refreshedUser
                                                                         ?.emailVerified ??
                                                                     false;
+                                                            final isTestAccount =
+                                                                AuthService.isTestEmail(currentUser.email);
 
-                                                            if (!isEmailVerified) {
+                                                            if (!isTestAccount && !isEmailVerified) {
                                                               // E-posta doğrulanmamış, EmailVerificationScreen'e yönlendir
                                                               if (mounted) {
                                                                 Navigator

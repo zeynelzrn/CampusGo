@@ -11,6 +11,7 @@ import '../widgets/app_notification.dart';
 import '../utils/image_helper.dart';
 import '../services/auth_service.dart';
 import 'email_verification_screen.dart';
+import 'main_screen.dart';
 import 'welcome_screen.dart';
 
 class CreateProfileScreen extends ConsumerStatefulWidget {
@@ -380,22 +381,33 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen>
         );
 
     if (success && mounted) {
-      // Profil oluşturuldu, şimdi e-posta doğrulama ekranına git
       final authService = AuthService();
-      
-      _showSuccess('Profil Oluşturuldu',
-          subtitle: 'Şimdi e-posta adresini doğrula!');
+      final isTestAccount = AuthService.isTestEmail(authService.currentUserEmail);
+
+      if (isTestAccount) {
+        _showSuccess('Profil Oluşturuldu', subtitle: 'Hemen keşfetmeye başla!');
+      } else {
+        _showSuccess('Profil Oluşturuldu',
+            subtitle: 'Şimdi e-posta adresini doğrula!');
+      }
 
       await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EmailVerificationScreen(
-              email: authService.currentUserEmail,
+        if (isTestAccount) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => EmailVerificationScreen(
+                email: authService.currentUserEmail,
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     }
   }

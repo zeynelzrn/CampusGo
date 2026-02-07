@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../repositories/profile_repository.dart';
+import '../services/auth_service.dart';
 import '../services/purchase_service.dart';
 import 'welcome_screen.dart';
 import 'main_screen.dart';
@@ -86,12 +87,13 @@ class _SplashScreenState extends State<SplashScreen>
       // Güncel doğrulama durumunu al
       await currentUser.reload();
       final refreshedUser = FirebaseAuth.instance.currentUser;
+      final isTestAccount = AuthService.isTestEmail(refreshedUser?.email);
       final isEmailVerified = refreshedUser?.emailVerified ?? false;
 
       if (!mounted) return;
 
-      // E-posta doğrulanmamışsa, doğrulama ekranına yönlendir
-      if (!isEmailVerified) {
+      // Test hesapları (test-* ile başlayanlar) doğrulama ekranına takılmaz
+      if (!isTestAccount && !isEmailVerified) {
         _navigateTo(EmailVerificationScreen(email: currentUser.email));
         return;
       }

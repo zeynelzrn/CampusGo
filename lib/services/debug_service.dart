@@ -175,16 +175,15 @@ class DebugService {
 
   // ==================== DELETE DEMO USERS (SIMPLE UID WHITELIST) ====================
 
-  /// PROTECTED UIDs: Only these 3 accounts will NEVER be deleted
-  /// Everything else gets deleted - no email checks, no domain checks
+  /// PROTECTED UIDs: Sadece bu 4 hesap ASLA silinmez, diger herkes silinir
   static const List<String> _protectedUids = [
     'WEacRnjytahh7cL74fvdT4H0Fpx1', // Ana geliştirici hesabı (Yaşar Üniversitesi)
     'KJcDoC0XTZZRAKP6QNu6ahOugCA3', // Test hesabı - Zeynel Zeren
     'GEE22M3nqpNR890Fz4igFIzFQoj1', // Test hesabı - Zeynel TCR
+    'ylO6E1fk3VTtyMrv7kjDFzhYIuC2', // 4. korunan hesap
   ];
 
-  /// Delete all users EXCEPT the 2 protected UIDs
-  /// Simple and clean - no complex email/domain logic
+  /// Delete all users EXCEPT the 4 protected UIDs.
   Future<Map<String, dynamic>> deleteAllDemoUsers() async {
     int deletedUsers = 0;
     int protectedUsers = 0;
@@ -194,7 +193,7 @@ class DebugService {
     try {
       debugPrint('');
       debugPrint('╔═══════════════════════════════════════════════════════╗');
-      debugPrint('║         SIMPLE UID WHITELIST - 2fl HESAP KORUMALI       ║');
+      debugPrint('║         SIMPLE UID WHITELIST - 4 HESAP KORUMALI        ║');
       debugPrint('╠═══════════════════════════════════════════════════════╣');
       debugPrint('║  Korunan UID\'ler:');
       for (final uid in _protectedUids) {
@@ -215,7 +214,6 @@ class DebugService {
         final email = data['email'] as String? ?? 'NO_EMAIL';
         final name = data['name'] as String? ?? 'NO_NAME';
 
-        // TEK KONTROL: UID listede mi?
         if (_protectedUids.contains(docId)) {
           debugPrint('🔐 KORUNDU: $email ($name) [UID: $docId]');
           protectedUsers++;
@@ -257,15 +255,17 @@ class DebugService {
 
   /// Delete all subcollections for a user
   Future<void> _deleteUserSubcollections(DocumentReference userRef) async {
-    // List of ALL known subcollections (including seen_users for complete reset)
+    // List of ALL known subcollections (uygulamadaki tum alt koleksiyonlar)
     final subcollections = [
       'matches',
       'sent_likes',
       'received_likes',
       'dislikes',
-      'seen_users',  // In case this is used
-      'blocked',     // In case blocking feature exists
-      'likes',       // Alternative naming
+      'seen_users',
+      'blocked',
+      'likes',
+      'blocked_users', // Engel listesi
+      'blocked_by',    // Beni engelleyenler
     ];
 
     for (final subcollection in subcollections) {
